@@ -21,7 +21,7 @@ class Carrier:
         package through that service. If the package cannot be sent through
         that service, an exception should be raised.
         """
-        return Money('0.00', 'USD')
+        raise NotImplementedError
 
 
 class Service:
