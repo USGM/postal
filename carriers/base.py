@@ -12,7 +12,7 @@ from money import Money
 
 
 class Carrier:
-    def get_services(self, package=None):
+    def get_services(self, package):
         return []
 
     def quote(self, service, package):
