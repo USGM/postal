@@ -3,8 +3,24 @@ This is the module for interfacing with FedEx's web services APIs.
 """
 import inspect
 import os
+import re
+
 from suds.client import Client
+from suds.plugin import MessagePlugin
 from base import Carrier
+
+
+class ClearEmpty(MessagePlugin):
+    def clear_empty_tags(self, tags):
+        for tag in tags:
+            children = tag.getChildren()[:]
+            if children:
+                self.clear_empty_tags(children)
+            if re.match(r'^<[^>]+?/>$', tag.plain()):
+                tag.parent.remove(tag)
+
+    def marshalled(self, context):
+        self.clear_empty_tags(context.envelope.getChildren()[:])
 
 
 class FedExApi(Carrier):
@@ -23,12 +39,13 @@ class FedExApi(Carrier):
         full_path = os.path.join(base_path, 'RateService_v14.wsdl')
         url = "file://%s" % full_path
 
-        self.rates_client = Client(url)
+        self.rates_client = Client(url, plugins=[ClearEmpty()])
 
         full_path = os.path.join(
             base_path, 'PackageMovementInformationService_v5.wsdl')
         url = "file://%s" % full_path
-        self.movement_client = Client(url)
+        self.movement_client = Client(url, plugins=[ClearEmpty()])
+
 
     def authentication(self):
         auth = self.rates_client.factory.create('WebAuthenticationDetail')
@@ -88,22 +105,17 @@ class FedExApi(Carrier):
         target.Address.City = address.city
         target.Address.PostalCode = address.postal_code
         target.Address.CountryCode = address.country.alpha2
-        target.Address.CountryName = address.country.name
         target.Address.StateOrProvinceCode = address.subdivision
 
     def requested_shipment(self, package):
         request = self.rates_client.factory.create('RequestedShipment')
+        request.DropoffType = 'REGULAR_PICKUP'
 
         packaging = self.rates_client.factory.create('PackagingType')
         request.PackagingType = packaging.YOUR_PACKAGING
 
         self.set_address(request.Shipper, package.origin)
         self.set_address(request.Recipient, package.destination)
-
-        payment = request.ShippingChargesPayment
-        payment.PaymentType.value = 'SENDER'
-        payment.Payor.ResponsibleParty.AccountNumber = self.account_number
-        self.set_address(payment.Payor.ResponsibleParty, package.origin)
 
         request.RateRequestTypes = 'LIST'
         request.PackageCount = 1
@@ -120,12 +132,13 @@ class FedExApi(Carrier):
         client = self.user_client()
         transaction_detail = self.transaction_detail()
         version = self.rates_version_id()
-        return_transit = False
+        return_transit = True
         codes = []
+        variable_options = []
         requested_shipment = self.requested_shipment(package)
         print self.rates_client.service.getRates(
             auth, client, transaction_detail, version, return_transit, codes,
-            requested_shipment)
+            variable_options, requested_shipment)
 
     def quote(self, service, package):
         pass

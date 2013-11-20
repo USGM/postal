@@ -24,7 +24,7 @@ test_to = {
 
 import logging
 logging.basicConfig(level=logging.INFO)
-logging.getLogger('suds.client').setLevel(logging.DEBUG)
+logging.getLogger('suds.transport').setLevel(logging.DEBUG)
 
 class TestFedEx(unittest.TestCase):
 
