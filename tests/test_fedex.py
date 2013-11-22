@@ -1,4 +1,5 @@
 import unittest
+from ..carriers.base import Service
 
 from ..carriers.fedex import FedExApi
 from ..data import Address, Package
@@ -22,9 +23,10 @@ test_to = {
     'subdivision': 'TX',
     'country': 'US'}
 
-import logging
-logging.basicConfig(level=logging.INFO)
-logging.getLogger('suds.transport').setLevel(logging.DEBUG)
+#import logging
+#logging.basicConfig(level=logging.INFO)
+#logging.getLogger('suds.transport').setLevel(logging.DEBUG)
+
 
 class TestFedEx(unittest.TestCase):
 
@@ -35,7 +37,13 @@ class TestFedEx(unittest.TestCase):
         self.package = Package(2, 3, 4, 5, self.test_from, self.test_to)
 
     def test_get_services(self):
-        self.fedex.get_services(self.package)
+        services = self.fedex.get_services(self.package)
+        self.assertTrue(services)
+        for service in services:
+            self.assertTrue(isinstance(service, Service))
+
+        for service in services:
+            print service, service.get_delivery_date(), service.get_price(self.package)
 
 if __name__ == '__main__':
     unittest.main()

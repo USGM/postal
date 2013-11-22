@@ -60,6 +60,14 @@ class Package:
         if imperial:
             self.metricize()
 
+    def __hash__(self):
+        dimensions = 'x'.join(map(str, sorted(
+            [self.length, self.width, self.height, self.weight])))
+        return hash((
+            dimensions, self.origin.postal_code, self.origin.country,
+            self.origin.postal_code, self.destination.country,
+            self.destination.postal_code))
+
     @staticmethod
     def to_centimeters(number):
         return number * 2.54

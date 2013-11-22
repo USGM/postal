@@ -15,14 +15,14 @@ class AddressError(PostalError):
     """
 
 
-class CarrierObjection(PostalError):
+class CarrierError(PostalError):
     """
     Used when a carrier sends back a complaint about a request that was given
     to it.
     """
 
 
-class ExceedsLimits(PostalError):
+class ExceedsLimitsError(PostalError):
     """
     Used when a requested shipment exceeds the limits of a service.
     """

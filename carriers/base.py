@@ -8,8 +8,6 @@ instantiated by Carrier classes to describe a method by which a package may
 be sent.
 """
 
-from money import Money
-
 
 class Carrier:
     def get_services(self, package):
@@ -26,13 +24,20 @@ class Carrier:
 
 class Service:
     def __init__(
-            self, carrier, service_id, name):
+            self, carrier, service_id, name, delivery_date=None):
         self.carrier = carrier
         # Unique identifier for use with a carrier's get_service() method.
         # This should always be a string.
         self.service_id = service_id
         # The display name for a service, such as 'Priority Mail International'
         self.name = name
+        self.delivery_date = delivery_date
+
+    def __str__(self):
+        return "%s: %s" % (self.carrier.name, self.name)
+
+    def __repr__(self):
+        return "<%s>" % str(self)
 
     def get_price(self, package):
         """
@@ -46,3 +51,10 @@ class Service:
         Should return a date or something. TBD.
         """
         return self.carrier.request_pickup(self.carrier, package)
+
+    def get_delivery_date(self):
+        """
+        This information may need to be specially overwritten, so this data
+        should always be accessed via this overloadable function.
+        """
+        return self.delivery_date
