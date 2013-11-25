@@ -9,6 +9,21 @@ be sent.
 """
 from suds import WebFault
 from ..exceptions import CarrierError
+import re
+from suds.plugin import MessagePlugin
+
+
+class ClearEmpty(MessagePlugin):
+    def clear_empty_tags(self, tags):
+        for tag in tags:
+            children = tag.getChildren()[:]
+            if children:
+                self.clear_empty_tags(children)
+            if re.match(r'^<[^>]+?/>$', tag.plain()):
+                tag.parent.remove(tag)
+
+    def marshalled(self, context):
+        self.clear_empty_tags(context.envelope.getChildren()[:])
 
 
 class Carrier(object):

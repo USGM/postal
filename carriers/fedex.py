@@ -3,29 +3,14 @@ This is the module for interfacing with FedEx's web services APIs.
 """
 import inspect
 import os
-import re
 from datetime import datetime
 
 from suds.client import Client
-from suds.plugin import MessagePlugin
 from money import Money
 
-from base import Carrier, Service
+from base import Carrier, Service, ClearEmpty
 from ..exceptions import ExceedsLimitsError
 from ..data import Address
-
-
-class ClearEmpty(MessagePlugin):
-    def clear_empty_tags(self, tags):
-        for tag in tags:
-            children = tag.getChildren()[:]
-            if children:
-                self.clear_empty_tags(children)
-            if re.match(r'^<[^>]+?/>$', tag.plain()):
-                tag.parent.remove(tag)
-
-    def marshalled(self, context):
-        self.clear_empty_tags(context.envelope.getChildren()[:])
 
 
 class FedExApi(Carrier):

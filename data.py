@@ -36,6 +36,10 @@ class Address:
         self.subdivision = subdivision
         self.residential = residential
         self.country = get_country(country)
+        try:
+            self.country = countries.get(alpha2=country)
+        except KeyError:
+            raise AddressError("Could not find the requested country.")
 
 
 class Package:
