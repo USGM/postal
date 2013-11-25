@@ -36,12 +36,13 @@ class FedExApi(Carrier):
         'FIRST_OVERNIGHT': 'First Overnight',
         'PRIORITY_OVERNIGHT': 'Priority Overnight',
         'STANDARD_OVERNIGHT': 'Standard Overnight',
-        'FEDEX_2_DAY': 'FedEx 2Day',
-        'FEDEX_2_DAY_AM': 'FedEx 2Day AM delivery',
-        'FEDEX_EXPRESS_SAVER': 'FedEx Express Saver',
-        'FEDEX_GROUND': 'FedEx Ground',
-        'FEDEX_HOME_DELIVERY': 'FedEx Home Delivery',
-        'SMART_POST': 'FedEx SmartPost'}
+        'FEDEX_2_DAY': '2Day',
+        'FEDEX_2_DAY_AM': '2Day AM delivery',
+        'FEDEX_EXPRESS_SAVER': 'Express Saver',
+        'FEDEX_GROUND': 'Ground',
+        'FEDEX_HOME_DELIVERY': 'Home Delivery',
+        'SMART_POST': 'SmartPost',
+        'GROUND_HOME_DELIVERY': 'Ground Home Delivery'}
 
     def __init__(self, key, account_number, password, meter_number):
         self.key = key
@@ -68,9 +69,9 @@ class FedExApi(Carrier):
 
     def rates_call(self, *args, **kwargs):
         try:
-            self.rates_client.service.getRates(*args, **kwargs)
+            return self.rates_client.service.getRates(*args, **kwargs)
         except WebFault as err:
-            raise CarrierError(err.message)
+            raise CarrierError(err.document)
 
     def authentication(self):
         auth = self.rates_client.factory.create('WebAuthenticationDetail')
@@ -103,7 +104,7 @@ class FedExApi(Carrier):
         codes = self.rates_client.factory.create('CarrierCodeType')
         return [codes.FDXE, codes.FDXG]
 
-    def line_item(self, package):
+    def line_item(self, request, package):
         item = self.rates_client.factory.create('RequestedPackageLineItem')
         item.SequenceNumber = 1
         item.GroupPackageCount = 1
@@ -115,6 +116,12 @@ class FedExApi(Carrier):
         dimensions.Width = int(round(package.width))
         dimensions.Length = int(round(package.length))
         dimensions.Units = 'CM'
+
+        if package.declarations:
+            value = self.set_declarations(request, package)
+            if value and package.insure:
+                item.InsuredValue.Currency = value.currency
+                item.InsuredValue.Amount = value.amount
 
         return item
 
@@ -130,13 +137,31 @@ class FedExApi(Carrier):
         target_address.PostalCode = address.postal_code
         target_address.CountryCode = address.country.alpha2
         target_address.StateOrProvinceCode = address.subdivision
+        target_address.Residential = address.residential
+
+    def set_declarations(self, request, package):
+        commodities = []
+        total_value = None
+        for declaration in package.declarations:
+            commodity = self.rates_client.factory.create('Commodity')
+            commodity.Description = declaration.description
+            value = declaration.value
+            commodity.UnitPrice.Currency = value.currency
+            commodity.UnitPrice.Amount = value.amount
+            value = value * declaration.units
+            commodity.CustomsValue.Currency = value.currency
+            commodity.CustomsValue.Amount = value.amount
+            commodities.append(commodity)
+            if not total_value:
+                total_value = value
+            else:
+                total_value += value
+        request.CustomsClearanceDetail.Commodities = commodities
+        return total_value
+
 
     def requested_shipment(self, package):
         request = self.rates_client.factory.create('RequestedShipment')
-        request.DropoffType = 'REGULAR_PICKUP'
-
-        packaging = self.rates_client.factory.create('PackagingType')
-        request.PackagingType = packaging.YOUR_PACKAGING
 
         self.set_address(request.Shipper, package.origin)
         self.set_address(request.Recipient, package.destination)
@@ -144,7 +169,8 @@ class FedExApi(Carrier):
         request.RateRequestTypes = 'ACCOUNT'
         request.PackageCount = 1
 
-        request.RequestedPackageLineItems = [self.line_item(package)]
+        request.RequestedPackageLineItems = [self.line_item(request, package)]
+        request.ShipTimestamp = package.ship_datetime
 
         return request
 
@@ -176,11 +202,11 @@ class FedExApi(Carrier):
         client = self.user_client()
         transaction_detail = self.transaction_detail()
         version = self.rates_version_id()
-        return_transit = False
+        return_transit = True
         codes = self.carrier_codes()
         variable_options = []
         requested_shipment = self.requested_shipment(package)
-        response = self.rates_client.service.getRates(
+        response = self.rates_call(
             auth, client, transaction_detail, version, return_transit, codes,
             variable_options, requested_shipment)
         result = self.rate_response_dict(response)

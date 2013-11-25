@@ -8,6 +8,13 @@ from pycountry import countries
 from exceptions import AddressError
 
 
+def get_country(country_code):
+    try:
+        return countries.get(alpha2=country_code)
+    except KeyError:
+        raise AddressError("Could not find the requested country.")
+
+
 class Address:
     """
     Addresses for shipping. Many services have address validation, which can
@@ -16,7 +23,7 @@ class Address:
     def __init__(
             self, contact_name=None, phone_number=None,
             street_lines=None, city=None, subdivision=None,
-            postal_code=None, country=None):
+            postal_code=None, country=None, residential=False):
         # The following should always be needed for any country.
         if not all([contact_name, phone_number, street_lines, city, country]):
             raise AddressError(
@@ -27,10 +34,8 @@ class Address:
         self.city = city
         self.postal_code = postal_code
         self.subdivision = subdivision
-        try:
-            self.country = countries.get(alpha2=country)
-        except KeyError:
-            raise AddressError("Could not find the requested country.")
+        self.residential = residential
+        self.country = get_country(country)
 
 
 class Package:
@@ -47,7 +52,7 @@ class Package:
     def __init__(
             self, length, width, height, weight,
             address_origin, address_destination, declarations=None,
-            insurance=None, imperial=True):
+            insure=False, imperial=True, ship_datetime=None):
         self.length = length
         self.width = width
         self.height = height
@@ -55,7 +60,8 @@ class Package:
         self.origin = address_origin
         self.destination = address_destination
         self.declarations = declarations
-        self.insurance = insurance
+        self.insure = insure
+        self.ship_datetime = ship_datetime
 
         if imperial:
             self.metricize()
@@ -88,6 +94,28 @@ class Package:
         self.length = self.to_centimeters(self.length)
         self.width = self.to_centimeters(self.width)
         self.height = self.to_centimeters(self.height)
+
+
+class Declaration:
+    """
+    Declarations are more useful for international shipments. They allow you to
+    specify what is in the package and what the value of these objects are.
+    """
+    def __init__(self, description, value, origin_country, units):
+        """
+        Special note: If you've got some item that can't be measured in pieces,
+        (such as a liquid), try putting the proper units in the name, and
+        setting units to 1. For example:
+
+        Water (64 fl oz)
+
+        Of course, if you have several 64 fl oz jugs of water, you should
+        set the number of units to how many you have.
+        """
+        self.description = description
+        self.value = value
+        self.units = units
+        self.origin_country = get_country(origin_country)
 
 
 class Shipment:
