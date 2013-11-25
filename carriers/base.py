@@ -7,9 +7,19 @@ This module also contains the base Service class. Service objects are
 instantiated by Carrier classes to describe a method by which a package may
 be sent.
 """
+from suds import WebFault
+from ..exceptions import CarrierError
 
 
 class Carrier:
+
+    @staticmethod
+    def service_call(client, func_name, *args, **kwargs):
+        try:
+            return getattr(client.service, func_name)(*args, **kwargs)
+        except WebFault as err:
+            raise CarrierError(err.document)
+
     def get_services(self, package):
         return []
 

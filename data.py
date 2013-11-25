@@ -48,6 +48,20 @@ class Package:
 
     The units are stored in centimeters and kilograms, but are assumed to be
     entered in inches and pounds unless imperial=False
+
+    ship_datetime should be set to the time you expect to be able to ship the
+    package.
+
+    declarations is a list of Declaration objects, used for customs data
+    and for calculating the insured value.
+
+    When insure is set true, API calls will declare the value of items in a way
+    that intends to pay for an insurance surcharge, if one is available.
+
+    NOTE: While it is referred to as an insured value, not all carriers provide
+    what is legally defined as insurance. The closest analogues are used with
+    each carrier in order to allow for filing claims with the carriers if
+    something should go wrong.
     """
     def __init__(
             self, length, width, height, weight,
@@ -100,6 +114,10 @@ class Declaration:
     """
     Declarations are more useful for international shipments. They allow you to
     specify what is in the package and what the value of these objects are.
+
+    This is also useful when you want to use Insurance, as it automatically
+    calculates the total value and is able to request the desired insured
+    value from upstream.
     """
     def __init__(self, description, value, origin_country, units):
         """

@@ -67,12 +67,6 @@ class FedExApi(Carrier):
         self.contact_type = (
             self.rates_client.factory.create('Party').__class__)
 
-    def rates_call(self, *args, **kwargs):
-        try:
-            return self.rates_client.service.getRates(*args, **kwargs)
-        except WebFault as err:
-            raise CarrierError(err.document)
-
     def authentication(self):
         auth = self.rates_client.factory.create('WebAuthenticationDetail')
         keys = self.rates_client.factory.create('WebAuthenticationCredential')
@@ -159,7 +153,6 @@ class FedExApi(Carrier):
         request.CustomsClearanceDetail.Commodities = commodities
         return total_value
 
-
     def requested_shipment(self, package):
         request = self.rates_client.factory.create('RequestedShipment')
 
@@ -206,7 +199,7 @@ class FedExApi(Carrier):
         codes = self.carrier_codes()
         variable_options = []
         requested_shipment = self.requested_shipment(package)
-        response = self.rates_call(
+        response = self.service_call(self.rates_client, 'getRates',
             auth, client, transaction_detail, version, return_transit, codes,
             variable_options, requested_shipment)
         result = self.rate_response_dict(response)
