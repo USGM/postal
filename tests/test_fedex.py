@@ -26,6 +26,14 @@ test_to = {
     'subdivision': 'TX',
     'country': 'US'}
 
+test_european = {
+    'street_lines': ['House of Commons'],
+    'contact_name': 'Jim Bob',
+    'city': 'London',
+    'postal_code': 'SW1A 0PW',
+    'phone_number': '02072193000',
+    'country': 'GB'}
+
 #import logging
 #logging.basicConfig(level=logging.INFO)
 #logging.getLogger('suds.transport').setLevel(logging.DEBUG)
@@ -37,6 +45,7 @@ class TestFedEx(unittest.TestCase):
         self.fedex = FedExApi(**fedex_credentials)
         self.test_from = Address(**test_from)
         self.test_to = Address(**test_to)
+        self.european_address = Address(**test_european)
         self.package = Package(2, 3, 4, 5, self.test_from, self.test_to)
         self.declarations = [
             Declaration('McGuffin', Money('500.00', 'USD'), 'US', 7),
@@ -53,9 +62,10 @@ class TestFedEx(unittest.TestCase):
         services = self.fedex.get_services(self.package)
         self.assertTrue(services)
         for service in services:
-            if service.delivery_date:
+            if service.delivery_datetime(self.package):
                 self.assertGreater(
-                    service.delivery_date, self.package.ship_datetime)
+                    service.delivery_datetime(self.package),
+                    self.package.ship_datetime)
 
     def test_residential_shipment(self):
         services = self.fedex.get_services(self.package)
@@ -78,11 +88,11 @@ class TestFedEx(unittest.TestCase):
         composite_set = commercial.intersection(residential)
 
         residential = [
-            service.get_price(self.package) for service in services_residential
+            service.price(self.package) for service in services_residential
             if service.service_id in composite_set]
         self.fedex.cache = cache_save
         commercial = [
-            service.get_price(self.package) for service in services
+            service.price(self.package) for service in services
             if service.service_id in composite_set]
         residential = sum(residential)
         commercial = sum(commercial)
@@ -92,21 +102,21 @@ class TestFedEx(unittest.TestCase):
 
         services = self.fedex.get_services(self.package)
         normal_total = sum(
-            [service.get_price(self.package) for service in services])
+            [service.price(self.package) for service in services])
 
         self.fedex.cache = {}
 
         self.package.declarations = self.declarations
         services = self.fedex.get_services(self.package)
         declarations_total = sum(
-            [service.get_price(self.package) for service in services])
+            [service.price(self.package) for service in services])
 
         self.fedex.cache = {}
 
         self.package.insure = True
         services = self.fedex.get_services(self.package)
         insured_total = sum(
-            [service.get_price(self.package) for service in services])
+            [service.price(self.package) for service in services])
         self.assertEqual(normal_total, declarations_total)
         self.assertGreater(insured_total, normal_total)
 
@@ -121,6 +131,11 @@ class TestFedEx(unittest.TestCase):
         self.assertEqual(address.phone_number, self.test_to.phone_number)
         self.assertEqual(address.contact_name, self.test_to.contact_name)
         self.assertIsNot(address, self.test_to)
+
+    def test_international_services(self):
+        self.package.destination = self.european_address
+        services = self.fedex.get_services(self.package)
+        self.assertTrue(services)
 
 if __name__ == '__main__':
     unittest.main()

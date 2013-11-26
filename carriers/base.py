@@ -13,6 +13,9 @@ from ..exceptions import CarrierError
 
 class Carrier:
 
+    def __init__(self):
+        pass
+
     @staticmethod
     def service_call(client, func_name, *args, **kwargs):
         try:
@@ -33,6 +36,14 @@ class Carrier:
         """
         raise NotImplementedError
 
+    def delivery_datetime(self, service, package):
+        """
+        Should return either a datetime object with an approximate delivery
+        time for a package, or None. If the package cannot be sent through this
+        service, an exception should be raised.
+        """
+        raise NotImplementedError
+
     def quote(self, service, package):
         """
         Given a service and a package, determine the cost of sending the
@@ -44,14 +55,13 @@ class Carrier:
 
 class Service:
     def __init__(
-            self, carrier, service_id, name, delivery_date=None):
+            self, carrier, service_id, name):
         self.carrier = carrier
         # Unique identifier for use with a carrier's get_service() method.
         # This should always be a string.
         self.service_id = service_id
         # The display name for a service, such as 'Priority Mail International'
         self.name = name
-        self.delivery_date = delivery_date
 
     def __str__(self):
         return "%s: %s" % (self.carrier.name, self.name)
@@ -59,7 +69,7 @@ class Service:
     def __repr__(self):
         return "<%s>" % str(self)
 
-    def get_price(self, package):
+    def price(self, package):
         """
         If a carrier can't ship a package on this service, this should raise
         an exception.
@@ -72,9 +82,8 @@ class Service:
         """
         return self.carrier.request_pickup(self.carrier, package)
 
-    def get_delivery_date(self):
+    def delivery_datetime(self, package):
         """
-        This information may need to be specially overwritten, so this data
-        should always be accessed via this overloadable function.
+        Get the expected delivery date of a package.
         """
-        return self.delivery_date
+        return self.carrier.delivery_datetime(self, package)

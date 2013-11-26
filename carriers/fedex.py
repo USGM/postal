@@ -43,7 +43,19 @@ class FedExApi(Carrier):
         'FEDEX_GROUND': 'Ground',
         'FEDEX_HOME_DELIVERY': 'Home Delivery',
         'SMART_POST': 'SmartPost',
-        'GROUND_HOME_DELIVERY': 'Ground Home Delivery'}
+        'GROUND_HOME_DELIVERY': 'Ground Home Delivery',
+        'SAME_DAY': 'Same Day',
+        'SAME_DAY_CITY': 'Same Day City',
+        'FEDEX_FREIGHT_ECONOMY': 'Freight Economy',
+        'FEDEX_FREIGHT_PRIORITY': 'Freight Priority',
+        'FEDEX_FIRST_FREIGHT': 'First Freight',
+        'FEDEX_3_DAY_FREIGHT': '3 Day Freight',
+        'INTERNATIONAL_ECONOMY': 'International Economy',
+        'INTERNATIONAL_ECONOMY_FREIGHT': 'International Economy Freight',
+        'INTERNATIONAL_FIRST': 'International First',
+        'INTERNATIONAL_PRIORITY': 'International Priority',
+        'EUROPE_FIRST_INTERNATIONAL_PRIORITY': 'Europe First '
+                                               'International Priority'}
 
     def __init__(self, key, account_number, password, meter_number):
         self.key = key
@@ -221,18 +233,22 @@ class FedExApi(Carrier):
         # For now, we make this in-process.
         self.cache.update({package: response})
 
-    def rate_response_dict(self, response):
+    @staticmethod
+    def rate_response_dict(response):
+        if not hasattr(response, 'RateReplyDetails'):
+            return {}
         return {
             method.ServiceType: {
                 'service': method.ServiceType,
                 'price': method.RatedShipmentDetails[
-                    0].RatedPackages[0].PackageRateDetail.NetCharge,
-                'delivery_date': getattr(method, 'DeliveryTimestamp', None)}
+                    0].ShipmentRateDetail.TotalNetCharge,
+                'delivery_datetime': getattr(
+                    method, 'DeliveryTimestamp', None)}
             for method in response.RateReplyDetails}
 
-    def create_service(self, service, specs):
+    def create_service(self, service):
         return Service(
-            self, service, self.service_table[service], specs['delivery_date'])
+            self, service, self.service_table[service])
 
     def get_services(self, package):
         """
@@ -243,19 +259,29 @@ class FedExApi(Carrier):
         transaction_detail = self.transaction_detail(self.rates_client)
         version = self.rates_version_id()
         return_transit = True
-        codes = self.carrier_codes()
+        codes = []
         variable_options = []
         requested_shipment = self.requested_shipment(package)
-        response = self.service_call(self.rates_client, 'getRates',
+        response = self.service_call(
+            self.rates_client, 'getRates',
             auth, client, transaction_detail, version, return_transit, codes,
             variable_options, requested_shipment)
         result = self.rate_response_dict(response)
         self.cache_results(package, result)
 
         final = [
-            self.create_service(key, value) for key, value in result.items()]
+            self.create_service(key) for key in result.keys()]
 
         return final
+
+    def delivery_datetime(self, service, package):
+        if not package in self.cache:
+            self.get_services(package)
+        data = self.cache[package].get(service.service_id, None)
+        if not data:
+            raise ExceedsLimitsError(
+                "This package is not able to be shipped on this service.")
+        return data['delivery_datetime']
 
     def quote(self, service, package):
         if not package in self.cache:

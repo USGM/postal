@@ -65,14 +65,14 @@ class Package:
     """
     def __init__(
             self, length, width, height, weight,
-            address_origin, address_destination, declarations=None,
+            origin, destination, declarations=None,
             insure=False, imperial=True, ship_datetime=None):
         self.length = length
         self.width = width
         self.height = height
         self.weight = weight
-        self.origin = address_origin
-        self.destination = address_destination
+        self.origin = origin
+        self.destination = destination
         self.declarations = declarations
         self.insure = insure
         self.ship_datetime = ship_datetime
