@@ -9,7 +9,7 @@ from ..data import Address, Package, Declaration
 from test_credentials import fedex_credentials
 
 test_from = {
-    'street_lines': ['1321 Upland Drive Houston'],
+    'street_lines': ['1321 Jimmy Upland Drive'],
     'contact_name': 'Jonathan Piacenti',
     'city': 'Houston',
     'postal_code': '77043',
@@ -18,11 +18,11 @@ test_from = {
     'country': 'US'}
 
 test_to = {
-    'street_lines': ['14781 Memorial Dr.'],
-    'contact_name': 'Memorial Postal',
-    'city': 'Houston',
-    'postal_code': '77079',
-    'phone_number': '2814971446',
+    'street_lines': ['6410 Three Flower Lane'],
+    'contact_name': 'No one in particular',
+    'city': 'Kingwood',
+    'postal_code': '77345',
+    'phone_number': '5555555555',
     'subdivision': 'TX',
     'country': 'US'}
 
@@ -48,65 +48,79 @@ class TestFedEx(unittest.TestCase):
         for service in services:
             self.assertTrue(isinstance(service, Service))
 
-        print "=" * 79
-        print "GET SERVICES"
-        for service in services:
-            print service, service.get_delivery_date(), service.get_price(
-                self.package)
-
     def test_delayed_shipment(self):
         self.package.ship_datetime = datetime.now() + relativedelta(days=10)
         services = self.fedex.get_services(self.package)
         self.assertTrue(services)
         for service in services:
-            self.assertTrue(isinstance(service, Service))
-
-        print "=" * 79
-        print "DELAYED SHIPMENT"
-        for service in services:
-            print service, service.get_delivery_date(), service.get_price(
-                self.package)
+            if service.delivery_date:
+                self.assertGreater(
+                    service.delivery_date, self.package.ship_datetime)
 
     def test_residential_shipment(self):
+        services = self.fedex.get_services(self.package)
+        cache_save = self.fedex.cache
+        self.fedex.cache = {}
         self.test_to.residential = True
-        services = self.fedex.get_services(self.package)
+        services_residential = self.fedex.get_services(self.package)
         self.assertTrue(services)
         for service in services:
             self.assertTrue(isinstance(service, Service))
-
-        print "=" * 79
-        print "RESIDENTIAL SHIPMENT"
-        for service in services:
-            print service, service.get_delivery_date(), service.get_price(
-                self.package)
-
-    def test_declarations(self):
-        self.package.declarations = self.declarations
-        services = self.fedex.get_services(self.package)
-        self.assertTrue(services)
-        for service in services:
+        self.assertTrue(services_residential)
+        for service in services_residential:
             self.assertTrue(isinstance(service, Service))
 
-        print "=" * 79
-        print "WITH DECLARATIONS, NO INSURANCE"
-        for service in services:
-            print service, service.get_delivery_date(), service.get_price(
-                self.package)
+        # Some services will be available for residential, and others not.
+        # Iterate through and find all the ones that are available between
+        # both.
+        commercial = {service.service_id for service in services}
+        residential = {service.service_id for service in services_residential}
+        composite_set = commercial.intersection(residential)
+
+        residential = [
+            service.get_price(self.package) for service in services_residential
+            if service.service_id in composite_set]
+        self.fedex.cache = cache_save
+        commercial = [
+            service.get_price(self.package) for service in services
+            if service.service_id in composite_set]
+        residential = sum(residential)
+        commercial = sum(commercial)
+        self.assertGreater(residential, commercial)
 
     def test_insurance(self):
-        self.package.declarations = self.declarations
-        self.package.insure = True
 
         services = self.fedex.get_services(self.package)
-        self.assertTrue(services)
-        for service in services:
-            self.assertTrue(isinstance(service, Service))
+        normal_total = sum(
+            [service.get_price(self.package) for service in services])
 
-        print "=" * 79
-        print "WITH DECLARATIONS AND INSURANCE"
-        for service in services:
-            print service, service.get_delivery_date(), service.get_price(
-                self.package)
+        self.fedex.cache = {}
+
+        self.package.declarations = self.declarations
+        services = self.fedex.get_services(self.package)
+        declarations_total = sum(
+            [service.get_price(self.package) for service in services])
+
+        self.fedex.cache = {}
+
+        self.package.insure = True
+        services = self.fedex.get_services(self.package)
+        insured_total = sum(
+            [service.get_price(self.package) for service in services])
+        self.assertEqual(normal_total, declarations_total)
+        self.assertGreater(insured_total, normal_total)
+
+    def test_address_validation(self):
+        score, address = self.fedex.validate_address(self.test_to)
+        self.assertTrue(address.residential)
+        self.assertEqual(address.street_lines, ["6410 Threeflower Ln"])
+        self.assertEqual(address.city, "Kingwood")
+        self.assertEqual(address.subdivision, "TX")
+        self.assertEqual(address.country.alpha2, "US")
+        self.assertEqual(address.postal_code, "77345-2514")
+        self.assertEqual(address.phone_number, self.test_to.phone_number)
+        self.assertEqual(address.contact_name, self.test_to.contact_name)
+        self.assertIsNot(address, self.test_to)
 
 if __name__ == '__main__':
     unittest.main()

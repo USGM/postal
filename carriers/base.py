@@ -23,6 +23,16 @@ class Carrier:
     def get_services(self, package):
         return []
 
+    def validate_address(self, address):
+        """
+        If the carrier implements address validation services, you can set
+        those up here.
+
+        This should return a true or false value, as well as a new address
+        object, comprised of any fixes upstream sends.
+        """
+        raise NotImplementedError
+
     def quote(self, service, package):
         """
         Given a service and a package, determine the cost of sending the
