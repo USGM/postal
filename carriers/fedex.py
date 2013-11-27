@@ -57,25 +57,31 @@ class FedExApi(Carrier):
         'EUROPE_FIRST_INTERNATIONAL_PRIORITY': 'Europe First '
                                                'International Priority'}
 
+    @staticmethod
+    def service_url(wsdl_name):
+        base_path = os.path.split(os.path.abspath(
+            inspect.getfile(inspect.currentframe())))[0]
+        base_path = os.path.join(base_path, 'wsdl', 'fedex')
+        full_path = os.path.join(base_path, wsdl_name)
+        return "file://%s" % full_path
+
+    def create_client(self, wsdl_name):
+        return Client(self.service_url(wsdl_name), plugins=[ClearEmpty()])
+
     def __init__(self, key, account_number, password, meter_number):
+        super(FedExApi, self).__init__()
         self.key = key
         self.account_number = account_number
         self.password = password
         self.meter_number = meter_number
         self.cache = {}
 
-        base_path = os.path.split(os.path.abspath(
-            inspect.getfile(inspect.currentframe())))[0]
-        base_path = os.path.join(base_path, 'wsdl', 'fedex')
-        full_path = os.path.join(base_path, 'RateService_v14.wsdl')
-        url = "file://%s" % full_path
+        self.rates_client = self.create_client('RateService_v14.wsdl')
 
-        self.rates_client = Client(url, plugins=[ClearEmpty()])
+        self.address_client = self.create_client(
+            'AddressValidationService_v2.wsdl')
 
-        full_path = os.path.join(
-            base_path, 'AddressValidationService_v2.wsdl')
-        url = "file://%s" % full_path
-        self.address_client = Client(url, plugins=[ClearEmpty()])
+        self.ship_client = self.create_client('ShipService_v13.wsdl')
 
         self.contact_type = (
             self.rates_client.factory.create('Party').__class__)

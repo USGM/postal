@@ -11,7 +11,7 @@ from suds import WebFault
 from ..exceptions import CarrierError
 
 
-class Carrier:
+class Carrier(object):
 
     def __init__(self):
         pass
