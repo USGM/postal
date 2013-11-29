@@ -1,8 +1,11 @@
 __author__ = 'Nathan Everitt'
 
-#import logging
-#logging.basicConfig(level=logging.DEBUG)
-#logging.getLogger('suds.transit').setLevel(logging.DEBUG)
+import logging
+logging.basicConfig(level=logging.DEBUG)
+logging.getLogger('pycountry').setLevel(logging.CRITICAL)
+logging.getLogger('suds.resolver').setLevel(logging.CRITICAL)
+logging.getLogger('suds.xsd').setLevel(logging.CRITICAL)
+logging.getLogger('suds.transit').setLevel(logging.DEBUG)
 
 from ..carriers import ups
 from .. import data
@@ -14,7 +17,7 @@ try:
         length=3, width=4, height=5, weight=6, imperial=True,
         origin=None,
         destination=data.Address(
-            contact_name='Jonh Doe',
+            contact_name='John Doe',
             phone_number='1234567890',
             street_lines=[
                 '123 Main St',
@@ -31,7 +34,7 @@ try:
     services = ups.UPSAPI().get_services(pak)
     pprint(services)
 
-    print ups.UPSAPI().delivery_datetime(services.keys()[0], pak)
+    #print ups.UPSAPI().delivery_datetime(services.keys()[0], pak)
 except WebFault as err:
     print
     print '***** FAULT *****'

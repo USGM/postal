@@ -69,6 +69,7 @@ Ship = Client(
 )
 
 
+
 class UPSAPI(base.Carrier):
 
     name = 'UPS'
@@ -85,24 +86,15 @@ class UPSAPI(base.Carrier):
         rated_shipments = {}
 
         for rated_shipment in rates.RatedShipment:
-            service = base.Service(
+            rated_shipments[base.Service(
                 self,
                 rated_shipment.Service.Code,
                 _service_code_to_description.get(rated_shipment.Service.Code, None)
-            )
-            rate = dict(
-                price=money.Money(rated_shipment.TotalCharges.MonetaryValue, rated_shipment.TotalCharges.CurrencyCode)
-            )
-            try:
-                rate['delivery_datetime'] = _guaranteed_delivery_to_string(rated_shipment.GuaranteedDelivery)
-                #datetime.datetime.now()
-            except AttributeError:
-                rate['delivery_datetime'] = None
-            rated_shipments[service] = rate
+            )] = _get_rated_shipment_info(rated_shipment)
 
         return rated_shipments
 
-    def request_rates(self, request_type, packages, destination):
+    def request_rates(self, request_type, packages, destination, service=None):
         """
         request_type = 'Rate'|'Shop'
             Rate = The server rates (The
@@ -149,6 +141,10 @@ class UPSAPI(base.Carrier):
 
         shipment = RateWS.factory.create('ns2:ShipmentType')
 
+        if service is not None:
+            shipment.Service.Code = service.service_id
+            shipment.Service.Description = service.name
+
         _populate_origin(shipment)
         _populate_destination(shipment, destination)
 
@@ -194,8 +190,8 @@ class UPSAPI(base.Carrier):
             shipment.InvoiceLineTotal.CurrencyCode = 'USD'
             shipment.InvoiceLineTotal.MonetaryValue = '0'
 
-        print request
-        print shipment
+        #print request
+        #print shipment
         rates = RateWS.service.ProcessRate(request, _pickup_type, _customer_classification, shipment)
 
         if rates.Response.ResponseStatus.Code != '1':  # 1 = Success
@@ -219,9 +215,15 @@ class UPSAPI(base.Carrier):
         return self.delivery_datetime_list(service, [package], package.destination)
 
     def delivery_datetime_list(self, service, packages, destination):
-        response = self.request_rates('Rate', packages, destination)
-        #return _guaranteed_delivery_to_string(...)
-        return response
+        rates = self.request_rates('Rate', packages, destination, service=service)
+
+        if len(rates.RatedShipment) != 1:
+            raise Exception()
+        rated_shipment = rates.RatedShipment[0]
+        if rated_shipment.Service.Code != service.service_id:
+            raise Exception()
+
+        return _get_rated_shipment_info(rated_shipment)
 
     def quote(self, service, package):
         """
@@ -262,23 +264,32 @@ def _populate_destination(shipment, destination):
     shipment.ShipTo.Address.StateProvinceCode = destination.subdivision
     shipment.ShipTo.Address.PostalCode = destination.postal_code
     shipment.ShipTo.Address.CountryCode = destination.country.alpha2
-    #if destination.residential:
-    #    shipment.ShipTo.Address.ResidentialAddressIndicator = ''
+    if destination.residential:
+        shipment.ShipTo.Address.ResidentialAddressIndicator = ''
 
+def _get_rated_shipment_info(rated_shipment):
+    info = dict(price=money.Money(rated_shipment.TotalCharges.MonetaryValue, rated_shipment.TotalCharges.CurrencyCode))
+    try:
+        info['delivery_datetime'] = _guaranteed_delivery_to_string(rated_shipment.GuaranteedDelivery)
+        #datetime.datetime.now()
+    except AttributeError:
+        info['delivery_datetime'] = None
+
+    return info
 
 
 _service_code_to_description = {
     '01': 'UPS Next Day Air',  # 'UPS Express' if shipping from Canada
     '02': 'UPS Second Day Air',
-    # 'UPS Worldwide ExpeditedSM' - 02 Rating, 08 Shipping, if shipping from Canada
+    # 'UPS Worldwide Expedited' - 02 Rating, 08 Shipping, if shipping from Canada
     '03': 'UPS Ground',
-    '07': 'UPS Worldwide ExpressSM',  # different names when originating from other countries
-    '08': 'UPS Worldwide ExpeditedSM',  # different names when originating from other countries
+    '07': 'UPS Worldwide Express',  # different names when originating from other countries
+    '08': 'UPS Worldwide Expedited',  # different names when originating from other countries
     '11': 'UPS Standard',
     '12': 'UPS Three-Day Select',
     '13': 'UPS Next Day Air Saver',
-    '14': 'UPS Next Day Air Early A.M. SM',  # different name when originating from Canada
-    '54': 'UPS Worldwide Express Plus SM',  # different name when originating from Mexico
+    '14': 'UPS Next Day Air Early A.M.',  # different name when originating from Canada
+    '54': 'UPS Worldwide Express Plus',  # different name when originating from Mexico
     '59': 'UPS Second Day Air A.M.',
     '65': 'UPS Saver',
     '96': 'UPS Worldwide Express Freight'
