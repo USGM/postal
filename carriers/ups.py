@@ -30,6 +30,7 @@ class AuthenticationPlugin(MessagePlugin):
         security.set('xmlns:upss', "http://www.ups.com/XMLSchema/XOLTWS/UPSS/v1.0")
 
         header.append(security)
+
         username_token = Element('upss:UsernameToken')
         security.append(username_token)
 

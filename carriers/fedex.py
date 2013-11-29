@@ -8,7 +8,6 @@ from base64 import b64decode
 from datetime import datetime
 from math import ceil
 from PyPDF2 import PdfFileReader, PdfFileWriter
-
 from suds.client import Client
 from money import Money
 
