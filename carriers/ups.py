@@ -9,6 +9,7 @@ from suds.sax.element import Element
 from suds import WebFault
 import suds.cache
 import money
+import base
 
 
 def get_directory_of(a):
