@@ -168,8 +168,6 @@ class FedExApi(Carrier):
         output = PdfFileWriter()
 
         page = input.getPage(0)
-        #page.trimBox.lowerLeft = (25, 25)
-        #page.trimBox.upperRight = (225, 225)
         page.cropBox.lowerLeft = (30, 325)
         page.cropBox.upperRight = (320, 760)
         output.addPage(page)
@@ -300,7 +298,7 @@ class FedExApi(Carrier):
             return {}
         return {
             method.ServiceType: {
-                'service': method.ServiceType,
+                #'service': method.ServiceType,
                 'price': method.RatedShipmentDetails[
                     0].ShipmentRateDetail.TotalNetCharge,
                 'delivery_datetime': getattr(
@@ -330,8 +328,11 @@ class FedExApi(Carrier):
         result = self.rate_response_dict(response)
         self.cache_results(package, result)
 
-        final = [
-            self.create_service(key) for key in result.keys()]
+        final = {
+            self.create_service(key): {
+                'price': value['price'],
+                'delivery_datetime': value['delivery_datetime']}
+            for key, value in result.items()}
 
         return final
 

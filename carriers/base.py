@@ -27,9 +27,18 @@ class ClearEmpty(MessagePlugin):
 
 
 class Carrier(object):
+    name = 'Undefined Carrier'
 
     def __init__(self):
         pass
+
+    def __eq__(self, other):
+        if not isinstance(other, Carrier):
+            return NotImplemented
+        return other.name == self.name
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     @staticmethod
     def service_call(func, *args, **kwargs):
@@ -39,7 +48,13 @@ class Carrier(object):
             raise CarrierError(err.document)
 
     def get_services(self, package):
-        return []
+        """
+        Get all services that this carrier can provide for transporting this
+        package. It should return a dictionary with services as the key, and
+        values which are dictionaries containing keys for price, and
+        delivery_datetime.
+        """
+        return {}
 
     def validate_address(self, address):
         """
@@ -83,6 +98,21 @@ class Service:
 
     def __repr__(self):
         return "<%s>" % str(self)
+
+    def __hash__(self):
+        return hash((self.carrier.name, self.service_id))
+
+    def __eq__(self, other):
+        if not hasattr(other, 'service_id'):
+            return NotImplemented
+        if not hasattr(other, 'carrier'):
+            return NotImplemented
+        return (
+            self.service_id == other.service_id) and (
+                self.carrier == other.carrier)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     def price(self, package):
         """
