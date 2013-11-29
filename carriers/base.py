@@ -32,9 +32,9 @@ class Carrier(object):
         pass
 
     @staticmethod
-    def service_call(client, func_name, *args, **kwargs):
+    def service_call(func, *args, **kwargs):
         try:
-            return getattr(client.service, func_name)(*args, **kwargs)
+            return func(*args, **kwargs)
         except WebFault as err:
             raise CarrierError(err.document)
 

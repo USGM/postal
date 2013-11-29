@@ -8,6 +8,7 @@ from suds.plugin import MessagePlugin
 from suds.sax.element import Element
 from suds import WebFault
 import suds.cache
+import money
 
 
 def get_directory_of(a):
@@ -68,6 +69,27 @@ Ship = Client(
 
 def ship():
     print Ship
+
+
+service_code_to_description = {
+    '01': 'UPS Next Day Air',  # 'UPS Express' if shipping from Canada
+    '02': 'UPS Second Day Air',
+    # 'UPS Worldwide ExpeditedSM' - 02 Rating, 08 Shipping, if shipping from Canada
+    '03': 'UPS Ground',
+    '07': 'UPS Worldwide ExpressSM',  # different names when originating from other countries
+    '08': 'UPS Worldwide ExpeditedSM',  # different names when originating from other countries
+    '11': 'UPS Standard',
+    '12': 'UPS Three-Day Select',
+    '13': 'UPS Next Day Air Saver',
+    '14': 'UPS Next Day Air Early A.M. SM',  # different name when originating from Canada
+    '54': 'UPS Worldwide Express Plus SM',  # different name when originating from Mexico
+    '59': 'UPS Second Day Air A.M.',
+    '65': 'UPS Saver',
+    '96': 'UPS Worldwide Express Freight'
+    ### leaving out a few that are Polish-only
+}
+
+
 
 
 
@@ -249,7 +271,53 @@ def request_rate(request_type, pickup_type, customer_type):
         #print shipment
 
 
-        print RateWS.service.ProcessRate(request, _pickup_type, _customer_classification, shipment)
+        rates = RateWS.service.ProcessRate(request, _pickup_type, _customer_classification, shipment)
+
+        if rates.Response.ResponseStatus.Code != '1':  # 1 = Success
+            raise Exception()
+
+        for alert in rates.Response.Alert:
+            print 'ALERT:', alert.Description
+
+        #print rates
+        #print rates.RatedShipment[0]
+
+        rated_shipments = []
+
+        for rated_shipment in rates.RatedShipment:
+            print ' --- '
+            print (
+                service_code_to_description[rated_shipment.Service.Code]
+                if rated_shipment.Service.Code in service_code_to_description else
+                'Service#:' + rated_shipment.Service.Code + 'Unknown Service'
+            )
+            for alert in rated_shipment.RatedShipmentAlert:
+                print 'ALERT:', alert.Description
+            print 'Total cost:', rated_shipment.TotalCharges.MonetaryValue, rated_shipment.TotalCharges.CurrencyCode
+            print (
+                'Guaranteed to be delivered within ' + rated_shipment.GuaranteedDelivery.BusinessDaysInTransit +
+                ' business days'
+                + (', by ' + rated_shipment.GuaranteedDelivery.DeliveryByTime if hasattr(rated_shipment.GuaranteedDelivery, 'DeliveryByTime') else '')
+            )
+
+            rated_shipments.append((
+                rated_shipment.Service.Code,
+                money.Money(rated_shipment.TotalCharges.MonetaryValue, rated_shipment.TotalCharges.CurrencyCode),
+                (
+                    rated_shipment.GuaranteedDelivery.BusinessDaysInTransit,
+                    rated_shipment.GuaranteedDelivery.DeliveryByTime if hasattr(rated_shipment.GuaranteedDelivery, 'DeliveryByTime') else None
+                )
+            ))
+
+            base.Service(
+                None,  # carrier
+                rated_shipment.Service.Code,
+                service_code_to_description.get(rated_shipment.Service.Code, None)
+            )
+
+        print rated_shipments
+
+
     except WebFault as err:
         #print err.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Code
         print
