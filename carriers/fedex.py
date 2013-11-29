@@ -133,7 +133,7 @@ class FedExApi(Carrier):
         address_item = self.address_client.factory.create('AddressToValidate')
         self.set_address(address_item, address)
         result = self.service_call(
-            self.address_client.addressValidation,
+            self.address_client.service.addressValidation,
             auth, client_detail, transaction_detail, version_id,
             request_timestamp, address_validation_options, address_item)
         result = result.AddressResults[0][0][0]
@@ -205,7 +205,7 @@ class FedExApi(Carrier):
         version_id = self.ship_version_id()
         requested_shipment = self.requested_shipment(service, package)
         result = self.service_call(
-            self.ship_client, 'processShipment', auth, client_detail,
+            self.ship_client.service.processShipment, auth, client_detail,
             transaction_detail, version_id, requested_shipment)
         details = result.CompletedShipmentDetail.CompletedPackageDetails[0]
         tracking_number = details.OperationalDetail.Barcodes.StringBarcodes[
@@ -324,7 +324,7 @@ class FedExApi(Carrier):
         variable_options = []
         requested_shipment = self.requested_shipment_rate(package)
         response = self.service_call(
-            self.rates_client.getRates,
+            self.rates_client.service.getRates,
             auth, client, transaction_detail, version, return_transit, codes,
             variable_options, requested_shipment)
         result = self.rate_response_dict(response)
