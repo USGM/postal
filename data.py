@@ -24,6 +24,16 @@ class Address:
             self, contact_name=None, phone_number=None,
             street_lines=None, city=None, subdivision=None,
             postal_code=None, country=None, residential=False):
+        """
+        contact_name:string
+        phone_number:string
+        street_lines:[string] = list of each line of the street address, i.e. ['123 Whatever Lane', 'Box #123']
+        city:string
+        subdivision:string:len=2 = postal abbreviation of state or province
+        postal_code:string|None = the postal code or None if not applicable in the specified country
+        country:string:len=2 = 2-letter abbreviation of the country name (the alpha2 code)
+        residential:bool = true if this object represents a residential address
+        """
         # The following should always be needed for any country.
         if not all([contact_name, phone_number, street_lines, city, country]):
             raise AddressError(
