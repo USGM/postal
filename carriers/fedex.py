@@ -1,16 +1,20 @@
 """
 This is the module for interfacing with FedEx's web services APIs.
 """
+from StringIO import StringIO
 import inspect
 import os
+from base64 import b64decode
 from datetime import datetime
+from math import ceil
+from PyPDF2 import PdfFileReader, PdfFileWriter
 
 from suds.client import Client
 from money import Money
 
 from base import Carrier, Service, ClearEmpty
 from ..exceptions import ExceedsLimitsError
-from ..data import Address
+from ..data import Address, Shipment
 
 
 class FedExApi(Carrier):
@@ -137,6 +141,14 @@ class FedExApi(Carrier):
         address = self.address_from_validator(result, address)
         return success, address
 
+    def ship_version_id(self):
+        version = self.ship_client.factory.create('VersionId')
+        version.ServiceId = 'ship'
+        version.Major = 13
+        version.Intermediate = 0
+        version.Minor = 0
+        return version
+
     def rates_version_id(self):
         version = self.rates_client.factory.create('VersionId')
         version.ServiceId = 'crs'
@@ -145,22 +157,79 @@ class FedExApi(Carrier):
         version.Minor = 0
         return version
 
+    def label_specification(self, spec):
+        spec.LabelFormatType = 'COMMON2D'
+        spec.ImageType = 'PDF'
+        spec.LabelStockType = 'PAPER_4X6'
+
+    @staticmethod
+    def format_label(label):
+        input = PdfFileReader(StringIO(label))
+        output = PdfFileWriter()
+
+        page = input.getPage(0)
+        #page.trimBox.lowerLeft = (25, 25)
+        #page.trimBox.upperRight = (225, 225)
+        page.cropBox.lowerLeft = (30, 325)
+        page.cropBox.upperRight = (320, 760)
+        output.addPage(page)
+        output_stream = StringIO()
+        output.write(output_stream)
+        return output_stream.getvalue()
+
+    def requested_shipment(self, service, package):
+        request = self.ship_client.factory.create('RequestedShipment')
+        request.ShipTimestamp = package.ship_datetime or datetime.now()
+        request.ServiceType = service.service_id
+        request.DropoffType = 'REGULAR_PICKUP'
+        request.PackagingType = 'YOUR_PACKAGING'
+        request.RateRequestTypes = 'ACCOUNT'
+        self.set_address(request.Shipper, package.origin)
+        self.set_address(request.Recipient, package.destination)
+        payment = request.ShippingChargesPayment
+        payment.PaymentType = 'SENDER'
+        party = payment.Payor.ResponsibleParty
+        party.AccountNumber = self.account_number
+        party.Contact.PersonName = package.origin.contact_name
+        party.Contact.PhoneNumber = package.origin.phone_number
+        self.label_specification(request.LabelSpecification)
+        request.PackageCount = 1
+        request.RequestedPackageLineItems.append(
+            self.line_item(self.ship_client, request, package))
+        return request
+
+    def ship(self, service, package):
+        auth = self.authentication(self.ship_client)
+        client_detail = self.user_client(self.ship_client)
+        transaction_detail = self.transaction_detail(self.ship_client)
+        version_id = self.ship_version_id()
+        requested_shipment = self.requested_shipment(service, package)
+        result = self.service_call(
+            self.ship_client, 'processShipment', auth, client_detail,
+            transaction_detail, version_id, requested_shipment)
+        details = result.CompletedShipmentDetail.CompletedPackageDetails[0]
+        tracking_number = details.OperationalDetail.Barcodes.StringBarcodes[
+            0].Value
+        label = self.format_label(b64decode(details.Label.Parts[0].Image))
+
+        return Shipment(self, tracking_number, label)
+
     def carrier_codes(self):
         codes = self.rates_client.factory.create('CarrierCodeType')
         return [codes.FDXE, codes.FDXG]
 
-    def line_item(self, request, package):
-        item = self.rates_client.factory.create('RequestedPackageLineItem')
+    def line_item(self, client, request, package):
+        item = client.factory.create('RequestedPackageLineItem')
         item.SequenceNumber = 1
         item.GroupPackageCount = 1
-        item.Weight.Units.value = 'KG'
-        item.Weight.Value = int(round(package.weight))
+        item.Weight.Units.value = 'LB'
+        item.Weight.Value = int(ceil(package.weight))
 
         dimensions = item.Dimensions
-        dimensions.Height = int(round(package.height))
-        dimensions.Width = int(round(package.width))
-        dimensions.Length = int(round(package.length))
-        dimensions.Units = 'CM'
+        dimensions.Height = int(ceil(package.height))
+        dimensions.Width = int(ceil(package.width))
+        dimensions.Length = int(ceil(package.length))
+        dimensions.Units = 'IN'
 
         if package.declarations:
             value = self.set_declarations(request, package)
@@ -203,7 +272,7 @@ class FedExApi(Carrier):
         request.CustomsClearanceDetail.Commodities = commodities
         return total_value
 
-    def requested_shipment(self, package):
+    def requested_shipment_rate(self, package):
         request = self.rates_client.factory.create('RequestedShipment')
 
         self.set_address(request.Shipper, package.origin)
@@ -212,7 +281,8 @@ class FedExApi(Carrier):
         request.RateRequestTypes = 'ACCOUNT'
         request.PackageCount = 1
 
-        request.RequestedPackageLineItems = [self.line_item(request, package)]
+        request.RequestedPackageLineItems = [self.line_item(
+            self.rates_client, request, package)]
         request.ShipTimestamp = package.ship_datetime
 
         return request
@@ -252,7 +322,7 @@ class FedExApi(Carrier):
         return_transit = True
         codes = []
         variable_options = []
-        requested_shipment = self.requested_shipment(package)
+        requested_shipment = self.requested_shipment_rate(package)
         response = self.service_call(
             self.rates_client.getRates,
             auth, client, transaction_detail, version, return_transit, codes,

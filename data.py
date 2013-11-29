@@ -50,8 +50,10 @@ class Package:
     These can be used to query other services and find out what options for
     delivery are available.
 
-    The units are stored in centimeters and kilograms, but are assumed to be
-    entered in inches and pounds unless imperial=False
+    All carriers support Imperial units, but have spotty support for Metric.
+    It is with great annoyance that we have therefore made the default units
+    imperial. You can convert your measurements on the fly by setting imperial
+    to false.
 
     ship_datetime should be set to the time you expect to be able to ship the
     package.
@@ -70,7 +72,7 @@ class Package:
     def __init__(
             self, length, width, height, weight,
             origin, destination, declarations=None,
-            insure=False, imperial=True, ship_datetime=None):
+            insure=False, ship_datetime=None, imperial=True):
         self.length = length
         self.width = width
         self.height = height
@@ -81,8 +83,8 @@ class Package:
         self.insure = insure
         self.ship_datetime = ship_datetime
 
-        if imperial:
-            self.metricize()
+        if not imperial:
+            self.imperialize()
 
     def __hash__(self):
         dimensions = 'x'.join(map(str, sorted(
@@ -108,10 +110,11 @@ class Package:
     def to_pounds(number):
         return number / 0.453592
 
-    def metricize(self):
-        self.length = self.to_centimeters(self.length)
-        self.width = self.to_centimeters(self.width)
-        self.height = self.to_centimeters(self.height)
+    def imperialize(self):
+        self.length = self.to_inches(self.length)
+        self.width = self.to_inches(self.width)
+        self.height = self.to_inches(self.height)
+        self.weight = self.to_pounds(self.weight)
 
 
 class Declaration:
@@ -142,17 +145,19 @@ class Declaration:
 
 class Shipment:
     """
-    Created when a package has been committed for shipment.
+    Created when a package has been committed for shipment. Can also be used
+    to get options for dealing with a package after a shipment has been
+    requested, like cancellation.
     """
 
-    def __init__(self, parcel, service):
-        self.parcel = parcel
-        self.service = service
+    def __init__(self, carrier, tracking_number, label=None):
+        self.tracking_number = tracking_number
+        if carrier:
+            self.carrier = carrier
+        else:
+            self.derive_carrier()
+        self.label = label
 
-        self.tracking_number, self.label = self.service.ship(parcel)
-
-    def request_pickup(self, date):
-        """
-        Should return expected pickup time.
-        """
-        return self.service.request_pickup(self.tracking_number, date)
+    def derive_carrier(self):
+        # Reverse engineer the carrier based on the tracking number, somehow.
+        raise NotImplementedError

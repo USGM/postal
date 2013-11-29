@@ -91,6 +91,9 @@ class Service:
         """
         return self.carrier.quote(self, package)
 
+    def ship(self, package):
+        return self.carrier.ship(self, package)
+
     def request_pickup(self, package):
         """
         Should return a date or something. TBD.

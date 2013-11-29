@@ -5,11 +5,11 @@ from money.Money import Money
 from ..carriers.base import Service
 
 from ..carriers.fedex import FedExApi
-from ..data import Address, Package, Declaration
+from ..data import Address, Package, Declaration, Shipment
 from test_credentials import fedex_credentials
 
 test_from = {
-    'street_lines': ['1321 Jimmy Upland Drive'],
+    'street_lines': ['1321 Upland Drive'],
     'contact_name': 'Jonathan Piacenti',
     'city': 'Houston',
     'postal_code': '77043',
@@ -136,6 +136,12 @@ class TestFedEx(unittest.TestCase):
         self.package.destination = self.european_address
         services = self.fedex.get_services(self.package)
         self.assertTrue(services)
+
+    def test_ship_package(self):
+        services = self.fedex.get_services(self.package)
+        shipment = services[0].ship(self.package)
+        isinstance(shipment, Shipment)
+
 
 if __name__ == '__main__':
     unittest.main()
