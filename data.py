@@ -27,15 +27,18 @@ class Address:
         """
         contact_name:string
         phone_number:string
-        street_lines:[string] = list of each line of the street address, i.e. ['123 Whatever Lane', 'Box #123']
+        street_lines:[string] = list of each line of the street address,
+            i.e. ['123 Whatever Lane', 'Box #123']
         city:string
         subdivision:string:len=2 = postal abbreviation of state or province
-        postal_code:string|None = the postal code or None if not applicable in the specified country
-        country:string:len=2 = 2-letter abbreviation of the country name (the alpha2 code)
+        postal_code:string|None = the postal code or None if not applicable in
+            the specified country
+        country:string:len=2 = 2-letter abbreviation of the country name
+            (the alpha2 code)
         residential:bool = true if this object represents a residential address
         """
         # The following should always be needed for any country.
-        if not all([contact_name, phone_number, street_lines, city, country]):
+        if not all([contact_name, street_lines, city, country]):
             raise AddressError(
                 "Not enough information to construct an address.")
         self.contact_name = contact_name
@@ -46,10 +49,6 @@ class Address:
         self.subdivision = subdivision
         self.residential = residential
         self.country = get_country(country)
-        try:
-            self.country = countries.get(alpha2=country)
-        except KeyError:
-            raise AddressError("Could not find the requested country.")
 
 
 class Package:
@@ -113,7 +112,7 @@ class Package:
         return number / 2.54
 
     @staticmethod
-    def to_kilgram(number):
+    def to_kilogram(number):
         return number * 0.453592
 
     @staticmethod

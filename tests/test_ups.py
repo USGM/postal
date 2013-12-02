@@ -1,16 +1,20 @@
 __author__ = 'Nathan Everitt'
 
+"""###
 import logging
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger('pycountry').setLevel(logging.CRITICAL)
 logging.getLogger('suds.resolver').setLevel(logging.CRITICAL)
 logging.getLogger('suds.xsd').setLevel(logging.CRITICAL)
 logging.getLogger('suds.transit').setLevel(logging.DEBUG)
+###"""
 
 from ..carriers import ups
 from .. import data
 from suds import WebFault
 from pprint import pprint
+
+import test_credentials
 
 try:
     pak = data.Package(
@@ -31,10 +35,37 @@ try:
         )
     )
 
-    services = ups.UPSAPI().get_services(pak)
-    pprint(services)
+    api = ups.UPSAPI(
+        test_credentials.username,
+        test_credentials.password,
+        test_credentials.access_license_number,
+        test_credentials.shipper_number,
+        data.Address(
+            contact_name='US Global Mail',
+            street_lines=['1321 Upland Drive'],
+            city='Houston',
+            subdivision='TX',
+            postal_code='77043',
+            country='US'
+        )
+    )
 
-    #print ups.UPSAPI().delivery_datetime(services.keys()[0], pak)
+    #services = api.get_services(pak)
+    #pprint(services)
+
+    #print api.delivery_datetime(services.keys()[0], pak)
+    #print api.quote(services.keys()[0], pak)
+
+    pak.destination = data.Address(
+        contact_name='wat',
+        street_lines=['ashgkl;asdgjkl'],
+        city='alsiughiw',
+        subdivision='TX',
+        postal_code='77047',
+        country='US'
+    )
+    pprint(api.get_services(pak))
+
 except WebFault as err:
     print
     print '***** FAULT *****'
