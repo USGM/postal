@@ -47,7 +47,7 @@ class Carrier(object):
         except WebFault as err:
             raise CarrierError(err.document)
 
-    def get_services(self, package):
+    def get_services(self, request):
         """
         Get all services that this carrier can provide for transporting this
         package. It should return a dictionary with services as the key, and
@@ -66,7 +66,7 @@ class Carrier(object):
         """
         raise NotImplementedError
 
-    def delivery_datetime(self, service, package):
+    def delivery_datetime(self, service, request):
         """
         Should return either a datetime object with an approximate delivery
         time for a package, or None. If the package cannot be sent through this
@@ -74,7 +74,7 @@ class Carrier(object):
         """
         raise NotImplementedError
 
-    def quote(self, service, package):
+    def quote(self, service, request):
         """
         Given a service and a package, determine the cost of sending the
         package through that service. If the package cannot be sent through
@@ -114,24 +114,24 @@ class Service:
     def __ne__(self, other):
         return not self.__eq__(other)
 
-    def price(self, package):
+    def price(self, request):
         """
         If a carrier can't ship a package on this service, this should raise
         an exception.
         """
-        return self.carrier.quote(self, package)
+        return self.carrier.quote(self, request)
 
     def ship(self, package):
         return self.carrier.ship(self, package)
 
-    def request_pickup(self, package):
+    def request_pickup(self, request):
         """
         Should return a date or something. TBD.
         """
-        return self.carrier.request_pickup(self.carrier, package)
+        return self.carrier.request_pickup(self.carrier, request)
 
-    def delivery_datetime(self, package):
+    def delivery_datetime(self, request):
         """
         Get the expected delivery date of a package.
         """
-        return self.carrier.delivery_datetime(self, package)
+        return self.carrier.delivery_datetime(self, request)
