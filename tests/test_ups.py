@@ -56,15 +56,41 @@ try:
     #print api.delivery_datetime(services.keys()[0], pak)
     #print api.quote(services.keys()[0], pak)
 
-    pak.destination = data.Address(
+    """print api.validate_address(data.Address(
         contact_name='wat',
-        street_lines=['ashgkl;asdgjkl'],
-        city='alsiughiw',
+        street_lines=['shaserhse'],
+        city='Houston',
         subdivision='TX',
         postal_code='77047',
         country='US'
-    )
-    pprint(api.get_services(pak))
+    ))
+
+    print api.validate_address(data.Address(
+        contact_name='wat',
+        street_lines=['Upland Dr'],
+        city='Houston',
+        subdivision='TX',
+        postal_code='77047',
+        country='US'
+    ))"""
+
+    print api.validate_address(data.Address(
+        contact_name='wat',
+        street_lines=['1321 Upl'],
+        city='Houston',
+        subdivision='TX',
+        postal_code='77047',
+        postal_code_extension='1234',
+        country='US'
+    ))
+
+    """print api.validate_address(data.Address(
+        street_lines=['27 Edison Furlong Rd'],
+        city='Doylestown',
+        subdivision='PA',
+        postal_code='18901',
+        country='US'
+    ))"""
 
 except WebFault as err:
     print

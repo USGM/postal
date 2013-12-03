@@ -23,7 +23,9 @@ class Address:
     def __init__(
             self, contact_name=None, phone_number=None,
             street_lines=None, city=None, subdivision=None,
-            postal_code=None, country=None, residential=False):
+            postal_code=None, postal_code_extension=None,
+            country=None, residential=False,
+            urbanization=None):
         """
         contact_name:string
         phone_number:string
@@ -33,22 +35,34 @@ class Address:
         subdivision:string:len=2 = postal abbreviation of state or province
         postal_code:string|None = the postal code or None if not applicable in
             the specified country
+        postal_code_extension:(string:len=4)|None = the postal code extension
+            or None if not in the US
         country:string:len=2 = 2-letter abbreviation of the country name
             (the alpha2 code)
         residential:bool = true if this object represents a residential address
+        urbanization:string|None = sub-city political division; must be None
+            if country is not 'PR'/Puerto Rico (required for UPS)
         """
         # The following should always be needed for any country.
-        if not all([contact_name, street_lines, city, country]):
+        if not all([contact_name, phone_number, street_lines, city, country]):
             raise AddressError(
                 "Not enough information to construct an address.")
+        if urbanization is not None and country != 'PR':
+            raise AddressError('Urbanization given for non-PR address.')
+        if postal_code_extension is not None and country != 'US':
+            raise AddressError(
+                'Postal code extension given for non-US address.')
+
         self.contact_name = contact_name
         self.phone_number = phone_number
         self.street_lines = street_lines
         self.city = city
         self.postal_code = postal_code
+        self.postal_code_extension = postal_code_extension
         self.subdivision = subdivision
         self.residential = residential
         self.country = get_country(country)
+        self.urbanization = urbanization
 
 
 class Package:

@@ -207,7 +207,8 @@
 			<!-- Production URL -->
 			<!-- <soap:address location="https://onlinetools.ups.com/webservices/XAV"/> -->
 			<!-- CIE (Customer Integration Environment) URL -->
-			<soap:address location="https://wwwcie.ups.com/webservices/XAV"/>
+			<!-- <soap:address location="https://wwwcie.ups.com/webservices/XAV"/> -->
+            <soap:address location="https://onlinetools.ups.com/webservices/XAV"/>
 		</wsdl:port>
 	</wsdl:service>
 </wsdl:definitions>

@@ -11,15 +11,22 @@ import suds.cache
 import money
 import base
 from datetime import datetime
+from ..data import Address
 
 
 def get_directory_of(a):
     return os.path.split((os.path.abspath(inspect.getfile(a))))[0]
 
 
-class FixBrokenNamespacePlugin(MessagePlugin):
+class FixBrokenRateNamespace(MessagePlugin):
     def marshalled(self, context):
         (context.envelope.getChild('Body').getChild('RateRequest')
+            .getChild('Request')).prefix = 'ns0'
+
+
+class FixBrokenAddressNamespace(MessagePlugin):
+    def marshalled(self, context):
+        (context.envelope.getChild('Body').getChild('XAVRequest')
             .getChild('Request')).prefix = 'ns0'
 
 
@@ -95,7 +102,7 @@ class UPSAPI(base.Carrier):
                 AuthenticationPlugin(
                     username, password, access_license_number
                 ),
-                FixBrokenNamespacePlugin()
+                FixBrokenRateNamespace()
             ]
         )
         self.XAV = Client(
@@ -108,10 +115,9 @@ class UPSAPI(base.Carrier):
                 AuthenticationPlugin(
                     username, password, access_license_number
                 ),
-                #FixBrokenNamespacePlugin()
+                FixBrokenAddressNamespace()
             ]
         )
-        print self.XAV
 
     def get_services(self, package):
         return self.get_services_list([package], package.destination)
@@ -247,27 +253,92 @@ class UPSAPI(base.Carrier):
             shipment.InvoiceLineTotal.CurrencyCode = 'USD'
             shipment.InvoiceLineTotal.MonetaryValue = '0'
 
-        #print request
-        #print shipment
         rates = self.RateWS.service.ProcessRate(
             request, _pickup_type, _customer_classification, shipment)
 
         if rates.Response.ResponseStatus.Code != '1':  # 1 = Success
             raise Exception()
 
-        for alert in rates.Response.Alert:
-            print 'ALERT:', alert.Description
+        if hasattr(rates.Response, 'Alert'):
+            for alert in rates.Response.Alert:
+                print 'ALERT:', alert.Description
 
         return rates
 
     def validate_address(self, address):
+        request = self.XAV.factory.create('ns0:RequestType')
+        request.RequestOption = '3'  # validation and classification
 
-        #request = self.RateWS.factory.create('ns0:RequestType')
-        #request.RequestOption = [request_type]
+        address_key = self.XAV.factory.create('ns2:AddressKeyFormatType')
+        address_key.ConsigneeName = address.contact_name
+        address_key.AddressLine = address.street_lines[0]
+        address_key.PoliticalDivision2 = address.city
+        address_key.PoliticalDivision1 = address.subdivision
+        address_key.Urbanization = address.urbanization
+        address_key.CountryCode = address.country.alpha2
+        address_key.PostcodePrimaryLow = address.postal_code
+        address_key.PostcodeExtendedLow = address.postal_code_extension
 
-        #self.XAV.ProcessXAV(request, )
+        # no tag for RegionalRequestIndicator = street-level validation
+        response = self.XAV.service.ProcessXAV(
+            request,
+            None,  # empty tag = street-level validation
+            2,  # candidate list size
+            address_key
+        )
+        #print response
 
-        raise NotImplementedError
+        if response.Response.ResponseStatus.Code != '1':
+            raise Exception()
+
+        if hasattr(response.Response, 'Alert'):
+            for alert in response.Response.Alert:
+                print 'ALERT: ' + alert.Description
+
+        #if hasattr(response, 'NoCandidatesIndicator'):
+        #    return False, None
+        #if hasattr(response, 'AmbiguousAddressIndicator'):
+        #    return False, None
+        #if hasattr(response, 'ValidAddressIndicator'):
+        #    return False, None
+        if not hasattr(response, 'Candidate'):
+            return False, None
+
+        if len(response.Candidate) == 0:
+            return False, None
+
+        #for candidate in response.Candidate:
+        candidate = response.Candidate[0]
+
+        residential = candidate.AddressClassification.Code
+        if residential == '0':  # unknown (usually for st # ranges)
+            residential = None
+        elif residential == '1':  # commercial
+            residential = False
+        elif residential == '2':  # residential
+            residential = True
+        else:
+            raise Exception()  # TODO: make this a warning in a release version
+            residential = None
+
+        result = Address(
+            contact_name=address.contact_name,
+            phone_number=address.phone_number,
+            street_lines=candidate.AddressKeyFormat.AddressLine,
+            subdivision=candidate.AddressKeyFormat.PoliticalDivision1,
+            city=candidate.AddressKeyFormat.PoliticalDivision2,
+            postal_code=candidate.AddressKeyFormat.PostcodePrimaryLow,
+            postal_code_extension=
+                candidate.AddressKeyFormat.PostcodeExtendedLow,
+            country=candidate.AddressKeyFormat.CountryCode,
+            residential=  # if UPS doesn't know, use data from parameter
+                residential if residential is not None else address.residential
+        )
+
+        if result == address:
+            return True, result
+        else:
+            return False, result
 
     def delivery_datetime(self, service, package):
         rates = self.request_rates(
