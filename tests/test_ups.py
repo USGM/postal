@@ -92,6 +92,11 @@ try:
 
     print api.ship(services.keys()[0], request)
 
+    print services.keys()[0]
+    print services.keys()[0].service_id
+
+    print api.delivery_datetime(services.keys()[0], pak, pickup_datetime=datetime(2013, 12, 16, 9, 30))
+
 except WebFault as err:
     print
     print '***** FAULT *****'

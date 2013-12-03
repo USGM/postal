@@ -128,6 +128,19 @@ class UPSAPI(base.Carrier):
             cache=suds.cache.NoCache(),
             plugins=[authentication, FixBrokenShipmentRequestNamespace()]
         )
+        self.TNTWS = Client(
+            'file://' + os.path.join(
+                get_directory_of(inspect.currentframe()),
+                'wsdl', 'ups', 'TNTWS.wsdl'
+            ),
+            cache=suds.cache.NoCache(),
+            plugins=[
+                AuthenticationPlugin(
+                    username, password, access_license_number
+                ),
+                FixBrokenTimeNamespace()
+            ]
+        )
 
     def ship(self, service, request):
         api_request = self._Ship.factory.create('ns0:RequestType')
@@ -716,7 +729,6 @@ _service_code_to_time_in_transit_code = {
     '11': '03',
     '65': '20',
     '96': '29'  # UPS Worldwide Express Freight
-
 
     ### No mappings:
     # UPS Next Day Air Early A.M. (Saturday Delivery)
