@@ -89,7 +89,6 @@ class Request(object):
                  packages, ship_datetime=None, insure=False):
         self.origin = origin
         self.destination = destination
-        self.ship_datetime = ship_datetime
         self.insure = insure
         self.packages = packages
         self.ship_datetime = ship_datetime
