@@ -13,6 +13,7 @@ from ..carriers import ups
 from .. import data
 from suds import WebFault
 from pprint import pprint
+from datetime import datetime
 
 import test_credentials
 
@@ -51,8 +52,8 @@ try:
         )
     )
 
-    #services = api.get_services(pak)
-    #pprint(services)
+    services = api.get_services(pak)
+    pprint(services)
 
     #print api.delivery_datetime(services.keys()[0], pak)
     #print api.quote(services.keys()[0], pak)
@@ -75,7 +76,7 @@ try:
         country='US'
     ))"""
 
-    print api.validate_address(data.Address(
+    """print api.validate_address(data.Address(
         contact_name='wat',
         phone_number='argv',
         street_lines=['1321 Upl'],
@@ -84,7 +85,7 @@ try:
         postal_code='77047',
         postal_code_extension='1234',
         country='US'
-    ))
+    ))"""
 
     """print api.validate_address(data.Address(
         street_lines=['27 Edison Furlong Rd'],
@@ -93,6 +94,11 @@ try:
         postal_code='18901',
         country='US'
     ))"""
+
+    print services.keys()[0]
+    print services.keys()[0].service_id
+
+    print api.delivery_datetime(services.keys()[0], pak, pickup_datetime=datetime(2013, 12, 16, 9, 30))
 
 except WebFault as err:
     print
