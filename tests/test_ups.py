@@ -42,6 +42,7 @@ try:
         test_credentials.shipper_number,
         data.Address(
             contact_name='US Global Mail',
+            phone_number='ohai',
             street_lines=['1321 Upland Drive'],
             city='Houston',
             subdivision='TX',
@@ -76,6 +77,7 @@ try:
 
     print api.validate_address(data.Address(
         contact_name='wat',
+        phone_number='argv',
         street_lines=['1321 Upl'],
         city='Houston',
         subdivision='TX',

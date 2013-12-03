@@ -279,14 +279,12 @@ class UPSAPI(base.Carrier):
         address_key.PostcodePrimaryLow = address.postal_code
         address_key.PostcodeExtendedLow = address.postal_code_extension
 
-        # no tag for RegionalRequestIndicator = street-level validation
         response = self.XAV.service.ProcessXAV(
             request,
-            None,  # empty tag = street-level validation
+            None,  # missing tag = street-level validation
             2,  # candidate list size
             address_key
         )
-        #print response
 
         if response.Response.ResponseStatus.Code != '1':
             raise Exception()
@@ -295,19 +293,12 @@ class UPSAPI(base.Carrier):
             for alert in response.Response.Alert:
                 print 'ALERT: ' + alert.Description
 
-        #if hasattr(response, 'NoCandidatesIndicator'):
-        #    return False, None
-        #if hasattr(response, 'AmbiguousAddressIndicator'):
-        #    return False, None
-        #if hasattr(response, 'ValidAddressIndicator'):
-        #    return False, None
         if not hasattr(response, 'Candidate'):
             return False, None
 
         if len(response.Candidate) == 0:
             return False, None
 
-        #for candidate in response.Candidate:
         candidate = response.Candidate[0]
 
         residential = candidate.AddressClassification.Code
@@ -331,8 +322,16 @@ class UPSAPI(base.Carrier):
             postal_code_extension=
                 candidate.AddressKeyFormat.PostcodeExtendedLow,
             country=candidate.AddressKeyFormat.CountryCode,
-            residential=  # if UPS doesn't know, use data from parameter
-                residential if residential is not None else address.residential
+            residential=(
+                residential
+                if residential is not None else
+                address.residential  # if UPS doesn't know, use parameter
+            ),
+            urbanization=(
+                candidate.AddressKeyFormat.Urbanization
+                if hasattr(candidate.AddressKeyFormat, 'Urbanization') else
+                None
+            )
         )
 
         if result == address:
