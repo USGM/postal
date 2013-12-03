@@ -1,5 +1,4 @@
 from StringIO import StringIO
-import unittest
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
@@ -8,7 +7,7 @@ from money.Money import Money
 
 from ..carriers.base import Service
 
-from ..data import Address, Package, Declaration, Shipment
+from ..data import Address, Package, Declaration, Shipment, Request
 
 test_from = {
     'street_lines': ['1321 Upland Drive'],
@@ -25,6 +24,14 @@ test_to = {
     'city': 'Kingwood',
     'postal_code': '77345',
     'phone_number': '5555555555',
+    'subdivision': 'TX',
+    'country': 'US'}
+
+test_two = {
+    'street_lines': ['1730 Mustang Trail'],
+    'contact_name': 'Some Guy',
+    'city': 'Kingwood',
+    'postal_code': '77339',
     'subdivision': 'TX',
     'country': 'US'}
 
@@ -56,33 +63,35 @@ class TestCarrier(object):
         self.test_from = Address(**test_from)
         self.test_to = Address(**test_to)
         self.european_address = Address(**test_european)
-        self.package = Package(2, 3, 4, 5, self.test_from, self.test_to)
+        self.package = Package(2, 3, 4, 5)
+        self.package2 = Package(4, 6, 6, 4)
+        self.request = Request(self.test_from, self.test_to, [self.package])
         self.declarations = [
             Declaration('McGuffin', Money('500.00', 'USD'), 'US', 7),
             Declaration('Brains', Money('1000.00', 'USD'), 'US', 5)]
 
     def test_get_services(self):
-        services = self.carrier.get_services(self.package)
+        services = self.carrier.get_services(self.request)
         self.assertTrue(services)
         for service in services.keys():
             self.assertTrue(isinstance(service, Service))
 
     def test_delayed_shipment(self):
-        self.package.ship_datetime = datetime.now() + relativedelta(days=10)
-        services = self.carrier.get_services(self.package)
+        self.request.ship_datetime = datetime.now() + relativedelta(days=10)
+        services = self.carrier.get_services(self.request)
         self.assertTrue(services)
         for service, values in services.items():
             if values['delivery_datetime']:
                 self.assertGreater(
                     values['delivery_datetime'],
-                    self.package.ship_datetime)
+                    self.request.ship_datetime)
 
     def test_residential_shipment(self):
-        services = self.carrier.get_services(self.package)
+        services = self.carrier.get_services(self.request)
         cache_save = self.carrier.cache
         self.carrier.cache = {}
         self.test_to.residential = True
-        services_residential = self.carrier.get_services(self.package)
+        services_residential = self.carrier.get_services(self.request)
         self.assertTrue(services)
         for service in services.keys():
             self.assertTrue(isinstance(service, Service))
@@ -98,11 +107,11 @@ class TestCarrier(object):
         composite_set = commercial.intersection(residential)
 
         residential = [
-            service.price(self.package) for service in services_residential
+            service.price(self.request) for service in services_residential
             if service in composite_set]
         self.carrier.cache = cache_save
         commercial = [
-            service.price(self.package) for service in services
+            service.price(self.request) for service in services
             if service in composite_set]
         residential = sum(residential)
         commercial = sum(commercial)
@@ -110,23 +119,23 @@ class TestCarrier(object):
 
     def test_insurance(self):
 
-        services = self.carrier.get_services(self.package)
+        services = self.carrier.get_services(self.request)
         normal_total = sum(
-            [service.price(self.package) for service in services])
+            [service.price(self.request) for service in services])
 
         self.carrier.cache = {}
 
         self.package.declarations = self.declarations
-        services = self.carrier.get_services(self.package)
+        services = self.carrier.get_services(self.request)
         declarations_total = sum(
-            [service.price(self.package) for service in services])
+            [service.price(self.request) for service in services])
 
         self.carrier.cache = {}
 
-        self.package.insure = True
-        services = self.carrier.get_services(self.package)
+        self.request.insure = True
+        services = self.carrier.get_services(self.request)
         insured_total = sum(
-            [service.price(self.package) for service in services])
+            [service.price(self.request) for service in services])
         self.assertEqual(normal_total, declarations_total)
         self.assertGreater(insured_total, normal_total)
 
@@ -144,12 +153,18 @@ class TestCarrier(object):
 
     def test_international_services(self):
         self.package.destination = self.european_address
-        services = self.carrier.get_services(self.package)
+        services = self.carrier.get_services(self.request)
         self.assertTrue(services)
 
     def test_ship_package(self):
-        services = self.carrier.get_services(self.package)
-        shipment = services.keys()[0].ship(self.package)
+        services = self.carrier.get_services(self.request)
+        shipment = services.keys()[0].ship(self.request)
         self.assertIsInstance(shipment, Shipment)
         self.assertTrue(shipment.tracking_number)
-        PdfFileReader(StringIO(shipment.label))
+        label = shipment.package_details[self.package]['label']
+        PdfFileReader(StringIO(label))
+
+    def test_multiship(self):
+        services = self.carrier.get_services(self.request)
+        self.request.packages.append(self.package2)
+        shipment = services.keys()[0].ship(self.request)

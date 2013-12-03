@@ -1,13 +1,13 @@
 """
 This is the module for interfacing with FedEx's web services APIs.
 """
-from StringIO import StringIO
 import inspect
 import os
 from base64 import b64decode
 from datetime import datetime
 from math import ceil
 from PyPDF2 import PdfFileReader, PdfFileWriter
+from StringIO import StringIO
 from suds.client import Client
 from money import Money
 
@@ -163,7 +163,7 @@ class FedExApi(Carrier):
 
     @staticmethod
     def format_label(label):
-        input = PdfFileReader(StringIO(label))
+        input = PdfFileReader(StringIO(b64decode(label)))
         output = PdfFileWriter()
 
         page = input.getPage(0)
@@ -174,67 +174,73 @@ class FedExApi(Carrier):
         output.write(output_stream)
         return output_stream.getvalue()
 
-    def requested_shipment(self, service, package):
-        request = self.ship_client.factory.create('RequestedShipment')
-        request.ShipTimestamp = package.ship_datetime or datetime.now()
-        request.ServiceType = service.service_id
-        request.DropoffType = 'REGULAR_PICKUP'
-        request.PackagingType = 'YOUR_PACKAGING'
-        request.RateRequestTypes = 'ACCOUNT'
-        self.set_address(request.Shipper, package.origin)
-        self.set_address(request.Recipient, package.destination)
-        payment = request.ShippingChargesPayment
+    def requested_shipment(self, service, request):
+        api_request = self.ship_client.factory.create('RequestedShipment')
+        api_request.ShipTimestamp = request.ship_datetime or datetime.now()
+        api_request.ServiceType = service.service_id
+        api_request.DropoffType = 'REGULAR_PICKUP'
+        api_request.PackagingType = 'YOUR_PACKAGING'
+        api_request.RateRequestTypes = 'ACCOUNT'
+        self.set_address(api_request.Shipper, request.origin)
+        self.set_address(api_request.Recipient, request.destination)
+        payment = api_request.ShippingChargesPayment
         payment.PaymentType = 'SENDER'
         party = payment.Payor.ResponsibleParty
         party.AccountNumber = self.account_number
-        party.Contact.PersonName = package.origin.contact_name
-        party.Contact.PhoneNumber = package.origin.phone_number
-        self.label_specification(request.LabelSpecification)
-        request.PackageCount = 1
-        request.RequestedPackageLineItems.append(
-            self.line_item(self.ship_client, request, package))
-        return request
+        party.Contact.PersonName = request.origin.contact_name
+        party.Contact.PhoneNumber = request.origin.phone_number
+        self.label_specification(api_request.LabelSpecification)
+        api_request.PackageCount = len(request.packages)
+        self.line_items(self.ship_client, api_request, request)
+        return api_request
 
-    def ship(self, service, package):
+    def ship(self, service, request):
         auth = self.authentication(self.ship_client)
         client_detail = self.user_client(self.ship_client)
         transaction_detail = self.transaction_detail(self.ship_client)
         version_id = self.ship_version_id()
-        requested_shipment = self.requested_shipment(service, package)
+        requested_shipment = self.requested_shipment(service, request)
         result = self.service_call(
             self.ship_client.service.processShipment, auth, client_detail,
             transaction_detail, version_id, requested_shipment)
-        details = result.CompletedShipmentDetail.CompletedPackageDetails[0]
-        tracking_number = details.OperationalDetail.Barcodes.StringBarcodes[
-            0].Value
-        label = self.format_label(b64decode(details.Label.Parts[0].Image))
+        package_details = {}
+        # TODO: Get real authoritative number.
+        master_tracking_number = 'XXXXXX'
+        details = result.CompletedShipmentDetail.CompletedPackageDetails
+        for detail, package in zip(details, request.packages):
+            package_details[package] = {
+                'tracking_number': (
+                    detail.OperationalDetail.Barcodes.StringBarcodes[0].Value),
+                'label': self.format_label(detail.Label.Parts[0].Image)}
 
-        return Shipment(self, tracking_number, label)
+        return Shipment(self, master_tracking_number, package_details)
 
     def carrier_codes(self):
         codes = self.rates_client.factory.create('CarrierCodeType')
         return [codes.FDXE, codes.FDXG]
 
-    def line_item(self, client, request, package):
-        item = client.factory.create('RequestedPackageLineItem')
-        item.SequenceNumber = 1
-        item.GroupPackageCount = 1
-        item.Weight.Units.value = 'LB'
-        item.Weight.Value = int(ceil(package.weight))
+    def line_items(self, client, api_request, request):
+        for index, package in enumerate(request.packages):
+            item = client.factory.create('RequestedPackageLineItem')
+            item.SequenceNumber = index + 1
+            item.GroupNumber = 1
+            item.GroupPackageCount = 1
+            item.Weight.Units.value = 'LB'
+            item.Weight.Value = int(ceil(package.weight))
 
-        dimensions = item.Dimensions
-        dimensions.Height = int(ceil(package.height))
-        dimensions.Width = int(ceil(package.width))
-        dimensions.Length = int(ceil(package.length))
-        dimensions.Units = 'IN'
+            dimensions = item.Dimensions
+            dimensions.Height = int(ceil(package.height))
+            dimensions.Width = int(ceil(package.width))
+            dimensions.Length = int(ceil(package.length))
+            dimensions.Units = 'IN'
 
-        if package.declarations:
-            value = self.set_declarations(request, package)
-            if value and package.insure:
-                item.InsuredValue.Currency = value.currency
-                item.InsuredValue.Amount = value.amount
+            if package.declarations:
+                value = self.set_declarations(api_request, package)
+                if value and request.insure:
+                    item.InsuredValue.Currency = value.currency
+                    item.InsuredValue.Amount = value.amount
+            api_request.RequestedPackageLineItems.append(item)
 
-        return item
 
     @staticmethod
     def set_address(target, address):
@@ -266,30 +272,29 @@ class FedExApi(Carrier):
                 total_value = value
             else:
                 total_value += value
-        request.CustomsClearanceDetail.Commodities = commodities
+        request.CustomsClearanceDetail.Commodities.extend(commodities)
         return total_value
 
-    def requested_shipment_rate(self, package):
-        request = self.rates_client.factory.create('RequestedShipment')
+    def requested_shipment_rate(self, request):
+        api_request = self.rates_client.factory.create('RequestedShipment')
 
-        self.set_address(request.Shipper, package.origin)
-        self.set_address(request.Recipient, package.destination)
+        self.set_address(api_request.Shipper, request.origin)
+        self.set_address(api_request.Recipient, request.destination)
 
-        request.RateRequestTypes = 'ACCOUNT'
-        request.PackageCount = 1
+        api_request.RateRequestTypes = 'ACCOUNT'
+        api_request.PackageCount = len(request.packages)
 
-        request.RequestedPackageLineItems = [self.line_item(
-            self.rates_client, request, package)]
-        request.ShipTimestamp = package.ship_datetime
+        self.line_items(self.rates_client, api_request, request)
+        api_request.ShipTimestamp = request.ship_datetime
 
-        return request
+        return api_request
 
-    def cache_results(self, package, response):
+    def cache_results(self, packages, response):
         """
         Avoid looking up information on an object more than we must.
         """
         # For now, we make this in-process.
-        self.cache.update({package: response})
+        self.cache.update({self.cache_key(packages): response})
 
     @staticmethod
     def rate_response_dict(response):
@@ -308,7 +313,7 @@ class FedExApi(Carrier):
         return Service(
             self, service, self.service_table[service])
 
-    def get_services(self, package):
+    def get_services(self, request):
         """
         Get available services for shipping a package.
         """
@@ -319,13 +324,13 @@ class FedExApi(Carrier):
         return_transit = True
         codes = []
         variable_options = []
-        requested_shipment = self.requested_shipment_rate(package)
+        requested_shipment = self.requested_shipment_rate(request)
         response = self.service_call(
             self.rates_client.service.getRates,
             auth, client, transaction_detail, version, return_transit, codes,
             variable_options, requested_shipment)
         result = self.rate_response_dict(response)
-        self.cache_results(package, result)
+        self.cache_results(request, result)
 
         final = {
             self.create_service(key): {
@@ -335,19 +340,24 @@ class FedExApi(Carrier):
 
         return final
 
-    def delivery_datetime(self, service, package):
-        if not package in self.cache:
-            self.get_services(package)
-        data = self.cache[package].get(service.service_id, None)
+    @staticmethod
+    def cache_key(request):
+        return tuple(sorted(request.packages, key=hash))
+
+    def delivery_datetime(self, service, request):
+        if not self.cache_key(request) in self.cache:
+            self.get_services(request)
+        data = self.cache[tuple(request)].get(service.service_id, None)
         if not data:
             raise ExceedsLimitsError(
                 "This package is not able to be shipped on this service.")
         return data['delivery_datetime']
 
-    def quote(self, service, package):
-        if not package in self.cache:
-            self.get_services(package)
-        data = self.cache[package].get(service.service_id, None)
+    def quote(self, service, request):
+        if not self.cache_key(request) in self.cache:
+            self.get_services(request)
+        data = self.cache[self.cache_key(request)].get(
+            service.service_id, None)
         if not data:
             raise ExceedsLimitsError(
                 "This package is not able to be shipped on this service.")

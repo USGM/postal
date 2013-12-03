@@ -77,8 +77,8 @@ class UPSAPI(base.Carrier):
     def __init__(self):
         super(UPSAPI, self).__init__()
 
-    def get_services(self, package):
-        return self.get_services_list([package], package.destination)
+    def get_services(self, request):
+        return self.get_services_list([request], request.destination)
 
     def get_services_list(self, packages, destination):
         rates = self.request_rates('Shop', packages, destination)
@@ -211,8 +211,8 @@ class UPSAPI(base.Carrier):
         """
         raise NotImplementedError
 
-    def delivery_datetime(self, service, package):
-        return self.delivery_datetime_list(service, [package], package.destination)
+    def delivery_datetime(self, service, request):
+        return self.delivery_datetime_list(service, [request], request.destination)
 
     def delivery_datetime_list(self, service, packages, destination):
         rates = self.request_rates('Rate', packages, destination, service=service)
@@ -225,7 +225,7 @@ class UPSAPI(base.Carrier):
 
         return _get_rated_shipment_info(rated_shipment)
 
-    def quote(self, service, package):
+    def quote(self, service, request):
         """
         Given a service and a package, determine the cost of sending the
         package through that service. If the package cannot be sent through

@@ -15,7 +15,7 @@ def get_country(country_code):
         raise AddressError("Could not find the requested country.")
 
 
-class Address:
+class Address(object):
     """
     Addresses for shipping. Many services have address validation, which can
     be used to determine if an address is sane or not.
@@ -52,24 +52,17 @@ class Address:
             raise AddressError("Could not find the requested country.")
 
 
-class Package:
+class Request(object):
     """
-    A parcel is something that we have not yet committed to ship, but which
-    has information like its height, width, and length, as well as its weight.
+    This object represents a full request to send to one of the carriers.
+    It can contain several packages.
 
-    These can be used to query other services and find out what options for
-    delivery are available.
+    packages should contain a list of Package objects.
 
-    All carriers support Imperial units, but have spotty support for Metric.
-    It is with great annoyance that we have therefore made the default units
-    imperial. You can convert your measurements on the fly by setting imperial
-    to false.
+    origin and destination should be Address objects.
 
-    ship_datetime should be set to the time you expect to be able to ship the
-    package.
-
-    declarations is a list of Declaration objects, used for customs data
-    and for calculating the insured value.
+    ship_datetime should be set to the time when the shipment is expected to
+    be made.
 
     When insure is set true, API calls will declare the value of items in a way
     that intends to pay for an insurance surcharge, if one is available.
@@ -79,19 +72,39 @@ class Package:
     each carrier in order to allow for filing claims with the carriers if
     something should go wrong.
     """
+    def __init__(self, origin, destination,
+                 packages, ship_datetime=None, insure=False):
+        self.origin = origin
+        self.destination = destination
+        self.ship_datetime = ship_datetime
+        self.insure = insure
+        self.packages = packages
+        self.ship_datetime = ship_datetime
+
+
+class Package(object):
+    """
+    Package objects represent the parcels that will be shipped and what their
+    value is.
+
+    All carriers support Imperial units, but have spotty support for Metric.
+    It is with great annoyance that we have therefore made the default units
+    imperial. You can convert your measurements on the fly by setting imperial
+    to false.
+
+    declarations is a list of Declaration objects, used for customs data
+    and for calculating the insured value.
+
+
+    """
     def __init__(
-            self, length, width, height, weight,
-            origin, destination, declarations=None,
-            insure=False, ship_datetime=None, imperial=True):
+            self, length, width, height, weight, declarations=None,
+            imperial=True):
         self.length = length
         self.width = width
         self.height = height
         self.weight = weight
-        self.origin = origin
-        self.destination = destination
         self.declarations = declarations
-        self.insure = insure
-        self.ship_datetime = ship_datetime
 
         if not imperial:
             self.imperialize()
@@ -99,10 +112,7 @@ class Package:
     def __hash__(self):
         dimensions = 'x'.join(map(str, sorted(
             [self.length, self.width, self.height, self.weight])))
-        return hash((
-            dimensions, self.origin.postal_code, self.origin.country,
-            self.origin.postal_code, self.destination.country,
-            self.destination.postal_code))
+        return hash(dimensions)
 
     @staticmethod
     def to_centimeters(number):
@@ -127,7 +137,7 @@ class Package:
         self.weight = self.to_pounds(self.weight)
 
 
-class Declaration:
+class Declaration(object):
     """
     Declarations are more useful for international shipments. They allow you to
     specify what is in the package and what the value of these objects are.
@@ -153,20 +163,23 @@ class Declaration:
         self.origin_country = get_country(origin_country)
 
 
-class Shipment:
+class Shipment(object):
     """
     Created when a package has been committed for shipment. Can also be used
     to get options for dealing with a package after a shipment has been
     requested, like cancellation.
+
+    labels, if they're available, should contain a dictionary of packages to
+    labels. If they are not available, it should be set to None.
     """
 
-    def __init__(self, carrier, tracking_number, label=None):
+    def __init__(self, carrier, tracking_number, package_details=None):
         self.tracking_number = tracking_number
         if carrier:
             self.carrier = carrier
         else:
             self.derive_carrier()
-        self.label = label
+        self.package_details = package_details
 
     def derive_carrier(self):
         # Reverse engineer the carrier based on the tracking number, somehow.
