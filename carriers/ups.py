@@ -119,8 +119,8 @@ class UPSAPI(base.Carrier):
             ]
         )
 
-    def get_services(self, package):
-        return self.get_services_list([package], package.destination)
+    def get_services(self, request):
+        return self.get_services_list([request], request.destination)
 
     def get_services_list(self, packages, destination):
         rates = self.request_rates('Shop', packages, destination)
@@ -339,10 +339,11 @@ class UPSAPI(base.Carrier):
         else:
             return False, result
 
-    def delivery_datetime(self, service, package):
-        rates = self.request_rates(
-            'Rate', [package], package.destination, service=service
-        )
+    def delivery_datetime(self, service, request):
+        return self.delivery_datetime_list(service, [request], request.destination)
+
+    def delivery_datetime_list(self, service, packages, destination):
+        rates = self.request_rates('Rate', packages, destination, service=service)
 
         if len(rates.RatedShipment) != 1:
             raise Exception()
@@ -353,9 +354,9 @@ class UPSAPI(base.Carrier):
         delivery_datetime, price = _get_rated_shipment_info(rated_shipment)
         return delivery_datetime
 
-    def quote(self, service, package):
+    def quote(self, service, request):
         rates = self.request_rates(
-            'Rate', [package], package.destination, service=service
+            'Rate', [request], request.destination, service=service
         )
 
         if len(rates.RatedShipment) != 1:
