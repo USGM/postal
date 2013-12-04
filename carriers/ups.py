@@ -459,7 +459,7 @@ class UPSAPI(base.Carrier):
 
         return None
 
-    def quote(self, service, package):
+    def quote(self, service, request):
         rates = self.request_rates(
             'Rate', request.packages, request.destination, service=service,
             ship_from=request.origin
@@ -471,7 +471,7 @@ class UPSAPI(base.Carrier):
         if rated_shipment.Service.Code != service.service_id:
             raise Exception()
 
-        delivery_datetime, price = _get_rated_shipment_info(rated_shipment)
+        price, delivery_time = _get_rated_shipment_info(rated_shipment)
         return price
 
 
@@ -514,13 +514,13 @@ def _get_rated_shipment_info(rated_shipment):
         rated_shipment.TotalCharges.CurrencyCode
     )
     try:
-        delivery_datetime = _guaranteed_delivery_to_string(
+        delivery_time = _guaranteed_delivery_to_string(
             rated_shipment.GuaranteedDelivery
         )
     except AttributeError:
-        delivery_datetime = None
+        delivery_time = None
 
-    return price, delivery_datetime
+    return price, delivery_time
 
 
 def _get_rated_shipment_info_dict(rated_shipment):
