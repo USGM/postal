@@ -79,8 +79,15 @@ class TestCarrier(object):
             self.assertTrue(isinstance(service, Service))
 
     def test_delayed_shipment(self):
-        sys.stderr.write('\nTest: Delayed Shipment ')
-        self.request.ship_datetime = datetime.now() + relativedelta(days=10)
+        ship_datetime = datetime.now() + relativedelta(days=10)
+        # Avoid issuing requests for Saturday or Sunday in case pickup is not
+        # provided on those days for carriers. The risk is still run of
+        # hitting a holiday, of course.
+        # The weekday count starts on Monday at 0.
+        if ship_datetime.weekday() in [5, 6]:
+            ship_datetime += relativedelta(days=2)
+        self.request.ship_datetime = ship_datetime
+
         services = self.carrier.get_services(self.request)
         self.assertTrue(services)
         for service, values in services.items():
@@ -90,7 +97,8 @@ class TestCarrier(object):
                     self.request.ship_datetime)
 
     def test_residential_shipment(self):
-        sys.stderr.write('\nTest: Residential Shipment ')
+        if not self.carrier.address_validation:
+            return
         services = self.carrier.get_services(self.request)
         cache_save = self.carrier.cache
         self.carrier.cache = {}
@@ -122,8 +130,6 @@ class TestCarrier(object):
         self.assertGreater(residential, commercial)
 
     def test_insurance(self):
-        sys.stderr.write('\nTest: Insurance ')
-
         services = self.carrier.get_services(self.request)
         normal_total = sum(
             [service.price(self.request) for service in services])
@@ -145,7 +151,8 @@ class TestCarrier(object):
         self.assertGreater(insured_total, normal_total)
 
     def test_address_validation(self):
-        sys.stderr.write('\nTest: Address Validation ')
+        if not self.carrier.address_validation:
+            return
         score, address = self.carrier.validate_address(self.test_to)
         try:
             self.assertIsNotNone(address)

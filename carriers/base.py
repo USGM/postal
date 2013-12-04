@@ -28,6 +28,10 @@ class ClearEmpty(MessagePlugin):
 
 class Carrier(object):
     name = 'Undefined Carrier'
+    # If a carrier provides Address Validation Services, this should be set
+    # to true.
+    address_validation = False
+    cache = {}
 
     def __init__(self):
         pass
@@ -46,6 +50,17 @@ class Carrier(object):
             return func(*args, **kwargs)
         except WebFault as err:
             raise CarrierError(err.document)
+
+    @staticmethod
+    def cache_key(request):
+        return hash(tuple(sorted(request.packages, key=hash)))
+
+    def cache_results(self, request, response_dict):
+        """
+        Avoid looking up information on an object more than we must.
+        """
+        # For now, we make this in-process.
+        self.cache.update({self.cache_key(request): response_dict})
 
     def get_services(self, request):
         """
@@ -66,18 +81,25 @@ class Carrier(object):
         """
         raise NotImplementedError
 
+    def ship(self, service, request):
+        """
+        Ship a package on the requested service. This should return a Shipment
+        object.
+        """
+        raise NotImplementedError
+
     def delivery_datetime(self, service, request):
         """
         Should return either a datetime object with an approximate delivery
-        time for a package, or None. If the package cannot be sent through this
+        time for a request, or None. If the package cannot be sent through this
         service, an exception should be raised.
         """
         raise NotImplementedError
 
     def quote(self, service, request):
         """
-        Given a service and a package, determine the cost of sending the
-        package through that service. If the package cannot be sent through
+        Given a service and a request, determine the cost of sending the
+        request through that service. If the request cannot be sent through
         that service, an exception should be raised.
         """
         raise NotImplementedError

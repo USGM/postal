@@ -88,6 +88,8 @@ Void = Client(
 class UPSAPI(base.Carrier):
     name = 'UPS'
 
+    address_validation = True
+
     def __init__(
         self, username, password, access_license_number, shipper_number,
         shipper_address

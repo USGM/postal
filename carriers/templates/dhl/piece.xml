@@ -1,0 +1,7 @@
+                <Piece>
+                    <PieceID>{number}</PieceID>
+                    <Height>{height}</Height>
+                    <Depth>{length}</Depth>
+                    <Width>{width}</Width>
+                    <Weight>{weight}</Weight>
+                </Piece>

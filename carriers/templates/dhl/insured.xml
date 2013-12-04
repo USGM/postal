@@ -1,0 +1,2 @@
+            <InsuredValue>{value}</InsuredValue>
+            <InsuredCurrency>{currency}</InsuredCurrency>

@@ -21,6 +21,7 @@ class FedExApi(Carrier):
     Implements calls to the USPS web API.
     """
     name = 'FedEx'
+    address_validation = True
     service_table = {
         'FIRST_OVERNIGHT': 'First Overnight',
         'PRIORITY_OVERNIGHT': 'Priority Overnight',
@@ -62,7 +63,6 @@ class FedExApi(Carrier):
         self.account_number = account_number
         self.password = password
         self.meter_number = meter_number
-        self.cache = {}
 
         self.rates_client = self.create_client('RateService_v14.wsdl')
 
@@ -289,13 +289,6 @@ class FedExApi(Carrier):
 
         return api_request
 
-    def cache_results(self, packages, response):
-        """
-        Avoid looking up information on an object more than we must.
-        """
-        # For now, we make this in-process.
-        self.cache.update({self.cache_key(packages): response})
-
     @staticmethod
     def rate_response_dict(response):
         if not hasattr(response, 'RateReplyDetails'):
@@ -339,10 +332,6 @@ class FedExApi(Carrier):
             for key, value in result.items()}
 
         return final
-
-    @staticmethod
-    def cache_key(request):
-        return tuple(sorted(request.packages, key=hash))
 
     def delivery_datetime(self, service, request):
         if not self.cache_key(request) in self.cache:

@@ -1,0 +1,6 @@
+        <Request>
+            <ServiceHeader>
+                <SiteID>{site_id}</SiteID>
+                <Password>{password}</Password>
+            </ServiceHeader>
+        </Request>
