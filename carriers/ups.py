@@ -30,6 +30,12 @@ class FixBrokenAddressNamespace(MessagePlugin):
             .getChild('Request')).prefix = 'ns0'
 
 
+class FixBrokenTimeNamespace(MessagePlugin):
+    def marshalled(self, context):
+        (context.envelope.getChild('Body').getChild('TimeInTransitRequest')
+            .getChild('Request')).prefix = 'ns0'
+
+
 class AuthenticationPlugin(MessagePlugin):
     def __init__(self, username, password, access_license_number):
         self.username = username
@@ -118,12 +124,25 @@ class UPSAPI(base.Carrier):
                 FixBrokenAddressNamespace()
             ]
         )
+        self.TNTWS = Client(
+            'file://' + os.path.join(
+                get_directory_of(inspect.currentframe()),
+                'wsdl', 'ups', 'TNTWS.wsdl'
+            ),
+            cache=suds.cache.NoCache(),
+            plugins=[
+                AuthenticationPlugin(
+                    username, password, access_license_number
+                ),
+                FixBrokenTimeNamespace()
+            ]
+        )
 
     def get_services(self, request):
-        return self.get_services_list([request], request.destination)
-
-    def get_services_list(self, packages, destination):
-        rates = self.request_rates('Shop', packages, destination)
+        rates = self.request_rates(
+            'Shop', request.packages, request.destination,
+            ship_from=request.origin
+        )
 
         rated_shipments = {}
 
@@ -340,23 +359,110 @@ class UPSAPI(base.Carrier):
             return False, result
 
     def delivery_datetime(self, service, request):
-        return self.delivery_datetime_list(service, [request], request.destination)
+        api_request = self.TNTWS.factory.create('ns0:RequestType')
+        #request.RequestOption = 'TNT'  # just mimicking the example Perl app
+        #request.RequestOption = str(service.service_id)
 
-    def delivery_datetime_list(self, service, packages, destination):
-        rates = self.request_rates('Rate', packages, destination, service=service)
+        api_request.RequestOption = ''  # Does not seem to matter what its
+        # contents are as long as the tag is not missing.
 
-        if len(rates.RatedShipment) != 1:
+        req_ship_from = self.TNTWS.factory.create('ns2:RequestShipFromType')
+        if request.origin is not None:
+            _populate_address(
+                req_ship_from, request.origin,
+                urbanization_title='Town', use_street=False, use_name=False
+            )
+        else:
+            _populate_address(
+                req_ship_from, self.shipper_address,
+                urbanization_title='Town', use_street=False, use_name=False
+            )
+
+        req_ship_to = self.TNTWS.factory.create('ns2:RequestShipToType')
+        _populate_address(
+            req_ship_to, request.destination,
+            urbanization_title='Town', use_street=False, use_name=False
+        )
+
+        sticks = self.TNTWS.factory.create('ns2:PickupType')
+        sticks.Date = '%04d%02d%02d' % (  # YYYYMMDD
+            request.ship_datetime.year,
+            request.ship_datetime.month,
+            request.ship_datetime.day
+        )
+        sticks.Time = '%02d%02d' % (
+            request.ship_datetime.hour, request.ship_datetime.minute)  # HHMM
+
+        weight = self.TNTWS.factory.create('ns2:ShipmentWeightType')
+        weight.UnitOfMeasurement.Code = 'LBS'
+        #weight.Weight = str(package.weight)
+        weight.Weight = str(reduce(lambda a, b: a + b, map(lambda c: c.weight, request.packages), 0))
+        print 'weight', weight.Weight
+
+        response = self.TNTWS.service.ProcessTimeInTransit(
+            api_request,
+            req_ship_from,
+            req_ship_to,
+            sticks,
+            weight,
+            str(len(request.packages)),  # num packages in shipment
+            None,  # invoice TODO: implement this
+            None,  # DocumentsOnlyIndicator (missing tag = false)
+
+            # This field needs to
+            # be populated when
+            # UPS WorldWide
+            # Express Freight
+            # Shipment Service
+            # is needed to be
+            # returned in
+            # response. The
+            # valid value is 04.
+            None,  # BillType
+
+            None,  # MaximumListSize - default is 35
+
+            None,  # SaturdayDeliveryInfoRequestIndicator
+            # missing tag = no request
+
+            None,  # DropOffAtFacilityIndicator
+            # missing tag = pick up at warehouse
+
+            # If indicator is
+            # present indicates
+            # pickup by cosignee
+            # and if absent
+            # indicates delivery
+            # by UPS.This
+            # accessorial is valid
+            # if Bill Type is 04
+            None  # HoldForPickupIndicator
+        )
+
+        if response.Response.ResponseStatus.Code != '1':
             raise Exception()
-        rated_shipment = rates.RatedShipment[0]
-        if rated_shipment.Service.Code != service.service_id:
-            raise Exception()
 
-        delivery_datetime, price = _get_rated_shipment_info(rated_shipment)
-        return delivery_datetime
+        for summary in response.TransitResponse.ServiceSummary:
+            if (
+                summary.Service.Code !=
+                _service_code_to_time_in_transit_code[service.service_id]
+            ):
+                continue
+
+            return datetime(
+                year=int(summary.EstimatedArrival.Arrival.Date[0:4]),
+                month=int(summary.EstimatedArrival.Arrival.Date[4:6]),
+                day=int(summary.EstimatedArrival.Arrival.Date[6:8]),
+                hour=int(summary.EstimatedArrival.Arrival.Time[0:2]),
+                minute=int(summary.EstimatedArrival.Arrival.Time[2:4])
+            )
+
+        return None
 
     def quote(self, service, request):
         rates = self.request_rates(
-            'Rate', [request], request.destination, service=service
+            'Rate', request.packages, request.destination, service=service,
+            ship_from=request.origin
         )
 
         if len(rates.RatedShipment) != 1:
@@ -365,7 +471,7 @@ class UPSAPI(base.Carrier):
         if rated_shipment.Service.Code != service.service_id:
             raise Exception()
 
-        delivery_datetime, price = _get_rated_shipment_info(rated_shipment)
+        price, delivery_time = _get_rated_shipment_info(rated_shipment)
         return price
 
 
@@ -381,16 +487,23 @@ def _guaranteed_delivery_to_string(node):
     )
 
 
-def _populate_address(node, address):
+def _populate_address(
+    node, address, urbanization_title='Urbanization', use_street=True,
+    use_name=True
+):
     """
     node = shipment.Shipper|shipment.ShipFrom|shipment.ShipTo
     """
-    node.Name = address.contact_name
-    node.Address.AddressLine = list(address.street_lines)
+    if use_name:
+        node.Name = address.contact_name
+    if use_street:
+        node.Address.AddressLine = address.street_lines
     node.Address.City = address.city
     node.Address.StateProvinceCode = address.subdivision
     node.Address.PostalCode = address.postal_code
     node.Address.CountryCode = address.country.alpha2
+    if urbanization_title is not None and address.urbanization is not None:
+        setattr(node.Address, urbanization_title, address.urbanization)
     if address.residential:
         node.Address.ResidentialAddressIndicator = ''
 
@@ -401,13 +514,13 @@ def _get_rated_shipment_info(rated_shipment):
         rated_shipment.TotalCharges.CurrencyCode
     )
     try:
-        delivery_datetime = _guaranteed_delivery_to_string(
+        delivery_time = _guaranteed_delivery_to_string(
             rated_shipment.GuaranteedDelivery
         )
     except AttributeError:
-        delivery_datetime = None
+        delivery_time = None
 
-    return price, delivery_datetime
+    return price, delivery_time
 
 
 def _get_rated_shipment_info_dict(rated_shipment):
@@ -468,4 +581,24 @@ _service_code_to_description = {
     '65': 'UPS Saver',
     '96': 'UPS Worldwide Express Freight'
     ### leaving out a few that are Polish-only
+}
+
+_service_code_to_time_in_transit_code = {
+    '14': '1DM',
+    '01': '1DA',
+    '13': '1DP',
+    '59': '2DM',
+    '02': '2DA',
+    '12': '3DS',
+    '03': 'GND',
+    '54': '21',
+    '07': '01',
+    '08': '05',
+    '11': '03'
+
+    ### No mappings:
+    # UPS Next Day Air Early A.M. (Saturday Delivery)
+    # UPS Next Day Air (Saturday Delivery)
+    # UPS Second Day Air (Saturday Delivery)
+    # UPS Worldwide Saver  - TODO: is this 65/UPS Saver???
 }
