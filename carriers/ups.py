@@ -518,7 +518,7 @@ class UPSAPI(base.Carrier):
         weight = self._TNTWS.factory.create('ns2:ShipmentWeightType')
         weight.UnitOfMeasurement.Code = 'LBS'
         #weight.Weight = str(package.weight)
-        weight.Weight = str(sum(map(lambda c: c.weight, request.packages)))
+        weight.Weight = str(sum([package.weight for package in request.packages]))
 
         response = self._TNTWS.service.ProcessTimeInTransit(
             api_request,

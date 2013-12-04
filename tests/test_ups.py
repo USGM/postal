@@ -64,6 +64,8 @@ try:
         ship_datetime=datetime(2013, 12, 16, 9, 30)
     )
 
+
+
     api = ups.UPSAPI(
         test_credentials.username,
         test_credentials.password,
@@ -95,7 +97,7 @@ try:
     print services.keys()[0]
     print services.keys()[0].service_id
 
-    print api.delivery_datetime(services.keys()[0], pak, pickup_datetime=datetime(2013, 12, 16, 9, 30))
+    print api.delivery_datetime(services.keys()[0], request)
 
 except WebFault as err:
     print
