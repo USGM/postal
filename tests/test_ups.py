@@ -98,6 +98,7 @@ try:
     print services.keys()[0].service_id
 
     print api.delivery_datetime(services.keys()[0], request)
+    print api.quote(services.keys()[0], request)
 
 except WebFault as err:
     print
