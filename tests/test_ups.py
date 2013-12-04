@@ -18,10 +18,11 @@ from datetime import datetime
 import test_credentials
 
 try:
-    pak = data.Package(
-        length=3, width=4, height=5, weight=6, imperial=True,
-        origin=None,
-        destination=data.Address(
+    pak = data.Package(length=3, width=4, height=5, weight=6)
+
+    request = data.Request(
+        None,
+        data.Address(
             contact_name='John Doe',
             phone_number='1234567890',
             street_lines=[
@@ -33,8 +34,12 @@ try:
             postal_code='77047',
             country='US',
             residential=True
-        )
+        ),
+        [pak],
+        ship_datetime=datetime(2013, 12, 16, 9, 30)
     )
+
+
 
     api = ups.UPSAPI(
         test_credentials.username,
@@ -52,7 +57,7 @@ try:
         )
     )
 
-    services = api.get_services(pak)
+    services = api.get_services(request)
     pprint(services)
 
     #print api.delivery_datetime(services.keys()[0], pak)
@@ -98,7 +103,7 @@ try:
     print services.keys()[0]
     print services.keys()[0].service_id
 
-    print api.delivery_datetime(services.keys()[0], pak, pickup_datetime=datetime(2013, 12, 16, 9, 30))
+    print api.delivery_datetime(services.keys()[0], request)
 
 except WebFault as err:
     print

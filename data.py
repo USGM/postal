@@ -55,7 +55,10 @@ class Address(object):
 
         self.contact_name = contact_name
         self.phone_number = phone_number
-        self.street_lines = street_lines
+
+        self.street_lines = list(street_lines)  # Calling list() to raise
+        # exception immediately if parameter is not iterable.
+
         self.city = city
         self.postal_code = postal_code
         self.postal_code_extension = postal_code_extension
@@ -90,7 +93,10 @@ class Request(object):
         self.origin = origin
         self.destination = destination
         self.insure = insure
-        self.packages = packages
+
+        self.packages = list(packages)  # Calling list() to raise exception
+        # immediately if parameter is not iterable.
+
         self.ship_datetime = ship_datetime
 
 

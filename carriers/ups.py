@@ -139,10 +139,10 @@ class UPSAPI(base.Carrier):
         )
 
     def get_services(self, request):
-        return self.get_services_list([request], request.destination)
-
-    def get_services_list(self, packages, destination):
-        rates = self.request_rates('Shop', packages, destination)
+        rates = self.request_rates(
+            'Shop', request.packages, request.destination,
+            ship_from=request.origin
+        )
 
         rated_shipments = {}
 
@@ -358,20 +358,18 @@ class UPSAPI(base.Carrier):
         else:
             return False, result
 
-    def delivery_datetime(
-        self, service, package, ship_from=None, pickup_datetime=None
-    ):
-        request = self.TNTWS.factory.create('ns0:RequestType')
+    def delivery_datetime(self, service, request):
+        api_request = self.TNTWS.factory.create('ns0:RequestType')
         #request.RequestOption = 'TNT'  # just mimicking the example Perl app
         #request.RequestOption = str(service.service_id)
 
-        request.RequestOption = ''  # Does not seem to matter what its
+        api_request.RequestOption = ''  # Does not seem to matter what its
         # contents are as long as the tag is not missing.
 
         req_ship_from = self.TNTWS.factory.create('ns2:RequestShipFromType')
-        if ship_from is not None:
+        if request.origin is not None:
             _populate_address(
-                req_ship_from, ship_from,
+                req_ship_from, request.origin,
                 urbanization_title='Town', use_street=False, use_name=False
             )
         else:
@@ -382,27 +380,32 @@ class UPSAPI(base.Carrier):
 
         req_ship_to = self.TNTWS.factory.create('ns2:RequestShipToType')
         _populate_address(
-            req_ship_to, package.destination,
+            req_ship_to, request.destination,
             urbanization_title='Town', use_street=False, use_name=False
         )
 
         sticks = self.TNTWS.factory.create('ns2:PickupType')
         sticks.Date = '%04d%02d%02d' % (  # YYYYMMDD
-            pickup_datetime.year, pickup_datetime.month, pickup_datetime.day)
+            request.ship_datetime.year,
+            request.ship_datetime.month,
+            request.ship_datetime.day
+        )
         sticks.Time = '%02d%02d' % (
-            pickup_datetime.hour, pickup_datetime.minute)  # HHMM
+            request.ship_datetime.hour, request.ship_datetime.minute)  # HHMM
 
         weight = self.TNTWS.factory.create('ns2:ShipmentWeightType')
         weight.UnitOfMeasurement.Code = 'LBS'
-        weight.Weight = str(package.weight)
+        #weight.Weight = str(package.weight)
+        weight.Weight = str(reduce(lambda a, b: a + b, map(lambda c: c.weight, request.packages), 0))
+        print 'weight', weight.Weight
 
         response = self.TNTWS.service.ProcessTimeInTransit(
-            request,
+            api_request,
             req_ship_from,
             req_ship_to,
             sticks,
             weight,
-            '1',  # num packages in shipment TODO: support many packages
+            str(len(request.packages)),  # num packages in shipment
             None,  # invoice TODO: implement this
             None,  # DocumentsOnlyIndicator (missing tag = false)
 
@@ -458,7 +461,8 @@ class UPSAPI(base.Carrier):
 
     def quote(self, service, package):
         rates = self.request_rates(
-            'Rate', [package], package.destination, service=service
+            'Rate', request.packages, request.destination, service=service,
+            ship_from=request.origin
         )
 
         if len(rates.RatedShipment) != 1:
