@@ -1,0 +1,4 @@
+        <Dutiable>
+            <DeclaredValue>{value}</DeclaredValue>
+            <DeclaredCurrency>{currency}</DeclaredCurrency>
+        </Dutiable>

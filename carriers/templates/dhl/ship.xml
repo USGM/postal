@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<req:ShipmentRequest xmlns:req="http://www.dhl.com"
+                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                     xsi:schemaLocation="http://www.dhl.com ship-val-global-req.xsd"
+                     schemaVersion="1.0">
+    {request_header}
+    <RegionCode>{region_code}</RegionCode>
+    <LanguageCode>en</LanguageCode>
+    <PiecesEnabled>Y</PiecesEnabled>
+    <Billing>
+        <ShipperAccountNumber>{account_number}</ShipperAccountNumber>
+        <ShippingPaymentType>S</ShippingPaymentType>
+        <BillingAccountNumber>{account_number}</BillingAccountNumber>
+        <DutyPaymentType>S</DutyPaymentType>
+        <DutyAccountNumber>{account_number}</DutyAccountNumber>
+    </Billing>
+    <Consignee>
+        <CompanyName>{company_name}</CompanyName>
+        {destination_address}
+    </Consignee>
+    {duties}
+    <ShipmentDetails>
+        <NumberOfPieces>{number_of_packages}</NumberOfPieces>
+        <Pieces>
+        {pieces}
+        </Pieces>
+        <Weight>{total_weight}</Weight>
+        <WeightUnit>L</WeightUnit>
+        <GlobalProductCode>P</GlobalProductCode>
+        <Date>{ship_date}</Date>
+        <Contents>{contents}</Contents>
+        <DimensionUnit>I</DimensionUnit>
+        {insured}
+        <IsDutiable>Y</IsDutiable>
+        <CurrencyCode>{default_currency}</CurrencyCode>
+    </ShipmentDetails>
+    <Shipper>
+        <ShipperID>{account_number}</ShipperID>
+        <CompanyName>{company_name}</CompanyName>
+        {origin_address}
+    </Shipper>
+    <EProcShip>N</EProcShip>
+    <LabelImageFormat>PDF</LabelImageFormat>
+</req:ShipmentRequest>

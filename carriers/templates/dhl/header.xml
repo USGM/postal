@@ -1,5 +1,7 @@
         <Request>
             <ServiceHeader>
+                <MessageTime>{message_time}</MessageTime>
+                <MessageReference>{message_reference}</MessageReference>
                 <SiteID>{site_id}</SiteID>
                 <Password>{password}</Password>
             </ServiceHeader>

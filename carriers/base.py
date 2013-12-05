@@ -31,6 +31,12 @@ class Carrier(object):
     # If a carrier provides Address Validation Services, this should be set
     # to true.
     address_validation = False
+    # If a carrier should not be used to make international shipments, this
+    # needs to be False.
+    international = True
+    # If a carrier should not be used to make domestic shipments, this needs
+    # to be False.
+    domestic = True
     cache = {}
 
     def __init__(self):

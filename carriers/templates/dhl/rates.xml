@@ -1,3 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<p:DCTRequest xmlns:p="http://www.dhl.com"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://www.dhl.com DCT-req.xsd ">
     <GetQuote>
         {request_header}
         <From>
@@ -8,17 +12,19 @@
             <PaymentCountryCode>{origin_country}</PaymentCountryCode>
             <Date>{ship_date}</Date>
             <ReadyTime>PT{hour}H{minute}M</ReadyTime>
-            <ReadyTimeGMTOffset>{tz_sign}{tz_hour}:{tz_min}</ReadyTimeGMTOffset>
+            <ReadyTimeGMTOffset>{tz_offset}</ReadyTimeGMTOffset>
             <DimensionUnit>IN</DimensionUnit>
             <WeightUnit>LB</WeightUnit>
             <Pieces>
             {pieces}
             </Pieces>
-            <IsDutiable>{is_dutiable}</IsDutiable>
+            <IsDutiable>Y</IsDutiable>
             {insured}
         </BkgDetails>
         <To>
             <CountryCode>{destination_country}</CountryCode>
             <Postalcode>{destination_postal_code}</Postalcode>
         </To>
+        {duties}
     </GetQuote>
+</p:DCTRequest>

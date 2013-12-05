@@ -167,11 +167,12 @@ class FedExApi(Carrier):
         output = PdfFileWriter()
 
         page = input.getPage(0)
-        page.cropBox.lowerLeft = (30, 325)
-        page.cropBox.upperRight = (320, 760)
+        page.mediaBox.lowerLeft = (30, 325)
+        page.mediaBox.upperRight = (320, 760)
         output.addPage(page)
         output_stream = StringIO()
         output.write(output_stream)
+        open('fedex_label.pdf', 'w').write(output_stream.getvalue())
         return output_stream.getvalue()
 
     def requested_shipment(self, service, request):

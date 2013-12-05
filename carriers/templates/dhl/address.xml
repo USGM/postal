@@ -1,0 +1,10 @@
+        {lines}
+        <City>{city}</City>
+        <Division>{subdivision}</Division>
+        <PostalCode>{postal_code}</PostalCode>
+        <CountryCode>{country_code}</CountryCode>
+        <CountryName>{country_name}</CountryName>
+        <Contact>
+            <PersonName>{contact_name}</PersonName>
+            <PhoneNumber>{phone_number}</PhoneNumber>
+        </Contact>
