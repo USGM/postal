@@ -23,8 +23,7 @@ class Address(object):
     def __init__(
             self, contact_name=None, phone_number=None,
             street_lines=None, city=None, subdivision=None,
-            postal_code=None, postal_code_extension=None,
-            country=None, residential=False,
+            postal_code=None, country=None, residential=False,
             urbanization=None):
         """
         contact_name:string
@@ -49,7 +48,8 @@ class Address(object):
                 "Not enough information to construct an address.")
         if urbanization is not None and country != 'PR':
             raise AddressError('Urbanization given for non-PR address.')
-        if postal_code_extension is not None and country != 'US':
+        if (postal_code is not None and len(postal_code) > 5
+                and country != 'US'):
             raise AddressError(
                 'Postal code extension given for non-US address.')
 
@@ -61,11 +61,27 @@ class Address(object):
 
         self.city = city
         self.postal_code = postal_code
-        self.postal_code_extension = postal_code_extension
         self.subdivision = subdivision
         self.residential = residential
         self.country = get_country(country)
         self.urbanization = urbanization
+
+    def __str__(self):
+        return (
+            self.contact_name + ' ' + self.phone_number + '\n' +
+            str(self.street_lines) + '\n' +
+            self.city + ', ' + self.subdivision + ' ' +
+            str(self.postal_code) +
+            (
+                ' urbanization: ' + self.urbanization
+                if self.urbanization is not None else
+                ''
+            ) + ' ' + self.country.alpha2 + '\n' +
+            'Residential: ' + str(self.residential)
+        )
+
+    def __repr__(self):
+        return '<\n' + str(self) + '\n>'
 
 
 class Request(object):
@@ -201,4 +217,7 @@ class Shipment(object):
 
     def derive_carrier(self):
         # Reverse engineer the carrier based on the tracking number, somehow.
+        raise NotImplementedError
+
+    def cancel(self):
         raise NotImplementedError

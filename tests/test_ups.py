@@ -1,14 +1,5 @@
 __author__ = 'Nathan Everitt'
 
-"""###
-import logging
-logging.basicConfig(level=logging.DEBUG)
-logging.getLogger('pycountry').setLevel(logging.CRITICAL)
-logging.getLogger('suds.resolver').setLevel(logging.CRITICAL)
-logging.getLogger('suds.xsd').setLevel(logging.CRITICAL)
-logging.getLogger('suds.transit').setLevel(logging.DEBUG)
-###"""
-
 from ..carriers import ups
 from .. import data
 from suds import WebFault
@@ -17,6 +8,40 @@ from datetime import datetime
 
 import test_credentials
 
+
+import unittest
+from base import TestCarrier
+
+"""###
+import logging
+logging.basicConfig(level=logging.INFO)
+logging.getLogger('suds.transport').setLevel(logging.DEBUG)
+###"""
+
+
+class TestUPS(TestCarrier, unittest.TestCase):
+    def init_carrier(self):
+        return ups.UPSAPI(
+            test_credentials.username,
+            test_credentials.password,
+            test_credentials.access_license_number,
+            test_credentials.shipper_number,
+            data.Address(
+                contact_name='US Global Mail',
+                phone_number='1234567890',
+                street_lines=['1321 Upland Drive'],
+                city='Houston',
+                subdivision='TX',
+                postal_code='77043',
+                country='US'
+            )
+        )
+
+#if __name__ == '__main__':
+#    unittest.main()
+
+
+#"""###
 try:
     pak = data.Package(length=3, width=4, height=5, weight=6)
 
@@ -31,15 +56,13 @@ try:
             ],
             city='Houston',
             subdivision='TX',
-            postal_code='77047',
+            postal_code='77047-1234',
             country='US',
             residential=True
         ),
         [pak],
         ship_datetime=datetime(2013, 12, 16, 9, 30)
     )
-
-
 
     api = ups.UPSAPI(
         test_credentials.username,
@@ -48,7 +71,7 @@ try:
         test_credentials.shipper_number,
         data.Address(
             contact_name='US Global Mail',
-            phone_number='ohai',
+            phone_number='1234567890',
             street_lines=['1321 Upland Drive'],
             city='Houston',
             subdivision='TX',
@@ -59,52 +82,15 @@ try:
 
     services = api.get_services(request)
     pprint(services)
-
-    #print api.delivery_datetime(services.keys()[0], pak)
-    #print api.quote(services.keys()[0], pak)
-
-    """print api.validate_address(data.Address(
-        contact_name='wat',
-        street_lines=['shaserhse'],
-        city='Houston',
-        subdivision='TX',
-        postal_code='77047',
-        country='US'
-    ))
-
-    print api.validate_address(data.Address(
-        contact_name='wat',
-        street_lines=['Upland Dr'],
-        city='Houston',
-        subdivision='TX',
-        postal_code='77047',
-        country='US'
-    ))"""
-
-    """print api.validate_address(data.Address(
-        contact_name='wat',
-        phone_number='argv',
-        street_lines=['1321 Upl'],
-        city='Houston',
-        subdivision='TX',
-        postal_code='77047',
-        postal_code_extension='1234',
-        country='US'
-    ))"""
-
-    """print api.validate_address(data.Address(
-        street_lines=['27 Edison Furlong Rd'],
-        city='Doylestown',
-        subdivision='PA',
-        postal_code='18901',
-        country='US'
-    ))"""
-
     print services.keys()[0]
     print services.keys()[0].service_id
 
-    print api.delivery_datetime(services.keys()[0], request)
-    print api.quote(services.keys()[0], request)
+    #print api.delivery_datetime(services.keys()[0], request)
+    #print api.quote(services.keys()[0], request)
+    #request.destination = api.validate_address(request.destination)[1]
+    #print request.destination
+
+    print api.ship(services.keys()[0], request)
 
 except WebFault as err:
     print
@@ -112,4 +98,4 @@ except WebFault as err:
     print err.fault
     print err.message
 
-#ups.ship()
+###"""

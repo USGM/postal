@@ -1,3 +1,4 @@
+import sys
 from StringIO import StringIO
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -71,12 +72,14 @@ class TestCarrier(object):
             Declaration('Brains', Money('1000.00', 'USD'), 'US', 5)]
 
     def test_get_services(self):
+        sys.stderr.write('\nTest: Get Services ')
         services = self.carrier.get_services(self.request)
         self.assertTrue(services)
         for service in services.keys():
             self.assertTrue(isinstance(service, Service))
 
     def test_delayed_shipment(self):
+        sys.stderr.write('\nTest: Delayed Shipment ')
         self.request.ship_datetime = datetime.now() + relativedelta(days=10)
         services = self.carrier.get_services(self.request)
         self.assertTrue(services)
@@ -87,6 +90,7 @@ class TestCarrier(object):
                     self.request.ship_datetime)
 
     def test_residential_shipment(self):
+        sys.stderr.write('\nTest: Residential Shipment ')
         services = self.carrier.get_services(self.request)
         cache_save = self.carrier.cache
         self.carrier.cache = {}
@@ -118,6 +122,7 @@ class TestCarrier(object):
         self.assertGreater(residential, commercial)
 
     def test_insurance(self):
+        sys.stderr.write('\nTest: Insurance ')
 
         services = self.carrier.get_services(self.request)
         normal_total = sum(
@@ -140,23 +145,63 @@ class TestCarrier(object):
         self.assertGreater(insured_total, normal_total)
 
     def test_address_validation(self):
+        sys.stderr.write('\nTest: Address Validation ')
         score, address = self.carrier.validate_address(self.test_to)
-        self.assertTrue(address.residential)
-        self.assertEqual(address.street_lines, ["6410 Threeflower Ln"])
-        self.assertEqual(address.city, "Kingwood")
-        self.assertEqual(address.subdivision, "TX")
-        self.assertEqual(address.country.alpha2, "US")
-        self.assertEqual(address.postal_code, "77345-2514")
-        self.assertEqual(address.phone_number, self.test_to.phone_number)
-        self.assertEqual(address.contact_name, self.test_to.contact_name)
-        self.assertIsNot(address, self.test_to)
+        try:
+            self.assertIsNotNone(address)
+            self.assertTrue(address.residential)
+            self.assertEqual(
+                map(lambda a: a.upper(), address.street_lines),
+                ["6410 THREEFLOWER LN"]
+            )
+            self.assertEqual(address.city.upper(), "KINGWOOD")
+            self.assertEqual(address.subdivision, "TX")
+            self.assertEqual(address.country.alpha2, "US")
+            self.assertEqual(address.postal_code, "77345-2514")
+            self.assertEqual(address.phone_number, self.test_to.phone_number)
+            self.assertEqual(address.contact_name, self.test_to.contact_name)
+            self.assertIsNot(address, self.test_to)
+        except:
+            sys.stderr.write(
+                '\nUnable to validate\n' + str(self.test_to) +
+                '\nInstead evaluated to:\n' + str(address)
+            )
+            raise
+
+    def test_address_validation_b(self):
+        sys.stderr.write('\nTest: Address Validation B ')
+        score, address = self.carrier.validate_address(Address(
+            contact_name='asdf', phone_number='1234567890',
+            street_lines=['217 Edison Furlong Rd'],
+            city='Doylestown', subdivision='PA', postal_code='18901',
+            country='US', residential=True
+        ))
+        try:
+            self.assertIsNotNone(address)
+            self.assertTrue(address.residential)
+            self.assertEqual(
+                map(lambda a: a.upper(), address.street_lines),
+                ["217 EDISON FURLONG RD"]
+            )
+            self.assertEqual(address.city.upper(), "DOYLESTOWN")
+            self.assertEqual(address.subdivision, "PA")
+            self.assertEqual(address.country.alpha2, "US")
+            self.assertEqual(address.postal_code, "18901")
+        except:
+            sys.stderr.write(
+                '\nUnable to validate\n ...' +
+                '\nInstead evaluated to:\n' + str(address)
+            )
+            raise
 
     def test_international_services(self):
+        sys.stderr.write('\nTest: International Services ')
         self.package.destination = self.european_address
         services = self.carrier.get_services(self.request)
         self.assertTrue(services)
 
     def test_ship_package(self):
+        sys.stderr.write('\nTest: Ship Package ')
         services = self.carrier.get_services(self.request)
         shipment = services.keys()[0].ship(self.request)
         self.assertIsInstance(shipment, Shipment)
@@ -165,6 +210,7 @@ class TestCarrier(object):
         PdfFileReader(StringIO(label))
 
     def test_multiship(self):
+        sys.stderr.write('\nTest: Multiship ')
         services = self.carrier.get_services(self.request)
         self.request.packages.append(self.package2)
         shipment = services.keys()[0].ship(self.request)

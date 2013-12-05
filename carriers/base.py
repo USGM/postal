@@ -82,6 +82,9 @@ class Carrier(object):
         """
         raise NotImplementedError
 
+    def ship(self, service, request):
+        raise NotImplementedError
+
 
 class Service:
     def __init__(
