@@ -1,4 +1,3 @@
-import sys
 from StringIO import StringIO
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -207,16 +206,15 @@ class TestCarrier(object):
         self.assertIsNotNone(address)
         self.assertTrue(address.residential)
         self.assertEqual(
-            map(lambda a: a.upper(), address.street_lines),
+            [a.upper() for a in address.street_lines],
             ["217 EDISON FURLONG RD"])
         self.assertEqual(address.city.upper(), "DOYLESTOWN")
         self.assertEqual(address.subdivision, "PA")
         self.assertEqual(address.country.alpha2, "US")
-        self.assertIsNotNone(address.postal_code)
-        self.assertEqual(address.postal_code[0:5], "18901")
+        self.assertTrue(address.postal_code)
+        self.assertEqual(address.postal_code.split('-')[0], "18901")
 
     def international_services(self):
-        sys.stderr.write('\nTest: International Services ')
         self.package.destination = self.european_address
         services = self.carrier.get_services(self.request)
         self.assertTrue(services)
