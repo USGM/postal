@@ -48,10 +48,6 @@ class Address(object):
                 "Not enough information to construct an address.")
         if urbanization is not None and country != 'PR':
             raise AddressError('Urbanization given for non-PR address.')
-        if (postal_code is not None and len(postal_code) > 5
-                and country != 'US'):
-            raise AddressError(
-                'Postal code extension given for non-US address.')
 
         self.contact_name = contact_name
         self.phone_number = phone_number
