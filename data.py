@@ -166,6 +166,17 @@ class Package(object):
         self.height = self.to_inches(self.height)
         self.weight = self.to_pounds(self.weight)
 
+    def __str__(self):
+        return (
+            'Package(length=' + repr(self.length) + ', width=' +
+            repr(self.width) + ', height=' + repr(self.height) + ', weight=' +
+            repr(self.weight) + ', declarations=' + repr(self.declarations) +
+            ')'
+        )
+
+    def __repr__(self):
+        return str(self)
+
 
 class Declaration(object):
     """
@@ -198,12 +209,20 @@ class Shipment(object):
     Created when a package has been committed for shipment. Can also be used
     to get options for dealing with a package after a shipment has been
     requested, like cancellation.
-
-    labels, if they're available, should contain a dictionary of packages to
-    labels. If they are not available, it should be set to None.
     """
-
     def __init__(self, carrier, tracking_number, package_details=None):
+        """
+        carrier:Carrier
+        tracking_number:string = the master tracking number of the shipment
+        package_details:{
+            Package --> {
+                'tracking_number' --> string,
+                'label' --> string = raw binary data of image of shipping label
+            },
+            ...
+        }
+        """
+
         self.tracking_number = tracking_number
         if carrier:
             self.carrier = carrier

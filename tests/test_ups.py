@@ -37,14 +37,12 @@ class TestUPS(TestCarrier, unittest.TestCase):
             )
         )
 
-#if __name__ == '__main__':
-#    unittest.main()
+if __name__ == '__main__':
+    unittest.main()
 
 
-#"""###
+"""###
 try:
-    pak = data.Package(length=3, width=4, height=5, weight=6)
-
     request = data.Request(
         None,
         data.Address(
@@ -60,7 +58,11 @@ try:
             country='US',
             residential=True
         ),
-        [pak],
+        [
+            data.Package(3, 4, 5, 6),
+            data.Package(5, 6, 7, 8),
+            data.Package(4, 5, 6, 7)
+        ],
         ship_datetime=datetime(2013, 12, 16, 9, 30)
     )
 
@@ -92,7 +94,12 @@ try:
     #request.destination = api.validate_address(request.destination)[1]
     #print request.destination
 
-    print api.ship(services.keys()[0], request)
+    shipment = api.ship(services.keys()[0], request)
+
+    for i in range(len(request.packages)):
+        with open('label-' + str(i) + '.pdf', 'w') as f:
+            f.write(shipment.package_details[request.packages[i]]['label'])
+
 
     print services.keys()[0]
     print services.keys()[0].service_id

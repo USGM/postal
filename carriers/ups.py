@@ -6,12 +6,11 @@ import os
 from suds.client import Client
 from suds.plugin import MessagePlugin
 from suds.sax.element import Element
-from suds import WebFault
 import suds.cache
 import money
 import base
 from datetime import datetime
-from ..data import Address
+from ..data import Address, Shipment
 
 
 def get_directory_of(a):
@@ -230,20 +229,29 @@ class UPSAPI(base.Carrier):
         master_tracking_number = \
             response.ShipmentResults.ShipmentIdentificationNumber
 
+        packages = {}
+        i = 0
         for pak in response.ShipmentResults.PackageResults:
-            tracking_number = pak.TrackingNumber
-
-            print pak.ShippingLabel
-
             import PIL.Image
 
             import cStringIO
             import base64
+
+            pdf = cStringIO.StringIO()
+
             PIL.Image.open(cStringIO.StringIO(
                 base64.b64decode(pak.ShippingLabel.GraphicImage))) \
                 .transpose(PIL.Image.ROTATE_270) \
                 .crop((0, 0, 800, 1200)) \
-                .save('label.pdf', 'PDF', resolution=200.0)
+                .save(pdf, 'PDF', resolution=200.0)
+
+            packages[request.packages[i]] = {
+                'tracking_number': pak.TrackingNumber,
+                'label': pdf.getvalue()
+            }
+            i += 1
+
+        return Shipment(self, master_tracking_number, packages)
 
     def get_services(self, request):
         rates = self.request_rates(
