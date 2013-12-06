@@ -199,25 +199,6 @@ class UPSAPI(base.Carrier):
         shipment_charge.Type = '01'
         shipment_charge.BillShipper.AccountNumber = self.shipper_number
 
-        #print api_shipment
-        #api_shipment.Package.Packaging = '02'
-        #api_shipment.Package.Dimensions.UnitOfMeasurement.Code = 'IN'
-        #api_shipment.Package.Dimensions.Length = '5'
-        #api_shipment.Package.Dimensions.Width = '4'
-        #api_shipment.Package.Dimensions.Height = '3'
-        #api_shipment.Package.PackageWeight.UnitOfMeasurement.Code = 'LBS'
-        #api_shipment.Package.PackageWeight.Weight = '6'
-
-        #for pak in request.packages:
-        #    pak_tag = self._Ship.factory.create('ns3:PackageType')
-        #    pak_tag.Packaging = '02'
-        #    pak_tag.Dimensions.UnitOfMeasurement.Code = 'IN'
-        #    pak_tag.Dimensions.Length = str(pak.length)
-        #    pak_tag.Dimensions.Width = str(pak.width)
-        #    pak_tag.Dimensions.Height = str(pak.height)
-        #    pak_tag.PackageWeight.UnitOfMeasurement.Code = 'LBS'
-        #    pak_tag.PackageWeight.Weight = str(pak.weight)
-
         def package_to_package_type(package):
             pak = self._Ship.factory.create('ns3:PackageType')
             pak.Packaging.Code = '02'
@@ -235,11 +216,34 @@ class UPSAPI(base.Carrier):
             package_to_package_type(a) for a in request.packages]
 
         label_spec = self._Ship.factory.create('ns3:LabelSpecificationType')
+        label_spec.LabelImageFormat.Code = 'GIF'
+
         receipt_spec = self._Ship.factory.create(
             'ns3:ReceiptSpecificationType')
 
-        print self._Ship.service.ProcessShipment(
+        response = self._Ship.service.ProcessShipment(
             api_request, api_shipment, label_spec, receipt_spec)
+
+        if response.Response.ResponseStatus.Code != '1':
+            raise Exception()
+
+        master_tracking_number = \
+            response.ShipmentResults.ShipmentIdentificationNumber
+
+        for pak in response.ShipmentResults.PackageResults:
+            tracking_number = pak.TrackingNumber
+
+            print pak.ShippingLabel
+
+            import PIL.Image
+
+            import cStringIO
+            import base64
+            PIL.Image.open(cStringIO.StringIO(
+                base64.b64decode(pak.ShippingLabel.GraphicImage))) \
+                .transpose(PIL.Image.ROTATE_270) \
+                .crop((0, 0, 800, 1200)) \
+                .save('label.pdf', 'PDF', resolution=200.0)
 
     def get_services(self, request):
         rates = self.request_rates(
