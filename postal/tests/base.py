@@ -214,7 +214,6 @@ class TestCarrier(object):
         self.assertEqual(address.city.upper(), "DOYLESTOWN")
         self.assertEqual(address.subdivision, "PA")
         self.assertEqual(address.country.alpha2, "US")
-        self.assertTrue(address.postal_code)
         self.assertEqual(address.postal_code.split('-')[0], "18901")
 
     def international_services(self):
