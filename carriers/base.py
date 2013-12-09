@@ -114,7 +114,7 @@ class Carrier(object):
         raise NotImplementedError
 
 
-class Service:
+class Service(object):
     def __init__(
             self, carrier, service_id, name):
         self.carrier = carrier

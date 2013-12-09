@@ -12,7 +12,7 @@ import test_credentials
 import unittest
 from base import TestCarrier
 
-"""###
+#"""###
 import logging
 logging.basicConfig(level=logging.INFO)
 logging.getLogger('suds.transport').setLevel(logging.DEBUG)
@@ -26,15 +26,7 @@ class TestUPS(TestCarrier, unittest.TestCase):
             test_credentials.password,
             test_credentials.access_license_number,
             test_credentials.shipper_number,
-            data.Address(
-                contact_name='US Global Mail',
-                phone_number='1234567890',
-                street_lines=['1321 Upland Drive'],
-                city='Houston',
-                subdivision='TX',
-                postal_code='77043',
-                country='US'
-            )
+            test_credentials.shipper_address
         )
 
 if __name__ == '__main__':

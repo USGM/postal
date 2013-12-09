@@ -199,7 +199,6 @@ class TestCarrier(object):
         self.assertIsNot(address, self.test_to)
 
     def address_validation_b(self):
-        sys.stderr.write('\nTest: Address Validation B ')
         score, address = self.carrier.validate_address(Address(
             contact_name='asdf', phone_number='1234567890',
             street_lines=['217 Edison Furlong Rd'],
@@ -213,7 +212,8 @@ class TestCarrier(object):
         self.assertEqual(address.city.upper(), "DOYLESTOWN")
         self.assertEqual(address.subdivision, "PA")
         self.assertEqual(address.country.alpha2, "US")
-        self.assertEqual(address.postal_code, "18901")
+        self.assertIsNotNone(address.postal_code)
+        self.assertEqual(address.postal_code[0:5], "18901")
 
     def international_services(self):
         sys.stderr.write('\nTest: International Services ')

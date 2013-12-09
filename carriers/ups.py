@@ -2,10 +2,14 @@ __author__ = 'Nathan Everitt'
 
 import inspect
 import os
+import cStringIO
+import base64
 
+import PIL.Image
 from suds.client import Client
 from suds.plugin import MessagePlugin
 from suds.sax.element import Element
+from suds import WebFault
 import suds.cache
 import money
 import base
@@ -84,9 +88,12 @@ Void = Client(
 )
 
 
+def _on_webfault(webfault):
+    raise Exception('Webfault#' + webfault.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Code + ': ' + webfault.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Description)
+
+
 class UPSAPI(base.Carrier):
     name = 'UPS'
-
     address_validation = True
 
     def __init__(
@@ -200,7 +207,7 @@ class UPSAPI(base.Carrier):
 
         def package_to_package_type(package):
             pak = self._Ship.factory.create('ns3:PackageType')
-            pak.Packaging.Code = '02'
+            pak.Packaging.Code = '02'  # customer-supplied packaging
             pak.Dimensions.UnitOfMeasurement.Code = 'IN'
             pak.Dimensions.Length = str(package.length)
             pak.Dimensions.Width = str(package.width)
@@ -220,8 +227,11 @@ class UPSAPI(base.Carrier):
         receipt_spec = self._Ship.factory.create(
             'ns3:ReceiptSpecificationType')
 
-        response = self._Ship.service.ProcessShipment(
-            api_request, api_shipment, label_spec, receipt_spec)
+        try:
+            response = self._Ship.service.ProcessShipment(
+                api_request, api_shipment, label_spec, receipt_spec)
+        except WebFault as err:
+            _on_webfault(err)
 
         if response.Response.ResponseStatus.Code != '1':
             raise Exception()
@@ -232,11 +242,6 @@ class UPSAPI(base.Carrier):
         packages = {}
         i = 0
         for pak in response.ShipmentResults.PackageResults:
-            import PIL.Image
-
-            import cStringIO
-            import base64
-
             pdf = cStringIO.StringIO()
 
             PIL.Image.open(cStringIO.StringIO(
@@ -308,10 +313,10 @@ class UPSAPI(base.Carrier):
             04 - Retail Rates
             53 - Standard List Rates
 
-        ship_from_address:data.Address|None = The address of the warehouse to
+        ship_from:data.Address|None = The address of the warehouse to
             ship from or None if same as shipper's office
         """
-        pickup_type = '06'
+        pickup_type = '01'
         customer_type = '00'
 
         pickup_type = str(pickup_type)
@@ -353,6 +358,8 @@ class UPSAPI(base.Carrier):
 
         _populate_address(shipment.ShipTo, destination)
 
+        using_ups_pak = False
+
         paks = []
         for package in packages:
             pak = self._RateWS.factory.create('ns2:PackageType')
@@ -381,14 +388,18 @@ class UPSAPI(base.Carrier):
             # For FRS rating requests the only valid value is customer supplied
             #   packaging 02.
             ####################################################### TODO
-            pak.PackagingType.Code = '21'
+            pak.PackagingType.Code = '02'
+
+            if pak.PackagingType.Code == '04':  # UPS Pak
+                using_ups_pak = True
 
             paks.append(pak)
         shipment.Package = paks
 
         if (
             shipment.ShipFrom.Address.CountryCode in ('US', 'PR') and
-            destination.country.alpha2 not in ('US', 'PR')
+            destination.country.alpha2 not in ('US', 'PR') and
+            using_ups_pak
         ):
             # Required if the shipment is from
             # US/PR Outbound to non US/PR
@@ -398,8 +409,11 @@ class UPSAPI(base.Carrier):
             shipment.InvoiceLineTotal.CurrencyCode = 'USD'
             shipment.InvoiceLineTotal.MonetaryValue = '0'
 
-        rates = self._RateWS.service.ProcessRate(
-            request, _pickup_type, _customer_classification, shipment)
+        try:
+            rates = self._RateWS.service.ProcessRate(
+                request, _pickup_type, _customer_classification, shipment)
+        except WebFault as err:
+            _on_webfault(err)
 
         if rates.Response.ResponseStatus.Code != '1':  # 1 = Success
             raise Exception()
@@ -425,12 +439,15 @@ class UPSAPI(base.Carrier):
         address_key.CountryCode = address.country.alpha2
         address_key.PostcodePrimaryLow = address.postal_code
 
-        response = self._XAV.service.ProcessXAV(
-            request,
-            None,  # missing tag = street-level validation
-            2,  # candidate list size
-            address_key
-        )
+        try:
+            response = self._XAV.service.ProcessXAV(
+                request,
+                None,  # missing tag = street-level validation
+                2,  # candidate list size
+                address_key
+            )
+        except WebFault as err:
+            _on_webfault
 
         if response.Response.ResponseStatus.Code != '1':
             raise Exception()
@@ -492,7 +509,7 @@ class UPSAPI(base.Carrier):
 
     def delivery_datetime(self, service, request):
         api_request = self._TNTWS.factory.create('ns0:RequestType')
-        #request.RequestOption = 'TNT'  # just mimicking the example Perl app
+        #api_request.RequestOption = 'TNT'  # just mimicking the example Perl app
         #request.RequestOption = str(service.service_id)
 
         api_request.RequestOption = ''  # Does not seem to matter what its
@@ -534,45 +551,61 @@ class UPSAPI(base.Carrier):
         #weight.Weight = str(package.weight)
         weight.Weight = str(sum([package.weight for package in request.packages]))
 
-        response = self._TNTWS.service.ProcessTimeInTransit(
-            api_request,
-            req_ship_from,
-            req_ship_to,
-            sticks,
-            weight,
-            str(len(request.packages)),  # num packages in shipment
-            None,  # invoice TODO: implement this
-            None,  # DocumentsOnlyIndicator (missing tag = false)
+        invoice = self._TNTWS.factory.create('ns2:InvoiceLineTotalType')
+        _populate_money(invoice, request.get_total_declared_value())
 
-            # This field needs to
-            # be populated when
-            # UPS WorldWide
-            # Express Freight
-            # Shipment Service
-            # is needed to be
-            # returned in
-            # response. The
-            # valid value is 04.
-            None,  # BillType
+        try:
+            response = self._TNTWS.service.ProcessTimeInTransit(
+                api_request,
+                req_ship_from,
+                req_ship_to,
+                sticks,
+                weight,
+                str(len(request.packages)),  # num packages in shipment
+                invoice,
+                None,  # DocumentsOnlyIndicator (missing tag = false)
 
-            None,  # MaximumListSize - default is 35
+                # This field needs to
+                # be populated when
+                # UPS WorldWide
+                # Express Freight
+                # Shipment Service
+                # is needed to be
+                # returned in
+                # response. The
+                # valid value is 04.
+                None,  # BillType
 
-            None,  # SaturdayDeliveryInfoRequestIndicator
-            # missing tag = no request
+                None,  # MaximumListSize - default is 35
 
-            None,  # DropOffAtFacilityIndicator
-            # missing tag = pick up at warehouse
+                None,  # SaturdayDeliveryInfoRequestIndicator
+                # missing tag = no request
 
-            # If indicator is
-            # present indicates
-            # pickup by cosignee
-            # and if absent
-            # indicates delivery
-            # by UPS.This
-            # accessorial is valid
-            # if Bill Type is 04
-            None  # HoldForPickupIndicator
-        )
+                None,  # DropOffAtFacilityIndicator
+                # missing tag = pick up at warehouse
+
+                # If indicator is
+                # present indicates
+                # pickup by cosignee
+                # and if absent
+                # indicates delivery
+                # by UPS.This
+                # accessorial is valid
+                # if Bill Type is 04
+                None  # HoldForPickupIndicator
+            )
+
+        except WebFault as err:
+            #print err.fault
+            print '[[['
+            print api_request, ';;'
+            print req_ship_from, ';;'
+            print req_ship_to, ';;'
+            print sticks, ';;'
+            print weight, ';;'
+            print str(len(request.packages)), ';;'
+            print ']]]'
+            _on_webfault(err)
 
         if response.Response.ResponseStatus.Code != '1':
             raise Exception()
@@ -652,7 +685,8 @@ def _populate_address(
         node.Address.AddressLine = address.street_lines
     node.Address.City = address.city
     node.Address.StateProvinceCode = address.subdivision
-    node.Address.PostalCode = address.postal_code
+    if address.postal_code is not None:
+        node.Address.PostalCode = address.postal_code.replace(' ', '')
     node.Address.CountryCode = address.country.alpha2
     if urbanization_title is not None and address.urbanization is not None:
         setattr(node.Address, urbanization_title, address.urbanization)
@@ -676,6 +710,11 @@ def _populate_shipper(
 
 def _get_money(node):
     return money.Money(node.MonetaryValue, node.CurrencyCode)
+
+
+def _populate_money(node, value):
+    node.CurrencyCode = value.currency
+    node.MonetaryValue = str(value.amount)
 
 
 _service_code_to_description = {

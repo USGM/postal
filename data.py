@@ -4,6 +4,7 @@ shipments.
 """
 
 from pycountry import countries
+import money
 
 from exceptions import AddressError
 
@@ -111,6 +112,15 @@ class Request(object):
 
         self.ship_datetime = ship_datetime
 
+    def get_total_declared_value(self):
+        result = 0
+        for pak in self.packages:
+            for dec in pak.declarations:
+                result += dec.value
+        if result == 0:
+            return money.Money(0, 'USD')  # so as not to break interface
+        return result
+
 
 class Package(object):
     """
@@ -134,7 +144,10 @@ class Package(object):
         self.width = width
         self.height = height
         self.weight = weight
-        self.declarations = declarations
+        if declarations is None:
+            self.declarations = []
+        else:
+            self.declarations = declarations
 
         if not imperial:
             self.imperialize()
@@ -189,6 +202,11 @@ class Declaration(object):
     """
     def __init__(self, description, value, origin_country, units):
         """
+        description:string = Human readable name of type of item
+        value:money.Money = worth of item
+        origin_country:string:alpha2 = alpha2 abbreviation of country
+        units:integer = ?
+
         Special note: If you've got some item that can't be measured in pieces,
         (such as a liquid), try putting the proper units in the name, and
         setting units to 1. For example:

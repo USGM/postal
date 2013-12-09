@@ -1,7 +1,6 @@
 pip install pycountry
 pip install python-money
 pip install suds
-pip install pypdf2
 
 # from http://stackoverflow.com/questions/4632261/pil-jpeg-library-help
 # Do this BEFORE installing Pillow:
