@@ -12,7 +12,7 @@ import test_credentials
 import unittest
 from base import TestCarrier
 
-#"""###
+"""###
 import logging
 logging.basicConfig(level=logging.INFO)
 logging.getLogger('suds.transport').setLevel(logging.DEBUG)

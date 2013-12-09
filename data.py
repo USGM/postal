@@ -115,8 +115,7 @@ class Request(object):
     def get_total_declared_value(self):
         result = 0
         for pak in self.packages:
-            for dec in pak.declarations:
-                result += dec.value
+            result += pak.get_total_declared_value()
         if result == 0:
             return money.Money(0, 'USD')  # so as not to break interface
         return result
@@ -151,6 +150,14 @@ class Package(object):
 
         if not imperial:
             self.imperialize()
+
+    def get_total_declared_value(self):
+        result = 0
+        for dec in self.declarations:
+            result += dec.get_total_value()
+        if result == 0:
+            return money.Money(0, 'USD')  # so as not to break interface
+        return result
 
     def __hash__(self):
         dimensions = 'x'.join(map(str, sorted(
@@ -220,6 +227,9 @@ class Declaration(object):
         self.value = value
         self.units = units
         self.origin_country = get_country(origin_country)
+
+    def get_total_value(self):
+        return self.units * self.value
 
 
 class Shipment(object):

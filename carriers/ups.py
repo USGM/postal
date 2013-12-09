@@ -89,7 +89,12 @@ Void = Client(
 
 
 def _on_webfault(webfault):
-    raise Exception('Webfault#' + webfault.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Code + ': ' + webfault.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Description)
+    raise Exception(
+        'Webfault#'
+        + webfault.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Code
+        + ': '
+        + webfault.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Description
+    )
 
 
 class UPSAPI(base.Carrier):
@@ -214,12 +219,29 @@ class UPSAPI(base.Carrier):
             pak.Dimensions.Height = str(package.height)
             pak.PackageWeight.UnitOfMeasurement.Code = 'LBS'
             pak.PackageWeight.Weight = str(package.weight)
-            if is_oversized(package):
+            if is_large(package):
                 pak.LargePackageIndicator = ''
+
+            if len(package.declarations) > 0:
+                _populate_money(
+                    pak.PackageServiceOptions.DeclaredValue,
+                    package.get_total_declared_value()
+                )
             return pak
 
         api_shipment.Package = [
             package_to_package_type(a) for a in request.packages]
+
+
+        api_shipment.Description = ', '.join([
+            a.description
+
+            ### flatten list of lists of declarations
+            for a in sum([b.declarations for b in request.packages], [])
+
+            ### truncate to 50 characters because UPS is S.P.E.C.I.A.L.
+        ])[0:50]
+
 
         label_spec = self._Ship.factory.create('ns3:LabelSpecificationType')
         label_spec.LabelImageFormat.Code = 'GIF'
@@ -259,10 +281,7 @@ class UPSAPI(base.Carrier):
         return Shipment(self, master_tracking_number, packages)
 
     def get_services(self, request):
-        rates = self.request_rates(
-            'Shop', request.packages, request.destination,
-            ship_from=request.origin
-        )
+        rates = self._request_rates(request, 'Shop')
 
         rated_shipments = {}
 
@@ -284,10 +303,7 @@ class UPSAPI(base.Carrier):
 
         return rated_shipments
 
-    def request_rates(
-        self, request_type, packages, destination, service=None,
-        ship_from=None
-    ):
+    def _request_rates(self, request, request_type, service=None):
         """
         request_type = 'Rate'|'Shop'
             Rate = The server rates (The
@@ -326,8 +342,8 @@ class UPSAPI(base.Carrier):
         if len(customer_type) != 2:
             raise TypeError()
 
-        request = self._RateWS.factory.create('ns0:RequestType')
-        request.RequestOption = [request_type]
+        api_request = self._RateWS.factory.create('ns0:RequestType')
+        api_request.RequestOption = [request_type]
 
         _pickup_type = self._RateWS.factory.create('ns2:CodeDescriptionType')
         _pickup_type.Code = pickup_type
@@ -351,17 +367,17 @@ class UPSAPI(base.Carrier):
         _populate_shipper(
             shipment.Shipper, self.shipper_address, self.shipper_number)
 
-        if ship_from is not None:
-            _populate_address(shipment.ShipFrom, ship_from)
+        if request.origin is not None:
+            _populate_address(shipment.ShipFrom, request.origin)
         else:
             _populate_address(shipment.ShipFrom, self.shipper_address)
 
-        _populate_address(shipment.ShipTo, destination)
+        _populate_address(shipment.ShipTo, request.destination)
 
         using_ups_pak = False
 
         paks = []
-        for package in packages:
+        for package in request.packages:
             pak = self._RateWS.factory.create('ns2:PackageType')
 
             pak.Dimensions.UnitOfMeasurement.Code = 'IN'
@@ -370,8 +386,14 @@ class UPSAPI(base.Carrier):
             pak.Dimensions.Height = str(package.height)
             pak.PackageWeight.UnitOfMeasurement.Code = 'LBS'
             pak.PackageWeight.Weight = str(package.weight)
-            if is_oversized(package):
+            if is_large(package):
                 pak.LargePackageIndicator = ''
+
+            if request.insure:
+                _populate_money(
+                    pak.PackageServiceOptions.DeclaredValue,
+                    package.get_total_declared_value()
+                )
 
             # 00 = Unknown
             # 01 = UPS Letter
@@ -397,8 +419,8 @@ class UPSAPI(base.Carrier):
         shipment.Package = paks
 
         if (
-            shipment.ShipFrom.Address.CountryCode in ('US', 'PR') and
-            destination.country.alpha2 not in ('US', 'PR') and
+            request.origin.country.alpha2 in ('US', 'PR') and
+            request.destination.country.alpha2 not in ('US', 'PR') and
             using_ups_pak
         ):
             # Required if the shipment is from
@@ -411,7 +433,7 @@ class UPSAPI(base.Carrier):
 
         try:
             rates = self._RateWS.service.ProcessRate(
-                request, _pickup_type, _customer_classification, shipment)
+                api_request, _pickup_type, _customer_classification, shipment)
         except WebFault as err:
             _on_webfault(err)
 
@@ -628,10 +650,7 @@ class UPSAPI(base.Carrier):
         return None
 
     def quote(self, service, request):
-        rates = self.request_rates(
-            'Rate', request.packages, request.destination, service=service,
-            ship_from=request.origin
-        )
+        rates = self._request_rates(request, 'Rate', service)
 
         if len(rates.RatedShipment) != 1:
             raise Exception()
@@ -642,34 +661,24 @@ class UPSAPI(base.Carrier):
         return _get_money(rated_shipment.TotalCharges)
 
 
-def is_oversized(package):
-    ### Use >, not >=; per documentation, packages can be UP TO the
-    ### dimensions below
+def is_large(package):
+    ### http://www.ups.com/content/pr/en/shipping/cost/additional.html#Large+Package+Surcharge
+    # A package is considered a "Large Package" when its length plus girth
+    # [(2 x width) + (2 x height)] combined exceeds 130 inches, but does not
+    # exceed the maximum UPS size of 165 inches.  An Additional Handling Charge
+    # will not be assessed when a Large Package Surcharge is applied.
 
-    if package.weight > 150:  # in pounds
-        return True
     H, W, L = sorted([package.length, package.width, package.height])
-
-    if L > 108:  # in inches
-        return True
-    if L + W * 2 + H * 2 > 165:  # in inches
-        return True
-    return False
+    return L + W * 2 + H * 2 > 130
 
 
-def _test_is_oversized():
+def _test_is_large():
     from ..data import Package
-    assert is_oversized(Package(109, 1, 1, 15))
-    assert not is_oversized(Package(108, 1, 1, 15))
-    assert not is_oversized(Package(5, 5, 5, 5))
-    assert is_oversized(Package(5, 5, 5, 151))
-    assert not is_oversized(Package(5, 5, 5, 150))
-    assert not is_oversized(Package(101, 16, 16, 20))
-    assert is_oversized(Package(102, 16, 16, 20))
-    assert is_oversized(Package(16, 102, 16, 20))
-    assert is_oversized(Package(16, 16, 102, 20))
-    assert is_oversized(Package(101, 16, 16, 151))
-_test_is_oversized()
+    assert is_large(Package(10, 10, 91, 0))
+    assert not is_large(Package(10, 10, 90, 0))
+    assert is_large(Package(91, 10, 10, 0))
+    assert is_large(Package(10, 91, 10, 0))
+_test_is_large()
 
 
 def _populate_address(
