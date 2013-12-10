@@ -155,7 +155,7 @@ class UPSAPI(base.Carrier):
             ]
         )
 
-    def ship(self, service, request):
+    def ship(self, service, request, receiver_account_number=None):
         api_request = self._Ship.factory.create('ns0:RequestType')
         api_request.RequestOption = 'validate'
 
@@ -169,18 +169,19 @@ class UPSAPI(base.Carrier):
             api_shipment.ShipTo, request.destination, use_phone=True,
             use_attn=True
         )
-        _populate_address(
-            api_shipment.ShipFrom,
-            (
-                request.origin
-                if request.origin is not None else
-                self.shipper_address
-            ),
-            use_phone=True, use_attn=True
-        )
 
-        shipment_charge = self._Ship.factory.create('ns3:ShipmentChargeType')
-        api_shipment.PaymentInformation.ShipmentCharge = [shipment_charge]
+        ship_from = (
+            request.origin
+            if request.origin is not None else
+            self.shipper_address
+        )
+        _populate_address(
+            api_shipment.ShipFrom, ship_from, use_phone=True, use_attn=True)
+
+        international = (ship_from.country != request.destination.country)
+
+        bill_shipper = self._Ship.factory.create('ns3:ShipmentChargeType')
+        api_shipment.PaymentInformation.ShipmentCharge = [bill_shipper]
 
         # A shipment charge type
         # of 01 = Transportation is
@@ -207,8 +208,16 @@ class UPSAPI(base.Carrier):
         # present5) The origin and
         # destination IATA code is
         # the same
-        shipment_charge.Type = '01'
-        shipment_charge.BillShipper.AccountNumber = self.shipper_number
+        bill_shipper.Type = '01'
+        bill_shipper.BillShipper.AccountNumber = self.shipper_number
+
+        if international:
+            bill_receiver = self._Ship.factory.create('ns3:ShipmentChargeType')
+            bill_receiver.Type = '02'
+
+            ### Evidently, if this is blank, UPS will contact the receiver
+            ### in order to acquire billing information.
+            bill_receiver.BillReceiver.AccountNumber = receiver_account_number
 
         def package_to_package_type(package):
             pak = self._Ship.factory.create('ns3:PackageType')
@@ -222,7 +231,10 @@ class UPSAPI(base.Carrier):
             if is_large(package):
                 pak.LargePackageIndicator = ''
 
-            if len(package.declarations) > 0:
+            if (
+                (len(package.declarations) > 0 and request.insure)
+                or international
+            ):
                 _populate_money(
                     pak.PackageServiceOptions.DeclaredValue,
                     package.get_total_declared_value()
@@ -389,7 +401,7 @@ class UPSAPI(base.Carrier):
             if is_large(package):
                 pak.LargePackageIndicator = ''
 
-            if request.insure:
+            if len(package.declarations) > 0 and request.insure:
                 _populate_money(
                     pak.PackageServiceOptions.DeclaredValue,
                     package.get_total_declared_value()
@@ -409,7 +421,6 @@ class UPSAPI(base.Carrier):
             # 2c = Large Express Box
             # For FRS rating requests the only valid value is customer supplied
             #   packaging 02.
-            ####################################################### TODO
             pak.PackagingType.Code = '02'
 
             if pak.PackagingType.Code == '04':  # UPS Pak
@@ -419,7 +430,7 @@ class UPSAPI(base.Carrier):
         shipment.Package = paks
 
         if (
-            request.origin.country.alpha2 in ('US', 'PR') and
+            shipment.ShipFrom.Address.CountryCode in ('US', 'PR') and
             request.destination.country.alpha2 not in ('US', 'PR') and
             using_ups_pak
         ):

@@ -1,16 +1,16 @@
 __author__ = 'Nathan Everitt'
 
-from ..carriers import ups
-from .. import data
+import unittest
+
 from suds import WebFault
 from pprint import pprint
 from datetime import datetime
+import money
 
-import test_credentials
-
-
-import unittest
 from base import TestCarrier
+from ..carriers import ups
+from .. import data
+import test_credentials
 
 """###
 import logging
@@ -51,9 +51,9 @@ try:
             residential=True
         ),
         [
-            data.Package(3, 4, 5, 6),
-            data.Package(5, 6, 7, 8),
-            data.Package(4, 5, 6, 7)
+            data.Package(3, 4, 5, 6, declarations=[data.Declaration('asdf', money.Money(101, 'USD'), 'US', 1)]),
+            data.Package(5, 6, 7, 8, declarations=[data.Declaration('qwer', money.Money(50, 'USD'), 'US', 2)]),
+            data.Package(4, 5, 6, 7, declarations=[data.Declaration('zxcv', money.Money(10, 'USD'), 'US', 3)])
         ],
         ship_datetime=datetime(2013, 12, 16, 9, 30)
     )
@@ -86,17 +86,17 @@ try:
     #request.destination = api.validate_address(request.destination)[1]
     #print request.destination
 
-    shipment = api.ship(services.keys()[0], request)
+    #shipment = api.ship(services.keys()[0], request)
+    #for i in range(len(request.packages)):
+    #    with open('label-' + str(i) + '.pdf', 'w') as f:
+    #        f.write(shipment.package_details[request.packages[i]]['label'])
 
-    for i in range(len(request.packages)):
-        with open('label-' + str(i) + '.pdf', 'w') as f:
-            f.write(shipment.package_details[request.packages[i]]['label'])
 
+    #print api.delivery_datetime(services.keys()[0], request)
 
-    print services.keys()[0]
-    print services.keys()[0].service_id
+    print api.quote(services.keys()[0], request)
 
-    print api.delivery_datetime(services.keys()[0], request)
+    request.insure = True
     print api.quote(services.keys()[0], request)
 
 except WebFault as err:
