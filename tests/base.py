@@ -94,8 +94,8 @@ class TestCarrier(object):
             self.test_from, self.european_address,
             [self.international_package])
         self.declarations = [
-            Declaration('McGuffin', Money('500.00', 'USD'), 'US', 7),
-            Declaration('Brains', Money('1000.00', 'USD'), 'US', 5)]
+            Declaration('McGuffin', Money('50.00', 'USD'), 'US', 7),
+            Declaration('Brains', Money('60.00', 'USD'), 'US', 5)]
         self.declarations2 = [
             Declaration('Emotional Baggage', Money('49.00', 'USD'), 'US', 5),
             Declaration('Dehydrated Water', Money('53.40', 'USD'), 'US', 10)]
@@ -103,6 +103,13 @@ class TestCarrier(object):
         self.international_package2.declarations = self.declarations2
 
     def services(self):
+        services = self.carrier.get_services(self.request)
+        self.assertTrue(services)
+        for service in services.keys():
+            self.assertTrue(isinstance(service, Service))
+
+    def services_multiship(self):
+        self.request.packages.append(self.package2)
         services = self.carrier.get_services(self.request)
         self.assertTrue(services)
         for service in services.keys():
@@ -233,14 +240,16 @@ class TestCarrier(object):
         self.assertTrue(services.keys()[0].ship(self.request))
 
     test_domestic_services = domestic(services)
+    test_domestic_services_multiship = domestic(services_multiship)
     test_domestic_delayed_shipment = domestic(delayed_shipment)
     test_domestic_residential_shipment = domestic(residential_shipment)
     test_domestic_insurance = domestic(insurance)
     test_domestic_address_validation = domestic(address_validation)
     test_domestic_address_validation_b = domestic(address_validation_b)
     test_domestic_ship_package = domestic(ship_package)
-    test_domestic_multiship = domestic(ship_package)
+    test_domestic_multiship = domestic(multiship)
     test_international_services = international(services)
+    test_international_services_multiship = international(services_multiship)
     test_international_delayed_shipment = international(delayed_shipment)
     test_international_residential_shipment = international(delayed_shipment)
     test_international_address_validation = international(address_validation)

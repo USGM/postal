@@ -12,7 +12,7 @@ from suds.client import Client
 from money import Money
 
 from base import Carrier, Service, ClearEmpty
-from ..exceptions import ExceedsLimitsError
+from ..exceptions import ExceedsLimitsError, CarrierError
 from ..data import Address, Shipment
 
 
@@ -81,6 +81,12 @@ class FedExApi(Carrier):
         keys.Password = self.password
         auth.UserCredential = keys
         return auth
+
+    def service_call(self, func, *args, **kwargs):
+        response = super(FedExApi, self).service_call(func, *args, **kwargs)
+        if response.HighestSeverity == "FAILURE":
+            raise CarrierError(response.Notifications[0].Message)
+        return response
 
     def user_client(self, client):
         client_detail = client.factory.create('ClientDetail')
@@ -175,7 +181,13 @@ class FedExApi(Carrier):
         open('fedex_label.pdf', 'w').write(output_stream.getvalue())
         return output_stream.getvalue()
 
-    def requested_shipment(self, service, request):
+    def requested_shipment(
+            self, service, request, package, sequence_num=None,
+            tracking_number=None):
+        """
+        FedEx supports Multiship, but only one package at a time. They have to
+        be 'added' to the initial request with secondary requests.
+        """
         api_request = self.ship_client.factory.create('RequestedShipment')
         api_request.ShipTimestamp = request.ship_datetime or datetime.now()
         api_request.ServiceType = service.service_id
@@ -191,8 +203,15 @@ class FedExApi(Carrier):
         party.Contact.PersonName = request.origin.contact_name
         party.Contact.PhoneNumber = request.origin.phone_number
         self.label_specification(api_request.LabelSpecification)
+        if tracking_number:
+            api_request.MasterTrackingId = tracking_number
+        if not tracking_number:
+            api_request.TotalWeight.Value = sum(
+                [package.weight for package in request.packages])
+            api_request.TotalWeight.Units = 'LB'
         api_request.PackageCount = len(request.packages)
-        self.line_items(self.ship_client, api_request, request)
+        self.line_items(
+            self.ship_client, api_request, request, [package], sequence_num)
         return api_request
 
     def ship(self, service, request):
@@ -200,30 +219,49 @@ class FedExApi(Carrier):
         client_detail = self.user_client(self.ship_client)
         transaction_detail = self.transaction_detail(self.ship_client)
         version_id = self.ship_version_id()
-        requested_shipment = self.requested_shipment(service, request)
+        package = request.packages[0]
+        requested_shipment = self.requested_shipment(service, request, package)
         result = self.service_call(
             self.ship_client.service.processShipment, auth, client_detail,
             transaction_detail, version_id, requested_shipment)
         package_details = {}
-        # TODO: Get real authoritative number.
-        master_tracking_number = 'XXXXXX'
-        details = result.CompletedShipmentDetail.CompletedPackageDetails
-        for detail, package in zip(details, request.packages):
+        if len(request.packages) > 1:
+            master_tracking_id = (
+                result.CompletedShipmentDetail.MasterTrackingId)
+        else:
+            master_tracking_id = (
+                result.CompletedShipmentDetail.CompletedPackageDetails[
+                    0].TrackingIds[0])
+        detail = result.CompletedShipmentDetail.CompletedPackageDetails[0]
+        package_details[package] = {
+            'tracking_number': master_tracking_id.TrackingNumber,
+            'label': self.format_label(detail.Label.Parts[0].Image)}
+        for sequence_num, package in enumerate(request.packages[1:]):
+            sequence_num += 2
+            requested_shipment = self.requested_shipment(
+                service, request, package, sequence_num,
+                tracking_number=master_tracking_id)
+            result = self.service_call(
+                self.ship_client.service.processShipment, auth, client_detail,
+                transaction_detail, version_id, requested_shipment)
+            detail = result.CompletedShipmentDetail.CompletedPackageDetails[0]
             package_details[package] = {
                 'tracking_number': (
-                    detail.OperationalDetail.Barcodes.StringBarcodes[0].Value),
+                    detail.TrackingIds[0].TrackingNumber),
                 'label': self.format_label(detail.Label.Parts[0].Image)}
 
-        return Shipment(self, master_tracking_number, package_details)
+        return Shipment(
+            self, master_tracking_id.TrackingNumber, package_details)
 
     def carrier_codes(self):
         codes = self.rates_client.factory.create('CarrierCodeType')
         return [codes.FDXE, codes.FDXG]
 
-    def line_items(self, client, api_request, request):
-        for index, package in enumerate(request.packages):
+    def line_items(
+            self, client, api_request, request, packages, sequence_num=None):
+        for index, package in enumerate(packages):
             item = client.factory.create('RequestedPackageLineItem')
-            item.SequenceNumber = index + 1
+            item.SequenceNumber = sequence_num or index + 1
             item.GroupNumber = 1
             item.GroupPackageCount = 1
             item.Weight.Units.value = 'LB'
@@ -236,11 +274,15 @@ class FedExApi(Carrier):
             dimensions.Units = 'IN'
 
             if package.declarations:
-                value = self.set_declarations(api_request, package)
+                value = self.set_declarations(
+                    client, api_request, package)
                 if value and request.insure:
                     item.InsuredValue.Currency = value.currency
                     item.InsuredValue.Amount = value.amount
             api_request.RequestedPackageLineItems.append(item)
+        if api_request.CustomsClearanceDetail.Commodities:
+            detail = api_request.CustomsClearanceDetail
+            detail.DutiesPayment.PaymentType = 'RECIPIENT'
 
 
     @staticmethod
@@ -256,24 +298,35 @@ class FedExApi(Carrier):
         target_address.StateOrProvinceCode = address.subdivision
         target_address.Residential = address.residential
 
-    def set_declarations(self, request, package):
+    def set_declarations(self, client, api_request, package):
         commodities = []
         total_value = None
         for declaration in package.declarations:
-            commodity = self.rates_client.factory.create('Commodity')
+            commodity = client.factory.create('Commodity')
             commodity.Description = declaration.description
             value = declaration.value
+            commodity.NumberOfPieces = declaration.units
             commodity.UnitPrice.Currency = value.currency
             commodity.UnitPrice.Amount = value.amount
             value = value * declaration.units
+            commodity.CountryOfManufacture = declaration.origin_country.alpha2
             commodity.CustomsValue.Currency = value.currency
             commodity.CustomsValue.Amount = value.amount
+            commodity.Weight.Value = 0
+            commodity.Weight.Units = 'LB'
+            commodity.QuantityUnits = 'EA'
+            commodity.Quantity = declaration.units
             commodities.append(commodity)
             if not total_value:
                 total_value = value
             else:
                 total_value += value
-        request.CustomsClearanceDetail.Commodities.extend(commodities)
+        api_request.CustomsClearanceDetail.Commodities.extend(commodities)
+        value = api_request.CustomsClearanceDetail.CustomsValue
+        if value.Amount is None:
+            value.Amount = 0
+        value.Amount += total_value.amount
+        value.Currency = total_value.currency
         return total_value
 
     def requested_shipment_rate(self, request):
@@ -285,7 +338,8 @@ class FedExApi(Carrier):
         api_request.RateRequestTypes = 'ACCOUNT'
         api_request.PackageCount = len(request.packages)
 
-        self.line_items(self.rates_client, api_request, request)
+        self.line_items(
+            self.rates_client, api_request, request, request.packages)
         api_request.ShipTimestamp = request.ship_datetime
 
         return api_request

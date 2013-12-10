@@ -54,8 +54,11 @@ class Carrier(object):
     def service_call(func, *args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except WebFault as err:
-            raise CarrierError(err.document)
+        except Exception as err:
+            if hasattr(err, 'document'):
+                raise CarrierError(err.document)
+            else:
+                raise CarrierError(err.message)
 
     @staticmethod
     def cache_key(request):
