@@ -1,11 +1,12 @@
 from StringIO import StringIO
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from test_configuration import config
 
 from PyPDF2 import PdfFileReader
 from money.Money import Money
 
-from ..carriers.base import Service
+from ..carriers.base import Service, Carrier
 
 from ..data import Address, Package, Declaration, Shipment, Request
 
@@ -19,12 +20,12 @@ test_from = {
     'country': 'US'}
 
 test_to = {
-    'street_lines': ['6410 Three Flower Lane'],
-    'contact_name': 'No one in particular',
-    'city': 'Kingwood',
-    'postal_code': '77345',
-    'phone_number': '5555555555',
-    'subdivision': 'TX',
+    'contact_name': 'Some Dude',
+    'phone_number': '1234567890',
+    'street_lines': ['217 Edison Furlong Rd'],
+    'city': 'Doylestown',
+    'subdivision': 'PA',
+    'postal_code': '18901',
     'country': 'US'}
 
 test_two = {
@@ -72,11 +73,15 @@ class TestCarrier(object):
     will detect subclasses of TestCase and run them, but we don't want that
     to happen for this parent class.
     """
+
+    # Replace this with the target carrier.
+
+    carrier_class = Carrier
+
     def init_carrier(self):
-        """
-        Tests should define this method. It should set up the carrier object
-        for the tests and return it.
-        """
+        return self.carrier_class(
+            configuration=config,
+            **config['carrier_inits'][self.carrier_class.name])
 
     def setUp(self):
         self.carrier = self.init_carrier()
@@ -135,6 +140,8 @@ class TestCarrier(object):
 
     def residential_shipment(self):
         if not self.carrier.address_validation:
+            return
+        if self.carrier.auto_residential:
             return
         services = self.carrier.get_services(self.request)
         cache_save = self.carrier.cache
@@ -195,25 +202,6 @@ class TestCarrier(object):
         self.assertTrue(address.residential)
         self.assertEqual(
             [a.upper() for a in address.street_lines],
-            ["6410 THREEFLOWER LN"])
-        self.assertEqual(address.city.upper(), "KINGWOOD")
-        self.assertEqual(address.subdivision, "TX")
-        self.assertEqual(address.country.alpha2, "US")
-        self.assertEqual(address.postal_code, "77345-2514")
-        self.assertEqual(address.phone_number, self.test_to.phone_number)
-        self.assertEqual(address.contact_name, self.test_to.contact_name)
-        self.assertIsNot(address, self.test_to)
-
-    def address_validation_b(self):
-        score, address = self.carrier.validate_address(Address(
-            contact_name='asdf', phone_number='1234567890',
-            street_lines=['217 Edison Furlong Rd'],
-            city='Doylestown', subdivision='PA', postal_code='18901',
-            country='US', residential=True))
-        self.assertIsNotNone(address)
-        self.assertTrue(address.residential)
-        self.assertEqual(
-            [a.upper() for a in address.street_lines],
             ["217 EDISON FURLONG RD"])
         self.assertEqual(address.city.upper(), "DOYLESTOWN")
         self.assertEqual(address.subdivision, "PA")
@@ -245,7 +233,6 @@ class TestCarrier(object):
     test_domestic_residential_shipment = domestic(residential_shipment)
     test_domestic_insurance = domestic(insurance)
     test_domestic_address_validation = domestic(address_validation)
-    test_domestic_address_validation_b = domestic(address_validation_b)
     test_domestic_ship_package = domestic(ship_package)
     test_domestic_multiship = domestic(multiship)
     test_international_services = international(services)

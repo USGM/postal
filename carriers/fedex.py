@@ -57,8 +57,10 @@ class FedExApi(Carrier):
     def create_client(self, wsdl_name):
         return Client(self.service_url(wsdl_name), plugins=[ClearEmpty()])
 
-    def __init__(self, key, account_number, password, meter_number):
-        super(FedExApi, self).__init__()
+    def __init__(
+            self, key, account_number, password, meter_number,
+            configuration=None):
+        super(FedExApi, self).__init__(configuration)
         self.key = key
         self.account_number = account_number
         self.password = password

@@ -35,8 +35,8 @@ class DHLApi(Carrier):
     domestic = False
     def __init__(
             self, account_number, region_code, company_name, default_currency,
-            site_id, password, test_mode=False):
-        super(DHLApi, self).__init__()
+            site_id, password, test_mode=False, configuration=None):
+        super(DHLApi, self).__init__(configuration)
         self.site_id = site_id
         self.password = password
         self.account_number = account_number

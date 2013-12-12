@@ -2,28 +2,18 @@
 Front-end for the Postal Library.
 """
 
-import inspect
-import pkgutil
-
-import carriers
-from exceptions import PostalError
-
 
 class Postal:
-    def __init__(self, configuration=None):
-        carriers = []
-        if configuration:
-            self.configuration = configuration
-        else:
-            raise PostalError("No configuration provided.")
+    def __init__(self, configuration_dict):
+        self.carriers = {carrier.name: carrier
+                         for carrier in configuration_dict['enabled_carriers']}
+        carrier_configs = configuration_dict['carrier_inits']
+        for key, value in self.carriers.items():
+            self.carriers[key] = value(
+                postal_configuration=configuration_dict,
+                **carrier_configs[key])
 
-        for module in inspect.getmembers(carriers, inspect.ismodule):
-            if hasattr(module, 'carriers'):
-                carriers.update(module.carriers)
-
-        self.carriers = carriers
-
-    def get_options(self, package):
-        return {
-            carrier: carrier.get_services(package)
-            for carrier in self.carriers}
+    def options(self, package):
+        for carrier in self.carriers.values():
+            for service in carrier.get_services(package):
+                yield service

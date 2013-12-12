@@ -8,7 +8,7 @@ instantiated by Carrier classes to describe a method by which a package may
 be sent.
 """
 from suds import WebFault
-from ..exceptions import CarrierError
+from ..exceptions import CarrierError, PostalError
 import re
 from suds.plugin import MessagePlugin
 
@@ -37,10 +37,17 @@ class Carrier(object):
     # If a carrier should not be used to make domestic shipments, this needs
     # to be False.
     domestic = True
+    # Set this to true if the carrier automatically corrects the residential
+    # status of addresses. This is mostly here to skip a test that makes sure
+    # residential fees are being picked up and abstracted away, since a fair
+    # comparison would not be possible.
+    auto_residential = False
     cache = {}
 
-    def __init__(self):
-        pass
+    def __init__(self, configuration):
+        self.configuration = configuration
+        if not configuration:
+            raise PostalError("Postal Configuration not set.")
 
     def __eq__(self, other):
         if not isinstance(other, Carrier):

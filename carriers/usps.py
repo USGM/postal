@@ -11,7 +11,8 @@ class USPSApi(Carrier):
     """
     Implements calls to the USPS web API.
     """
-    def __init__(self, username, password):
+    def __init__(self, username, password, configuration=None):
+        super(USPSApi, self).__init__(configuration)
         self.username = username
         self.password = password
 
