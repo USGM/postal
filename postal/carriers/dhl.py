@@ -24,8 +24,8 @@ from dateutil.relativedelta import relativedelta
 from money import Money
 from requests import post, RequestException
 
-from base import Carrier, Service
-from ..carriers.templates.constructor import load_template, populate_template
+from .base import Carrier, Service
+from .templates.constructor import load_template, populate_template
 from ..exceptions import ExceedsLimitsError, CarrierError
 from ..data import Shipment
 

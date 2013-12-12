@@ -1,10 +1,5 @@
-pip install pycountry
-pip install python-money
-pip install suds
-
-# from http://stackoverflow.com/questions/4632261/pil-jpeg-library-help
-# Do this BEFORE installing Pillow:
-# apt-get install libjpeg8-dev
-# ln -s /usr/lib/x86_64-linux-gnu/libjpeg.so /usr/lib
-
-pip install Pillow
+python-money==0.5
+PyPDF2==1.19
+Pillow==2.2.1
+requests==2.0.1
+suds==0.4

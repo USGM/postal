@@ -2,11 +2,14 @@
 These are the data structures used by Postal in order to represent things like
 shipments.
 """
+from logging import NullHandler
+from IPython.core.magics import logging
 
 from pycountry import countries
 import money
 
 from exceptions import AddressError
+
 
 
 def get_country(country_code):
