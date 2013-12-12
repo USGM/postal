@@ -103,7 +103,7 @@ class UPSAPI(base.Carrier):
 
     def __init__(
         self, username, password, access_license_number, shipper_number,
-        shipper_address
+        shipper_address=None
     ):
         super(UPSAPI, self).__init__()
         self.shipper_number = shipper_number
@@ -160,7 +160,14 @@ class UPSAPI(base.Carrier):
         api_request.RequestOption = 'validate'
 
         api_shipment = self._Ship.factory.create('ns3:ShipmentType')
+        api_shipment.ShipmentRatingOptions.NegotiatedRatesIndicator = ''
         api_shipment.Service.Code = service.service_id
+
+        shipper_address = self.shipper_address
+        if shipper_address is None:
+            shipper_address = request.origin
+            if shipper_address is None:
+                raise Exception()
         _populate_shipper(
             api_shipment.Shipper, self.shipper_address, self.shipper_number,
             True, True, '123456'
@@ -180,8 +187,8 @@ class UPSAPI(base.Carrier):
 
         international = (ship_from.country != request.destination.country)
 
-        bill_shipper = self._Ship.factory.create('ns3:ShipmentChargeType')
-        api_shipment.PaymentInformation.ShipmentCharge = [bill_shipper]
+        shipper_charge = self._Ship.factory.create('ns3:ShipmentChargeType')
+        api_shipment.PaymentInformation.ShipmentCharge = [shipper_charge]
 
         # A shipment charge type
         # of 01 = Transportation is
@@ -208,8 +215,8 @@ class UPSAPI(base.Carrier):
         # present5) The origin and
         # destination IATA code is
         # the same
-        bill_shipper.Type = '01'
-        bill_shipper.BillShipper.AccountNumber = self.shipper_number
+        shipper_charge.Type = '01'
+        shipper_charge.BillShipper.AccountNumber = self.shipper_number
 
         if international:
             bill_receiver = self._Ship.factory.create('ns3:ShipmentChargeType')
@@ -266,6 +273,7 @@ class UPSAPI(base.Carrier):
                 api_request, api_shipment, label_spec, receipt_spec)
         except WebFault as err:
             _on_webfault(err)
+        #print response
 
         if response.Response.ResponseStatus.Code != '1':
             raise Exception()
@@ -347,13 +355,6 @@ class UPSAPI(base.Carrier):
         pickup_type = '01'
         customer_type = '00'
 
-        pickup_type = str(pickup_type)
-        if len(pickup_type) != 2:
-            raise TypeError()
-        customer_type = str(customer_type)
-        if len(customer_type) != 2:
-            raise TypeError()
-
         api_request = self._RateWS.factory.create('ns0:RequestType')
         api_request.RequestOption = [request_type]
 
@@ -361,11 +362,11 @@ class UPSAPI(base.Carrier):
         _pickup_type.Code = pickup_type
 
         _customer_classification = self._RateWS.factory.create(
-            'ns2:CodeDescriptionType'
-        )
+            'ns2:CodeDescriptionType')
         _customer_classification.Code = customer_type
 
         shipment = self._RateWS.factory.create('ns2:ShipmentType')
+        shipment.ShipmentRatingOptions.NegotiatedRatesIndicator = ''
 
         if request_type == 'Rate' and service is None:
             raise Exception()
@@ -376,13 +377,19 @@ class UPSAPI(base.Carrier):
             shipment.Service.Code = service.service_id
             shipment.Service.Description = service.name
 
+        shipper_address = self.shipper_address
+        if shipper_address is None:
+            shipper_address = request.origin
+            if shipper_address is None:
+                raise Exception()
+
         _populate_shipper(
-            shipment.Shipper, self.shipper_address, self.shipper_number)
+            shipment.Shipper, shipper_address, self.shipper_number)
 
         if request.origin is not None:
             _populate_address(shipment.ShipFrom, request.origin)
         else:
-            _populate_address(shipment.ShipFrom, self.shipper_address)
+            _populate_address(shipment.ShipFrom, shipper_address)
 
         _populate_address(shipment.ShipTo, request.destination)
 
@@ -456,6 +463,9 @@ class UPSAPI(base.Carrier):
         #        print 'ALERT:', alert.Description
 
         return rates
+
+    #def get_service(self, service_id):                                # TODO
+    #    return Service(self, service_id, mapping[service_id])
 
     def validate_address(self, address):
         #print 'Validating:\n' + str(address)
@@ -771,20 +781,20 @@ _service_code_to_description = {
     # a FRS Rating Request is
     # 03=Ground
 
-    '01': 'UPS Next Day Air',  # 'UPS Express' if shipping from Canada
-    '02': 'UPS Second Day Air',
+    '01': 'Next Day Air',  # 'UPS Express' if shipping from Canada (delivers before 10:30am) ----- 522 in our DB
+    '02': 'Second Day Air',  # 524 in our DB
     # 'UPS Worldwide Expedited' - 02 Rating, 08 Shipping, if shipping from Canada
-    '03': 'UPS Ground',
-    '07': 'UPS Worldwide Express',  # different names when originating from other countries
-    '08': 'UPS Worldwide Expedited',  # different names when originating from other countries
-    '11': 'UPS Standard',
-    '12': 'UPS Three-Day Select',
-    '13': 'UPS Next Day Air Saver',
-    '14': 'UPS Next Day Air Early A.M.',  # different name when originating from Canada
-    '54': 'UPS Worldwide Express Plus',  # different name when originating from Mexico
-    '59': 'UPS Second Day Air A.M.',
-    '65': 'UPS Saver',
-    '96': 'UPS Worldwide Express Freight'
+    '03': 'Ground',  # 523 in our DB
+    '07': 'Worldwide Express',  # different names when originating from other countries ----- 520 in our DB
+    '08': 'Worldwide Expedited',  # different names when originating from other countries ----- 521 in our DB
+    '11': 'Standard',
+    '12': 'Three-Day Select',  # 525 in our DB
+    '13': 'Next Day Air Saver',  # delivers at 6pm
+    '14': 'Next Day Air Early A.M.',  # different name when originating from Canada
+    '54': 'Worldwide Express Plus',  # different name when originating from Mexico
+    '59': 'Second Day Air A.M.',
+    '65': 'Saver',
+    '96': 'Worldwide Express Freight'
     ### leaving out a few that are Polish-only
 }
 

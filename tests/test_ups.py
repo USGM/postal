@@ -7,7 +7,7 @@ from pprint import pprint
 from datetime import datetime
 import money
 
-from base import TestCarrier
+from base import TestCarrier, Service
 from ..carriers import ups
 from .. import data
 import test_credentials
@@ -32,7 +32,6 @@ class TestUPS(TestCarrier, unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
 
-
 """###
 try:
     request = data.Request(
@@ -44,18 +43,22 @@ try:
                 '123 Main St',
                 'Apt 666'
             ],
-            city='Houston',
+            city='Round Rock',
             subdivision='TX',
-            postal_code='77047-1234',
+            postal_code='78665',
             country='US',
             residential=True
         ),
         [
-            data.Package(3, 4, 5, 6, declarations=[data.Declaration('asdf', money.Money(101, 'USD'), 'US', 1)]),
-            data.Package(5, 6, 7, 8, declarations=[data.Declaration('qwer', money.Money(50, 'USD'), 'US', 2)]),
-            data.Package(4, 5, 6, 7, declarations=[data.Declaration('zxcv', money.Money(10, 'USD'), 'US', 3)])
+            #data.Package(3, 4, 5, 6, declarations=[data.Declaration('asdf', money.Money(101, 'USD'), 'US', 1)]),
+            #data.Package(5, 6, 7, 8, declarations=[data.Declaration('qwer', money.Money(50, 'USD'), 'US', 2)]),
+            #data.Package(4, 5, 6, 7, declarations=[data.Declaration('zxcv', money.Money(10, 'USD'), 'US', 3)])
+            data.Package(23, 11, 11, 18, declarations=[data.Declaration('omg', money.Money(500, 'USD'), 'US', 1)]),
+            data.Package(23, 11, 11, 14, declarations=[data.Declaration('omg', money.Money(500, 'USD'), 'US', 1)]),
+            data.Package(24, 4, 3, 2, declarations=[data.Declaration('omg', money.Money(200, 'USD'), 'US', 1)])
         ],
-        ship_datetime=datetime(2013, 12, 16, 9, 30)
+        ship_datetime=datetime(2013, 12, 16, 9, 30),
+        insure=True
     )
 
 
@@ -78,8 +81,8 @@ try:
 
     services = api.get_services(request)
     pprint(services)
-    print services.keys()[0]
-    print services.keys()[0].service_id
+    #print services.keys()[0]
+    #print services.keys()[0].service_id
 
     #print api.delivery_datetime(services.keys()[0], request)
     #print api.quote(services.keys()[0], request)
@@ -94,10 +97,14 @@ try:
 
     #print api.delivery_datetime(services.keys()[0], request)
 
-    print api.quote(services.keys()[0], request)
+    #print api.quote(services.keys()[0], request)
 
-    request.insure = True
-    print api.quote(services.keys()[0], request)
+    #request.insure = True
+    #print api.quote(services.keys()[0], request)
+
+    #print api.quote(Service(api, '03', 'UPS Ground'), request)
+
+    print api.ship(Service(api, '03', 'Ground'), request)
 
 except WebFault as err:
     print
