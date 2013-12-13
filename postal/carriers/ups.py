@@ -102,8 +102,8 @@ class UPSApi(base.Carrier):
 
     def __init__(
             self, username, password, access_license_number, shipper_number,
-            configuration=None):
-        super(UPSApi, self).__init__(configuration)
+            postal_configuration=None):
+        super(UPSApi, self).__init__(postal_configuration)
         self.shipper_number = shipper_number
 
         authentication = AuthenticationPlugin(

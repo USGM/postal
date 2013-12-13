@@ -59,8 +59,8 @@ class FedExApi(Carrier):
 
     def __init__(
             self, key, account_number, password, meter_number,
-            configuration=None):
-        super(FedExApi, self).__init__(configuration)
+            postal_configuration=None):
+        super(FedExApi, self).__init__(postal_configuration)
         self.key = key
         self.account_number = account_number
         self.password = password
