@@ -49,6 +49,30 @@ class FixBrokenShipmentRequestNamespace(MessagePlugin):
             .getChild('Request')).prefix = 'ns0'
 
 
+class FixMissingShipmentNegotiatedRates(MessagePlugin):
+    def marshalled(self, context):
+        shipment_rating_options = Element('ShipmentRatingOptions')
+        shipment_rating_options.prefix = 'ns1'
+        negotiated_rates_indicator = Element('NegotiatedRatesIndicator')
+        negotiated_rates_indicator.prefix = 'ns1'
+
+        context.envelope.getChild('Body').getChild('ShipmentRequest').getChild('Shipment').append(
+            shipment_rating_options)
+        shipment_rating_options.append(negotiated_rates_indicator)
+
+
+class FixMissingRatesNegotiatedRates(MessagePlugin):
+    def marshalled(self, context):
+        shipment_rating_options = Element('ShipmentRatingOptions')
+        shipment_rating_options.prefix = 'ns1'
+        negotiated_rates_indicator = Element('NegotiatedRatesIndicator')
+        negotiated_rates_indicator.prefix = 'ns1'
+
+        context.envelope.getChild('Body').getChild('RateRequest').getChild('Shipment').append(
+            shipment_rating_options)
+        shipment_rating_options.append(negotiated_rates_indicator)
+
+
 class AuthenticationPlugin(MessagePlugin):
     def __init__(self, username, password, access_license_number):
         self.username = username
@@ -113,7 +137,10 @@ class UPSApi(base.Carrier):
             'file://' + os.path.join(
                 get_directory_of(inspect.currentframe()),
                 'wsdl', 'ups', 'RateWS.wsdl'),
-            plugins=[authentication, FixBrokenRateNamespace()])
+            plugins=[
+                authentication, FixBrokenRateNamespace(),
+                FixMissingRatesNegotiatedRates()
+            ])
         self._XAV = Client(
             'file://' + os.path.join(
                 get_directory_of(inspect.currentframe()),
@@ -129,7 +156,11 @@ class UPSApi(base.Carrier):
                 get_directory_of(inspect.currentframe()),
                 'wsdl', 'ups', 'Ship.wsdl'),
             cache=suds.cache.NoCache(),
-            plugins=[authentication, FixBrokenShipmentRequestNamespace()])
+            plugins=[
+                authentication, FixBrokenShipmentRequestNamespace(),
+                FixMissingShipmentNegotiatedRates()
+            ]
+        )
         self.TNTWS = Client(
             'file://' + os.path.join(
                 get_directory_of(inspect.currentframe()),
@@ -235,7 +266,12 @@ class UPSApi(base.Carrier):
                 api_request, api_shipment, label_spec, receipt_spec)
         except WebFault as err:
             raise _on_webfault(err)
-        #print response
+
+        published_rate = _get_money(
+            response.ShipmentResults.ShipmentCharges.TotalCharges)
+        negotiated_rate = _get_money(
+            response.ShipmentResults.NegotiatedRateCharges.TotalCharge)
+        ### TODO: store/return these rates ^
 
         if response.Response.ResponseStatus.Code != '1':
             raise CarrierError(
@@ -414,8 +450,6 @@ class UPSApi(base.Carrier):
     #    return Service(self, service_id, mapping[service_id])
 
     def validate_address(self, address):
-        #print 'Validating:\n' + str(address)
-
         request = self._XAV.factory.create('ns0:RequestType')
         request.RequestOption = '3'  # validation and classification
 
@@ -431,10 +465,13 @@ class UPSApi(base.Carrier):
         try:
             response = self._XAV.service.ProcessXAV(
                 request,
+
                 # missing tag = street-level validation
                 None,
+
                 # candidate list size
                 2,
+
                 address_key)
 
         except WebFault as err:
@@ -556,15 +593,6 @@ class UPSApi(base.Carrier):
                 None)
 
         except WebFault as err:
-            #print err.fault
-            #print '[[['
-            #print api_request, ';;'
-            #print req_ship_from, ';;'
-            #print req_ship_to, ';;'
-            #print sticks, ';;'
-            #print weight, ';;'
-            #print str(len(request.packages)), ';;'
-            #print ']]]'
             raise _on_webfault(err)
 
         if response.Response.ResponseStatus.Code != '1':
@@ -596,7 +624,11 @@ class UPSApi(base.Carrier):
         if rated_shipment.Service.Code != service.service_id:
             raise Exception()
 
-        return _get_money(rated_shipment.TotalCharges)
+        ### If no negotiated rates:
+        #return _get_money(rated_shipment.TotalCharges)
+
+        ### otherwise:
+        return _get_money(rated_shipment.NegotiatedRateCharges.TotalCharge)
 
 
 def is_large(package):
