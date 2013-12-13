@@ -384,7 +384,7 @@ class FedExApi(Carrier):
 
         final = {
             self.create_service(key): {
-                'price': value['price'],
+                'price': Money(value['price'].Amount, value['price'].Currency),
                 'delivery_datetime': value['delivery_datetime']}
             for key, value in result.items()}
 
