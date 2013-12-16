@@ -1,6 +1,10 @@
 import inspect
 import os
 import base64
+import threading
+from Queue import Queue
+import traceback
+import sys
 
 from datetime import datetime
 from StringIO import StringIO
@@ -140,17 +144,20 @@ class UPSApi(base.Carrier):
             plugins=[
                 authentication, FixBrokenRateNamespace(),
                 FixMissingRatesNegotiatedRates()
-            ])
+            ],
+            timeout=postal_configuration['timeout'])
         self._XAV = Client(
             'file://' + os.path.join(
                 get_directory_of(inspect.currentframe()),
                 'wsdl', 'ups', 'XAV.wsdl'),
-            plugins=[authentication, FixBrokenAddressNamespace()])
+            plugins=[authentication, FixBrokenAddressNamespace()],
+            timeout=postal_configuration['timeout'])
         self._TNTWS = Client(
             'file://' + os.path.join(
                 get_directory_of(inspect.currentframe()),
                 'wsdl', 'ups', 'TNTWS.wsdl'),
-            plugins=[authentication, FixBrokenTimeNamespace()])
+            plugins=[authentication, FixBrokenTimeNamespace()],
+            timeout=postal_configuration['timeout'])
         self._Ship = Client(
             'file://' + os.path.join(
                 get_directory_of(inspect.currentframe()),
@@ -159,8 +166,8 @@ class UPSApi(base.Carrier):
             plugins=[
                 authentication, FixBrokenShipmentRequestNamespace(),
                 FixMissingShipmentNegotiatedRates()
-            ]
-        )
+            ],
+            timeout=postal_configuration['timeout'])
         self.TNTWS = Client(
             'file://' + os.path.join(
                 get_directory_of(inspect.currentframe()),
@@ -169,7 +176,8 @@ class UPSApi(base.Carrier):
             plugins=[
                 AuthenticationPlugin(
                     username, password, access_license_number),
-                FixBrokenTimeNamespace()])
+                FixBrokenTimeNamespace()],
+            timeout=postal_configuration['timeout'])
 
     def ship(self, service, request, receiver_account_number=None):
         origin = request.origin or self.postal_configuration['shipper_address']
@@ -301,22 +309,40 @@ class UPSApi(base.Carrier):
     def get_services(self, request):
         rates = self._request_rates(request, 'Shop')
 
-        rated_shipments = {}
-
+        shipment_info = Queue()
         for rated_shipment in rates.RatedShipment:
-            service = base.Service(
-                self,
-                rated_shipment.Service.Code,
-                _service_code_to_description.get(
-                    rated_shipment.Service.Code, None))
+            def task(rated_shipment):
+                try:
+                    service = base.Service(
+                        self,
+                        rated_shipment.Service.Code,
+                        _service_code_to_description.get(
+                            rated_shipment.Service.Code, None))
 
-            rated_shipments[service] = dict(
-                price=_get_money(rated_shipment.TotalCharges),
-                delivery_datetime=self.delivery_datetime(service, request),
-                alerts=[
-                    a.Description for a in rated_shipment.RatedShipmentAlert])
+                    shipment_info.put((service, dict(
+                        price=_get_money(rated_shipment.TotalCharges),
+                        delivery_datetime=self.delivery_datetime(
+                            service, request),
+                        alerts=[a.Description
+                            for a in rated_shipment.RatedShipmentAlert]
+                    )))
+                except Exception as err:
+                    err.traceback = sys.exc_info()[2]
+                    shipment_info.put(err)
 
-        return rated_shipments
+            threading.Thread(target=task, args=(rated_shipment,)).start()
+            
+        result = {}
+        for i in range(len(rates.RatedShipment)):
+            a = shipment_info.get()
+            if isinstance(a, Exception):
+                print str(type(a)) + ': ' + str(a)
+                traceback.print_tb(a.traceback)
+                raise a
+            else:
+                service, rates = a
+                result[service] = rates
+        return result
 
     def _request_rates(self, request, request_type, service=None):
         """
