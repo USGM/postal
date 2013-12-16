@@ -55,12 +55,15 @@ class FedExApi(Carrier):
         return "file://%s" % full_path
 
     def create_client(self, wsdl_name):
-        return Client(self.service_url(wsdl_name), plugins=[ClearEmpty()])
+        return Client(
+            self.service_url(wsdl_name), plugins=[ClearEmpty()],
+            timeout=self.postal_configuration['timeout'])
 
     def __init__(
             self, key, account_number, password, meter_number,
             postal_configuration=None):
         super(FedExApi, self).__init__(postal_configuration)
+        self.postal_configuration = postal_configuration
         self.key = key
         self.account_number = account_number
         self.password = password

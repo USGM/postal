@@ -53,7 +53,9 @@ class DHLApi(Carrier):
     def make_call(self, call):
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         try:
-            response = post(self.url, data=call, headers=headers)
+            response = post(
+                self.url, data=call, headers=headers,
+                timeout=self.postal_configuration['timeout'])
             response.raise_for_status()
         except RequestException as err:
             raise CarrierError("%s" % err)

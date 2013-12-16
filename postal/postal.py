@@ -1,5 +1,6 @@
 import threading
 from Queue import Queue
+import sys
 
 """
 Front-end for the Postal Library.
@@ -48,23 +49,35 @@ class Postal:
     def options_async(self, package):
         results = Queue()
         for carrier in self.carriers.values():
-            def callme():
-                for service, data in carrier.get_services(package).iteritems():
+            ### The implementation of this loop currently assumes that the
+            ### caller will always want all of the generated data.
 
-                    ### copy before modifying in case a carrier binding does
-                    ### something odd
-                    result = dict(data)
+            def callme(carrier):
+                try:
+                    for service, data in \
+                            carrier.get_services(package).iteritems():
 
-                    if 'service' in result:
-                        ### Don't silently overwrite something that might
-                        ### be important
-                        raise Exception()
+                        ### copy before modifying in case a carrier binding
+                        ### does something odd
+                        info = dict(data)
 
-                    result['service'] = service
-                    results.put(result)
-                results.put(None)  # this carrier is done
+                        if 'service' in info:
+                            ### Don't silently overwrite something that might
+                            ### be important
+                            raise Exception()
 
-            threading.Thread(target=callme).start()
+                        info['service'] = service
+                        results.put(info)
+
+                except Exception as err:
+                    err.traceback = sys.exc_info()[2]
+                    err.carrier = carrier
+                    results.put(err)
+
+                finally:
+                    results.put(None)  # this carrier is done
+
+            threading.Thread(target=callme, args=(carrier,)).start()
 
         num_carriers_finished = 0
         while num_carriers_finished < len(self.carriers):
