@@ -172,6 +172,8 @@ class UPSApi(base.Carrier):
                 FixBrokenTimeNamespace()])
 
     def ship(self, service, request, receiver_account_number=None):
+        origin = request.origin or self.postal_configuration['shipper_address']
+
         api_request = self._Ship.factory.create('ns0:RequestType')
         api_request.RequestOption = 'validate'
 
@@ -180,18 +182,17 @@ class UPSApi(base.Carrier):
         api_shipment.Service.Code = service.service_id
 
         _populate_shipper(
-            api_shipment.Shipper, request.origin, self.shipper_number,
+            api_shipment.Shipper, origin, self.shipper_number,
             True, True, '123456')
         _populate_address(
             api_shipment.ShipTo, request.destination, use_phone=True,
             use_attn=True)
 
-        ship_from = request.origin
         _populate_address(
             api_shipment.ShipFrom, request.origin, use_phone=True,
             use_attn=True)
 
-        international = (ship_from.country != request.destination.country)
+        international = (origin.country != request.destination.country)
 
         shipper_charge = self._Ship.factory.create('ns3:ShipmentChargeType')
         api_shipment.PaymentInformation.ShipmentCharge = [shipper_charge]
@@ -371,10 +372,12 @@ class UPSApi(base.Carrier):
             shipment.Service.Code = service.service_id
             shipment.Service.Description = service.name
 
-        _populate_shipper(
-            shipment.Shipper, request.origin, self.shipper_number)
+        origin = request.origin or self.postal_configuration['shipper_address']
 
-        _populate_address(shipment.ShipFrom, request.origin)
+        _populate_shipper(
+            shipment.Shipper, origin, self.shipper_number)
+
+        _populate_address(shipment.ShipFrom, origin)
 
         _populate_address(shipment.ShipTo, request.destination)
 
@@ -521,15 +524,12 @@ class UPSApi(base.Carrier):
         # contents are as long as the tag is not missing.
         api_request.RequestOption = ''
 
+        origin = request.origin or self.postal_configuration['shipper_address']
+
         req_ship_from = self._TNTWS.factory.create('ns2:RequestShipFromType')
-        if request.origin is not None:
-            _populate_address(
-                req_ship_from, request.origin,
-                urbanization_title='Town', use_street=False, use_name=False)
-        else:
-            _populate_address(
-                req_ship_from, self.shipper_address,
-                urbanization_title='Town', use_street=False, use_name=False)
+        _populate_address(
+            req_ship_from, origin,
+            urbanization_title='Town', use_street=False, use_name=False)
 
         req_ship_to = self._TNTWS.factory.create('ns2:RequestShipToType')
         _populate_address(

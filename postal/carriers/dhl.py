@@ -224,6 +224,8 @@ class DHLApi(Carrier):
         return ''.join(result)
 
     def rates_request(self, request):
+        origin = request.origin or self.postal_configuration['shipper_address']
+
         request_header = self.create_header()
         pieces = self.enumerate_pieces('rates_piece.xml', request)
         duties = self.money_snippet('rates_dutiable.xml', request)
@@ -238,8 +240,8 @@ class DHLApi(Carrier):
             insured = ''
         tz_offset = self.timezone_offset()
         escape_variables = {
-            'origin_country': request.origin.country.alpha2,
-            'origin_postal_code': request.origin.postal_code,
+            'origin_country': origin.country.alpha2,
+            'origin_postal_code': origin.postal_code,
             'ship_date': ship_date,
             'hour': hour,
             'minute': minute,
@@ -267,7 +269,8 @@ class DHLApi(Carrier):
         else:
             insured = ''
 
-        origin_address = self.build_address(request.origin)
+        origin = request.origin or self.postal_configuration['shipper_address']
+        origin_address = self.build_address(origin)
         destination_address = self.build_address(request.destination)
         number_of_packages = len(request.packages)
 
@@ -276,8 +279,8 @@ class DHLApi(Carrier):
         total_weight = sum([package.weight for package in request.packages])
 
         escape_variables = {
-            'origin_country': request.origin.country.alpha2,
-            'origin_postal_code': request.origin.postal_code,
+            'origin_country': origin.country.alpha2,
+            'origin_postal_code': origin.postal_code,
             'ship_date': ship_date,
             'destination_country': request.destination.country.alpha2,
             'destination_postal_code': request.destination.postal_code,
