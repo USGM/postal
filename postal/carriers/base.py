@@ -44,9 +44,9 @@ class Carrier(object):
     auto_residential = False
     cache = {}
 
-    def __init__(self, configuration):
-        self.configuration = configuration
-        if not configuration:
+    def __init__(self, postal_configuration):
+        self.postal_configuration = postal_configuration
+        if not postal_configuration:
             raise PostalError("Postal Configuration not set.")
 
     def __eq__(self, other):

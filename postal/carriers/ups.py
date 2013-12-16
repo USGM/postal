@@ -49,6 +49,30 @@ class FixBrokenShipmentRequestNamespace(MessagePlugin):
             .getChild('Request')).prefix = 'ns0'
 
 
+class FixMissingShipmentNegotiatedRates(MessagePlugin):
+    def marshalled(self, context):
+        shipment_rating_options = Element('ShipmentRatingOptions')
+        shipment_rating_options.prefix = 'ns1'
+        negotiated_rates_indicator = Element('NegotiatedRatesIndicator')
+        negotiated_rates_indicator.prefix = 'ns1'
+
+        context.envelope.getChild('Body').getChild('ShipmentRequest').getChild('Shipment').append(
+            shipment_rating_options)
+        shipment_rating_options.append(negotiated_rates_indicator)
+
+
+class FixMissingRatesNegotiatedRates(MessagePlugin):
+    def marshalled(self, context):
+        shipment_rating_options = Element('ShipmentRatingOptions')
+        shipment_rating_options.prefix = 'ns1'
+        negotiated_rates_indicator = Element('NegotiatedRatesIndicator')
+        negotiated_rates_indicator.prefix = 'ns1'
+
+        context.envelope.getChild('Body').getChild('RateRequest').getChild('Shipment').append(
+            shipment_rating_options)
+        shipment_rating_options.append(negotiated_rates_indicator)
+
+
 class AuthenticationPlugin(MessagePlugin):
     def __init__(self, username, password, access_license_number):
         self.username = username
@@ -102,8 +126,8 @@ class UPSApi(base.Carrier):
 
     def __init__(
             self, username, password, access_license_number, shipper_number,
-            configuration=None):
-        super(UPSApi, self).__init__(configuration)
+            postal_configuration=None):
+        super(UPSApi, self).__init__(postal_configuration)
         self.shipper_number = shipper_number
 
         authentication = AuthenticationPlugin(
@@ -113,7 +137,10 @@ class UPSApi(base.Carrier):
             'file://' + os.path.join(
                 get_directory_of(inspect.currentframe()),
                 'wsdl', 'ups', 'RateWS.wsdl'),
-            plugins=[authentication, FixBrokenRateNamespace()])
+            plugins=[
+                authentication, FixBrokenRateNamespace(),
+                FixMissingRatesNegotiatedRates()
+            ])
         self._XAV = Client(
             'file://' + os.path.join(
                 get_directory_of(inspect.currentframe()),
@@ -129,7 +156,11 @@ class UPSApi(base.Carrier):
                 get_directory_of(inspect.currentframe()),
                 'wsdl', 'ups', 'Ship.wsdl'),
             cache=suds.cache.NoCache(),
-            plugins=[authentication, FixBrokenShipmentRequestNamespace()])
+            plugins=[
+                authentication, FixBrokenShipmentRequestNamespace(),
+                FixMissingShipmentNegotiatedRates()
+            ]
+        )
         self.TNTWS = Client(
             'file://' + os.path.join(
                 get_directory_of(inspect.currentframe()),
@@ -141,6 +172,8 @@ class UPSApi(base.Carrier):
                 FixBrokenTimeNamespace()])
 
     def ship(self, service, request, receiver_account_number=None):
+        origin = request.origin or self.postal_configuration['shipper_address']
+
         api_request = self._Ship.factory.create('ns0:RequestType')
         api_request.RequestOption = 'validate'
 
@@ -149,18 +182,17 @@ class UPSApi(base.Carrier):
         api_shipment.Service.Code = service.service_id
 
         _populate_shipper(
-            api_shipment.Shipper, request.origin, self.shipper_number,
+            api_shipment.Shipper, origin, self.shipper_number,
             True, True, '123456')
         _populate_address(
             api_shipment.ShipTo, request.destination, use_phone=True,
             use_attn=True)
 
-        ship_from = request.origin
         _populate_address(
             api_shipment.ShipFrom, request.origin, use_phone=True,
             use_attn=True)
 
-        international = (ship_from.country != request.destination.country)
+        international = (origin.country != request.destination.country)
 
         shipper_charge = self._Ship.factory.create('ns3:ShipmentChargeType')
         api_shipment.PaymentInformation.ShipmentCharge = [shipper_charge]
@@ -235,7 +267,12 @@ class UPSApi(base.Carrier):
                 api_request, api_shipment, label_spec, receipt_spec)
         except WebFault as err:
             raise _on_webfault(err)
-        #print response
+
+        published_rate = _get_money(
+            response.ShipmentResults.ShipmentCharges.TotalCharges)
+        negotiated_rate = _get_money(
+            response.ShipmentResults.NegotiatedRateCharges.TotalCharge)
+        ### TODO: store/return these rates ^
 
         if response.Response.ResponseStatus.Code != '1':
             raise CarrierError(
@@ -335,10 +372,12 @@ class UPSApi(base.Carrier):
             shipment.Service.Code = service.service_id
             shipment.Service.Description = service.name
 
-        _populate_shipper(
-            shipment.Shipper, request.origin, self.shipper_number)
+        origin = request.origin or self.postal_configuration['shipper_address']
 
-        _populate_address(shipment.ShipFrom, request.origin)
+        _populate_shipper(
+            shipment.Shipper, origin, self.shipper_number)
+
+        _populate_address(shipment.ShipFrom, origin)
 
         _populate_address(shipment.ShipTo, request.destination)
 
@@ -414,8 +453,6 @@ class UPSApi(base.Carrier):
     #    return Service(self, service_id, mapping[service_id])
 
     def validate_address(self, address):
-        #print 'Validating:\n' + str(address)
-
         request = self._XAV.factory.create('ns0:RequestType')
         request.RequestOption = '3'  # validation and classification
 
@@ -431,10 +468,13 @@ class UPSApi(base.Carrier):
         try:
             response = self._XAV.service.ProcessXAV(
                 request,
+
                 # missing tag = street-level validation
                 None,
+
                 # candidate list size
                 2,
+
                 address_key)
 
         except WebFault as err:
@@ -484,15 +524,12 @@ class UPSApi(base.Carrier):
         # contents are as long as the tag is not missing.
         api_request.RequestOption = ''
 
+        origin = request.origin or self.postal_configuration['shipper_address']
+
         req_ship_from = self._TNTWS.factory.create('ns2:RequestShipFromType')
-        if request.origin is not None:
-            _populate_address(
-                req_ship_from, request.origin,
-                urbanization_title='Town', use_street=False, use_name=False)
-        else:
-            _populate_address(
-                req_ship_from, self.shipper_address,
-                urbanization_title='Town', use_street=False, use_name=False)
+        _populate_address(
+            req_ship_from, origin,
+            urbanization_title='Town', use_street=False, use_name=False)
 
         req_ship_to = self._TNTWS.factory.create('ns2:RequestShipToType')
         _populate_address(
@@ -556,15 +593,6 @@ class UPSApi(base.Carrier):
                 None)
 
         except WebFault as err:
-            #print err.fault
-            #print '[[['
-            #print api_request, ';;'
-            #print req_ship_from, ';;'
-            #print req_ship_to, ';;'
-            #print sticks, ';;'
-            #print weight, ';;'
-            #print str(len(request.packages)), ';;'
-            #print ']]]'
             raise _on_webfault(err)
 
         if response.Response.ResponseStatus.Code != '1':
@@ -596,7 +624,11 @@ class UPSApi(base.Carrier):
         if rated_shipment.Service.Code != service.service_id:
             raise Exception()
 
-        return _get_money(rated_shipment.TotalCharges)
+        ### If no negotiated rates:
+        #return _get_money(rated_shipment.TotalCharges)
+
+        ### otherwise:
+        return _get_money(rated_shipment.NegotiatedRateCharges.TotalCharge)
 
 
 def is_large(package):

@@ -59,8 +59,8 @@ class FedExApi(Carrier):
 
     def __init__(
             self, key, account_number, password, meter_number,
-            configuration=None):
-        super(FedExApi, self).__init__(configuration)
+            postal_configuration=None):
+        super(FedExApi, self).__init__(postal_configuration)
         self.key = key
         self.account_number = account_number
         self.password = password
@@ -189,20 +189,22 @@ class FedExApi(Carrier):
         FedEx supports Multiship, but only one package at a time. They have to
         be 'added' to the initial request with secondary requests.
         """
+        origin = request.origin or self.postal_configuration['shipper_address']
+
         api_request = self.ship_client.factory.create('RequestedShipment')
         api_request.ShipTimestamp = request.ship_datetime or datetime.now()
         api_request.ServiceType = service.service_id
         api_request.DropoffType = 'REGULAR_PICKUP'
         api_request.PackagingType = 'YOUR_PACKAGING'
         api_request.RateRequestTypes = 'ACCOUNT'
-        self.set_address(api_request.Shipper, request.origin)
+        self.set_address(api_request.Shipper, origin)
         self.set_address(api_request.Recipient, request.destination)
         payment = api_request.ShippingChargesPayment
         payment.PaymentType = 'SENDER'
         party = payment.Payor.ResponsibleParty
         party.AccountNumber = self.account_number
-        party.Contact.PersonName = request.origin.contact_name
-        party.Contact.PhoneNumber = request.origin.phone_number
+        party.Contact.PersonName = origin.contact_name
+        party.Contact.PhoneNumber = origin.phone_number
         self.label_specification(api_request.LabelSpecification)
         if tracking_number:
             api_request.MasterTrackingId = tracking_number
@@ -333,7 +335,8 @@ class FedExApi(Carrier):
     def requested_shipment_rate(self, request):
         api_request = self.rates_client.factory.create('RequestedShipment')
 
-        self.set_address(api_request.Shipper, request.origin)
+        origin = request.origin or self.postal_configuration['shipper_address']
+        self.set_address(api_request.Shipper, origin)
         self.set_address(api_request.Recipient, request.destination)
 
         api_request.RateRequestTypes = 'ACCOUNT'
@@ -383,7 +386,7 @@ class FedExApi(Carrier):
 
         final = {
             self.create_service(key): {
-                'price': value['price'],
+                'price': Money(value['price'].Amount, value['price'].Currency),
                 'delivery_datetime': value['delivery_datetime']}
             for key, value in result.items()}
 
