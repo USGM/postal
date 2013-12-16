@@ -180,7 +180,6 @@ class FedExApi(Carrier):
         output.addPage(page)
         output_stream = StringIO()
         output.write(output_stream)
-        open('fedex_label.pdf', 'w').write(output_stream.getvalue())
         return output_stream.getvalue()
 
     def requested_shipment(
