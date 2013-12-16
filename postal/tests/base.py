@@ -80,7 +80,7 @@ class TestCarrier(object):
 
     def init_carrier(self):
         return self.carrier_class(
-            configuration=config,
+            postal_configuration=config,
             **config['carrier_inits'][self.carrier_class.name])
 
     def setUp(self):
