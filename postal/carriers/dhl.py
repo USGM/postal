@@ -16,7 +16,7 @@ DHL.
 from base64 import b64decode
 from datetime import datetime
 from time import timezone
-from xml.etree.ElementTree import fromstring
+from xml.etree.ElementTree import fromstring, tostring
 
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from StringIO import StringIO
@@ -33,6 +33,7 @@ from ..data import Shipment
 class DHLApi(Carrier):
     name = 'DHL'
     domestic = False
+
     def __init__(
             self, account_number, region_code, company_name, default_currency,
             site_id, password, test_mode=False, postal_configuration=None):
@@ -95,7 +96,18 @@ class DHLApi(Carrier):
 
     @staticmethod
     def from_timestr(time_string):
-        return datetime.strptime(time_string, '%Y-%m-%dPT%HH%MM')
+        if not time_string:
+            return None
+        time = None
+        try:
+            time = datetime.strptime(time_string, '%Y-%m-%d')
+        except ValueError:
+            pass
+        try:
+            time = datetime.strptime(time_string, '%Y-%m-%dPT%HH%MM')
+        except ValueError:
+            pass
+        return time
 
     @staticmethod
     def make_datetime_string(time=None):
@@ -113,14 +125,18 @@ class DHLApi(Carrier):
 
     @staticmethod
     def response_to_dict(quotes):
-        return {
-            quote.find('GlobalProductCode').text: {
+        response_dict = {}
+        for quote in quotes:
+            key = quote.findtext('GlobalProductCode')
+            if not key:
+                continue
+            response_dict[key] = {
                 'service_name': quote.find('LocalProductName').text.title(),
                 'delivery_datetime': DHLApi.from_timestr(
-                    quote.find('DeliveryDate').text
-                    + quote.find('DeliveryTime').text),
+                    quote.findtext('DeliveryDate') or ''
+                    + quote.findtext('DeliveryTime') or ''),
                 'price': DHLApi.get_price(quote)}
-            for quote in quotes}
+        return response_dict
 
     def get_services(self, request):
         pieces = self.enumerate_pieces('rates_piece.xml', request)
