@@ -475,8 +475,14 @@ class UPSApi(base.Carrier):
 
         return rates
 
-    #def get_service(self, service_id):                                # TODO
-    #    return Service(self, service_id, mapping[service_id])
+    def get_service(self, service_id):
+        return Service(
+            self, service_id, _service_code_to_description[service_id])
+
+    def get_all_services(self):
+        return (
+            base.Service(self, code, name)
+            for code, name in _service_code_to_description)
 
     def validate_address(self, address):
         request = self._XAV.factory.create('ns0:RequestType')

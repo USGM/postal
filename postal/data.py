@@ -47,7 +47,7 @@ class Address(object):
             if country is not 'PR'/Puerto Rico (required for UPS)
         """
         # The following should always be needed for any country.
-        if not all([contact_name, phone_number, street_lines, city, country]):
+        if not all([street_lines, city, country]):
             raise AddressError(
                 "Not enough information to construct an address.")
         if urbanization is not None and country != 'PR':
