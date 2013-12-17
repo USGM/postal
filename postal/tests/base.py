@@ -107,6 +107,11 @@ class TestCarrier(object):
         self.international_package.declarations = self.declarations
         self.international_package2.declarations = self.declarations2
 
+    def test_get_all_services(self):
+        services = self.carrier.get_all_services()
+        for service in services:
+            self.assertIsInstance
+
     def services(self):
         services = self.carrier.get_services(self.request)
         self.assertTrue(services)
