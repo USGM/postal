@@ -130,8 +130,7 @@ class Carrier(object):
 
 
 class Service(object):
-    def __init__(
-            self, carrier, service_id, name):
+    def __init__(self, carrier, service_id, name):
         self.carrier = carrier
         # Unique identifier for use with a carrier's get_service() method.
         # This should always be a string.
