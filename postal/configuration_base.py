@@ -9,7 +9,7 @@ base_postal_configuration = {
 
     # Any carriers you don't want to include should be removed from this list.
     # Any extra carriers you create or import should be added to this list.
-    'enabled_carriers': [USPSApi, FedExApi, UPSApi, DHLApi],
+    'enabled_carriers': [USPSApi, FedExApi, UPSApi, DHLApi, USPSApi],
     # On occasion, Postal will need to tell a carrier what currency to use
     # when getting a rate or other request. Pick the standard abbreviation
     # for the currency you want used as per ISO-4217.

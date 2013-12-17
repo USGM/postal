@@ -6,11 +6,13 @@
           <ZipDestination>{destination_zip}</ZipDestination>
           <Pounds>{pounds}</Pounds>
           <Ounces>{ounces}</Ounces>
-          <Container>RECTANGULAR</Container>
+          {container}
           <Size>{size}</Size>
           <Width>{width}</Width>
           <Length>{length}</Length>
           <Height>{height}</Height>
           <Girth>{girth}</Girth>
+          <Machinable>true</Machinable>
+          <ShipDate>{ship_date}</ShipDate>
      </Package>
 </RateV4Request>
