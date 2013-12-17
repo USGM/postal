@@ -8,8 +8,7 @@ from test_credentials import usps_credentials
 
 
 class TestUSPS(TestCarrier, unittest.TestCase):
-    def init_carrier(self):
-        return USPSApi(**usps_credentials)
+    carrier_class = USPSApi
 
 if __name__ == '__main__':
     unittest.main()

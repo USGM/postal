@@ -7,3 +7,4 @@ config = base_postal_configuration
 config['carrier_inits']['UPS'] = ups_credentials
 config['carrier_inits']['FedEx'] = fedex_credentials
 config['carrier_inits']['DHL'] = dhl_credentials
+config['carrier_inits']['USPS'] = usps_credentials

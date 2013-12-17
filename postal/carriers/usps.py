@@ -29,11 +29,11 @@ class USPSApi(Carrier):
     """
     Implements calls to the USPS web API.
     """
+    name = 'USPS'
+
     def __init__(
             self, user_id, password, test_mode, postal_configuration=None):
         super(USPSApi, self).__init__(postal_configuration)
-        self.username = user_id
-        super(USPSApi, self).__init__()
         self.user_id = user_id
         self.password = password
 
@@ -61,6 +61,10 @@ class USPSApi(Carrier):
         root = fromstring(response.text)
         print tostring(root)
 
+    @staticmethod
+    def ship_date(date_time):
+        return date_time.strftime('%d-%b-%Y')
+
     def get_services(self, request):
         self.no_multiship(request)
         package = request.packages[0]
@@ -70,9 +74,13 @@ class USPSApi(Carrier):
         dims = sorted([package.width, package.height, package.length])
         if dims[0] > 12:
             size = "LARGE"
+            container = '<Container>RECTANGULAR</Container>'
         else:
             size = "REGULAR"
+            container = '<Container>VARIABLE</Container>'
         girth = (dims[0] + dims[1]) * 2
+        target_date = request.ship_datetime or datetime.now()
+        ship_date = self.ship_date(target_date)
         escape_dict = {
             'height': int(ceil(package.height)),
             'width': int(ceil(package.width)),
@@ -83,8 +91,11 @@ class USPSApi(Carrier):
             'girth': girth,
             'user_id': self.user_id,
             'origin_zip': request.origin.postal_code,
-            'destination_zip': request.destination.postal_code}
-        call = populate_template(template, escape_dict)
+            'destination_zip': request.destination.postal_code,
+            'ship_date': ship_date}
+        call = populate_template(
+            template, escape_dict, {'container': container})
+
         result = self.make_call(self.rate_url, 'RateV4', call)
 
 
