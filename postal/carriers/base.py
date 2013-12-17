@@ -78,6 +78,14 @@ class Carrier(object):
         # For now, we make this in-process.
         self.cache.update({self.cache_key(request): response_dict})
 
+    def get_all_services(self):
+        """
+        Get all services that this carrier provides. This list should be as
+        comprehensive as practical. If you want services available for a
+        specific request, get_services should be used instead.
+        """
+        return []
+
     def get_services(self, request):
         """
         Get all services that this carrier can provide for transporting this
@@ -118,9 +126,6 @@ class Carrier(object):
         request through that service. If the request cannot be sent through
         that service, an exception should be raised.
         """
-        raise NotImplementedError
-
-    def ship(self, service, request):
         raise NotImplementedError
 
 

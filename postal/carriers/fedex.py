@@ -368,6 +368,11 @@ class FedExApi(Carrier):
         return Service(
             self, service, self.service_table[service])
 
+    def get_all_services(self):
+        return [
+            Service(self, key, value)
+            for key, value in self.service_table.items()]
+
     def get_services(self, request):
         """
         Get available services for shipping a package.
