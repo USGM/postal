@@ -94,3 +94,4 @@ class Postal:
         services = []
         for carrier in self.carriers.values():
             services += carrier.get_all_services()
+        return services
