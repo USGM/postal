@@ -1,10 +1,10 @@
-import threading
-from Queue import Queue
-import sys
-
 """
 Front-end for the Postal Library.
 """
+
+import threading
+from Queue import Queue
+import sys
 
 
 class Postal:
@@ -86,3 +86,11 @@ class Postal:
                 num_carriers_finished += 1
             else:
                 yield result
+
+    def get_all_services(self):
+        """
+        Get all service options from all carriers.
+        """
+        services = []
+        for carrier in self.carriers.values():
+            services += carrier.get_all_services()
