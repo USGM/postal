@@ -22,7 +22,7 @@ class CarrierError(PostalError):
     """
 
 
-class ExceedsLimitsError(PostalError):
+class NotSupportedError(PostalError):
     """
     Used when a requested shipment exceeds the limits of a service.
     """

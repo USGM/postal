@@ -3,7 +3,6 @@ import os
 import base64
 import threading
 from Queue import Queue
-import traceback
 import sys
 
 from datetime import datetime
@@ -20,7 +19,7 @@ from suds.sax.element import Element
 from suds import WebFault
 
 from ..data import Address, Shipment
-from ..exceptions import CarrierError
+from ..exceptions import CarrierError, NotSupportedError
 
 __author__ = 'Nathan Everitt'
 
@@ -121,6 +120,10 @@ def _on_webfault(webfault):
     error = webfault.fault.detail.Errors.ErrorDetail.PrimaryErrorCode
     return CarrierError(
         'Webfault#%s:%s' % (error.Code, error.Description))
+
+
+def _on_unknown_error():
+    raise CarrierError('UPS encountered an unknown error.')
 
 
 class UPSApi(base.Carrier):
@@ -274,7 +277,7 @@ class UPSApi(base.Carrier):
             response = self._Ship.service.ProcessShipment(
                 api_request, api_shipment, label_spec, receipt_spec)
         except WebFault as err:
-            raise _on_webfault(err)
+            _on_webfault(err)
 
         published_rate = _get_money(
             response.ShipmentResults.ShipmentCharges.TotalCharges)
@@ -283,9 +286,7 @@ class UPSApi(base.Carrier):
         ### TODO: store/return these rates ^
 
         if response.Response.ResponseStatus.Code != '1':
-            raise CarrierError(
-                "UPS returned an unknown failure, and did not raise a"
-                " webfault.")
+            _on_unknown_error()
 
         master_tracking_number = \
             response.ShipmentResults.ShipmentIdentificationNumber
@@ -336,8 +337,6 @@ class UPSApi(base.Carrier):
         for i in range(len(rates.RatedShipment)):
             a = shipment_info.get()
             if isinstance(a, Exception):
-                print str(type(a)) + ': ' + str(a)
-                traceback.print_tb(a.traceback)
                 raise a
             else:
                 service, rates = a
@@ -390,9 +389,9 @@ class UPSApi(base.Carrier):
         shipment.ShipmentRatingOptions.NegotiatedRatesIndicator = ''
 
         if request_type == 'Rate' and service is None:
-            raise Exception()
+            raise TypeError()
         if request_type == 'Shop' and service is not None:
-            raise Exception()
+            raise TypeError()
 
         if service is not None:
             shipment.Service.Code = service.service_id
@@ -400,11 +399,8 @@ class UPSApi(base.Carrier):
 
         origin = request.origin or self.postal_configuration['shipper_address']
 
-        _populate_shipper(
-            shipment.Shipper, origin, self.shipper_number)
-
+        _populate_shipper(shipment.Shipper, origin, self.shipper_number)
         _populate_address(shipment.ShipFrom, origin)
-
         _populate_address(shipment.ShipTo, request.destination)
 
         using_ups_pak = False
@@ -464,10 +460,10 @@ class UPSApi(base.Carrier):
             rates = self._RateWS.service.ProcessRate(
                 api_request, _pickup_type, _customer_classification, shipment)
         except WebFault as err:
-            raise _on_webfault(err)
+            _on_webfault(err)
 
         if rates.Response.ResponseStatus.Code != '1':  # 1 = Success
-            raise Exception()
+            _on_unknown_error()
 
         #if hasattr(rates.Response, 'Alert'):
         #    for alert in rates.Response.Alert:
@@ -513,7 +509,7 @@ class UPSApi(base.Carrier):
             raise _on_webfault(err)
 
         if response.Response.ResponseStatus.Code != '1':
-            raise Exception()
+            _on_unknown_error()
 
         if not hasattr(response, 'Candidate') or len(response.Candidate) == 0:
             return False, address
@@ -663,6 +659,12 @@ class UPSApi(base.Carrier):
         return _get_money(rated_shipment.NegotiatedRateCharges.TotalCharge)
 
 
+def get_length_plus_girth(package):
+    height, width, length = sorted(
+        [package.length, package.width, package.height])
+    return length + width * 2 + height * 2
+
+
 def is_large(package):
     ### http://www.ups.com/content/pr/en/shipping/cost/additional.html#Large+Package+Surcharge
     # A package is considered a "Large Package" when its length plus girth
@@ -670,9 +672,15 @@ def is_large(package):
     # exceed the maximum UPS size of 165 inches.  An Additional Handling Charge
     # will not be assessed when a Large Package Surcharge is applied.
 
-    height, width, length = sorted(
-        [package.length, package.width, package.height])
-    return length + width * 2 + height * 2 > 130
+    return get_length_plus_girth(package) > 130
+
+
+def ensure_supported(package):
+    if get_length_plus_girth(package) > 165:
+        raise NotSupportedError('UPS does not support packages of that size.')
+    if package.weight > 150:
+        raise NotSupportedError(
+            'UPS does not support packages of that weight.')
 
 
 def _test_is_large():

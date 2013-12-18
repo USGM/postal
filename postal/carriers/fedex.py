@@ -12,7 +12,7 @@ from suds.client import Client
 from money import Money
 
 from base import Carrier, Service, ClearEmpty
-from ..exceptions import ExceedsLimitsError, CarrierError
+from ..exceptions import CarrierError, NotSupportedError
 from ..data import Address, Shipment
 
 
@@ -405,8 +405,8 @@ class FedExApi(Carrier):
             self.get_services(request)
         data = self.cache[tuple(request)].get(service.service_id, None)
         if not data:
-            raise ExceedsLimitsError(
-                "This package is not able to be shipped on this service.")
+            raise NotSupportedError(
+                "FedEx does not support shipment of that package(s).")
         return data['delivery_datetime']
 
     def quote(self, service, request):
@@ -415,8 +415,8 @@ class FedExApi(Carrier):
         data = self.cache[self.cache_key(request)].get(
             service.service_id, None)
         if not data:
-            raise ExceedsLimitsError(
-                "This package is not able to be shipped on this service.")
+            raise NotSupportedError(
+                "FedEx does not support shipment of that package(s).")
         return Money(data['price'].Amount, data['price'].Currency)
 
 # Need to find a way to dynamically get all carriers.
