@@ -84,12 +84,23 @@ class Request(object):
     When insure is set true, API calls will declare the value of items in a way
     that intends to pay for an insurance surcharge, if one is available.
 
+    extra_params is where extra, per-carrier information can be stored. Some
+    carriers may have extra options which can be used but which are outside
+    the scope of the main API. The keys of this database should be the carriers
+    and the values dictionaries.
+
     NOTE: While it is referred to as an insured value, not all carriers provide
     what is legally defined as insurance. The closest analogues are used with
     each carrier in order to allow for filing claims with the carriers if
     something should go wrong.
     """
-    def __init__(self, origin, destination, packages, ship_datetime=None):
+    def __init__(
+            self, origin, destination, packages,
+            ship_datetime=None, extra_params=None):
+        if extra_params is None:
+            self.extra_params = {}
+        else:
+            self.extra_params = extra_params
         self.origin = origin
         self.destination = destination
 

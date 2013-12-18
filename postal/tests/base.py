@@ -110,7 +110,7 @@ class TestCarrier(object):
     def test_get_all_services(self):
         services = self.carrier.get_all_services()
         for service in services:
-            self.assertIsInstance
+            self.assertIsInstance(service, Service)
 
     def services(self):
         services = self.carrier.get_services(self.request)
@@ -119,6 +119,8 @@ class TestCarrier(object):
             self.assertTrue(isinstance(service, Service))
 
     def services_multiship(self):
+        if not self.carrier.multiship:
+            return
         self.request.packages.append(self.package2)
         services = self.carrier.get_services(self.request)
         self.assertTrue(services)
@@ -126,7 +128,7 @@ class TestCarrier(object):
             self.assertTrue(isinstance(service, Service))
 
     def delayed_shipment(self):
-        ship_datetime = datetime.now() + relativedelta(days=10)
+        ship_datetime = datetime.now() + relativedelta(days=2)
         # Avoid issuing requests for Saturday or Sunday in case pickup is not
         # provided on those days for carriers. The risk is still run of
         # hitting a holiday, of course.
