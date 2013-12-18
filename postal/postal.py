@@ -5,6 +5,7 @@ Front-end for the Postal Library.
 import threading
 from Queue import Queue
 import sys
+import traceback
 
 
 class Postal:
@@ -16,7 +17,7 @@ class Postal:
             'company_name' -> string,
             'carrier_inits' -> {
                 string = name of carrier class without trailing 'Api' ->
-                    kwargs = arguments for each carrier's constructor,
+                    kwargs:dict = arguments for each carrier's constructor,
                 ...
             },
             'shipper_address' -> data.Address
@@ -52,7 +53,7 @@ class Postal:
             ### The implementation of this loop currently assumes that the
             ### caller will always want all of the generated data.
 
-            def callme(carrier):
+            def task(carrier):
                 try:
                     for service, data in \
                             carrier.get_services(package).iteritems():
@@ -70,14 +71,18 @@ class Postal:
                         results.put(info)
 
                 except Exception as err:
-                    err.traceback = sys.exc_info()[2]
+                    if hasattr(err, 'traceback'):
+                        print str(type(err)) + ': ' + str(err)
+                        traceback.print_tb(err.traceback)
+                    else:
+                        err.traceback = sys.exc_info()[2]
                     err.carrier = carrier
                     results.put(err)
 
                 finally:
                     results.put(None)  # this carrier is done
 
-            threading.Thread(target=callme, args=(carrier,)).start()
+            threading.Thread(target=task, args=(carrier,)).start()
 
         num_carriers_finished = 0
         while num_carriers_finished < len(self.carriers):
@@ -91,7 +96,6 @@ class Postal:
         """
         Get all service options from all carriers.
         """
-        services = []
         for carrier in self.carriers.values():
-            services += carrier.get_all_services()
-        return services
+            for service in carrier.get_all_services():
+                yield service

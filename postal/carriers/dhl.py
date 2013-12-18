@@ -26,7 +26,7 @@ from requests import post, RequestException
 
 from .base import Carrier, Service
 from .templates.constructor import load_template, populate_template
-from ..exceptions import ExceedsLimitsError, CarrierError
+from ..exceptions import CarrierError, NotSupportedError
 from ..data import Shipment
 
 
@@ -141,6 +141,8 @@ class DHLApi(Carrier):
         return response_dict
 
     def get_services(self, request):
+        self._ensure_international(request)
+        
         pieces = self.enumerate_pieces('rates_piece.xml', request)
         duties = self.money_snippet('rates_dutiable.xml', request)
 
@@ -216,8 +218,8 @@ class DHLApi(Carrier):
         for package in request.packages:
             if not package.declarations:
                 print package.__dict__
-                raise CarrierError(
-                    "All packages must have declarations with DHL.")
+                raise NotSupportedError(
+                    "DHL requires all packages to have declarations.")
             for declaration in package.declarations:
                 if not money:
                     money = declaration.value
@@ -226,8 +228,7 @@ class DHLApi(Carrier):
         if not money:
             return ''
         return populate_template(
-            template, {
-                'currency': money.currency, 'value': money.amount})
+            template, {'currency': money.currency, 'value': money.amount})
 
     @staticmethod
     def enumerate_pieces(template_name, request):
@@ -274,8 +275,7 @@ class DHLApi(Carrier):
         return populate_template(
             request_template, escape_variables, non_escape_variables)
 
-    def shipment_request(
-            self, request):
+    def shipment_request(self, request):
         request_header = self.create_header()
         duties = self.money_snippet('ship_dutiable.xml', request)
         pieces = self.enumerate_pieces('ship_piece.xml', request)
@@ -337,9 +337,14 @@ class DHLApi(Carrier):
             labels.append(output_stream.getvalue())
         return labels
 
+    def _ensure_international(self, request):
+        if (request.origin or self.postal_configuration['shipper_address']
+                ).country == request.destination.country:
+            raise NotSupportedError("DHL does not support domestic shipments.")
+
     def ship(self, service, request):
-        ship_request = self.shipment_request(
-            request)
+        self._ensure_international(request)
+        ship_request = self.shipment_request(request)
         response = self.make_call(ship_request)
         tracking_number = response.findtext('AirwayBillNumber')
         labels = response.findtext('LabelImage/OutputImage')
@@ -350,20 +355,22 @@ class DHLApi(Carrier):
         return Shipment(self, tracking_number, package_details)
 
     def delivery_datetime(self, service, request):
+        self._ensure_international(request)
         if not self.cache_key(request) in self.cache:
             self.get_services(request)
         data = self.cache[tuple(request)].get(service.service_id, None)
         if not data:
-            raise ExceedsLimitsError(
-                "This package is not able to be shipped on this service.")
+            raise NotSupportedError(
+                "DHL does not support shipment of that package(s).")
         return data['delivery_datetime']
 
     def quote(self, service, request):
+        self._ensure_international(request)
         if not self.cache_key(request) in self.cache:
             self.get_services(request)
         data = self.cache[self.cache_key(request)].get(
             service.service_id, None)
         if not data:
-            raise ExceedsLimitsError(
-                "This package is not able to be shipped on this service.")
+            raise NotSupportedError(
+                "DHL does not support shipment of that package(s).")
         return Money(data['price'].amount, data['price'].currency)
