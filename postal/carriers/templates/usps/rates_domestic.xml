@@ -1,5 +1,5 @@
-<RateV4Request USERID="{user_id}" >
-     <Revision/>
+<RateV4Request USERID="{user_id}">
+     <Revision>2</Revision>
      <Package ID="1ST">
           <Service>ALL</Service>
           <ZipOrigination>{origin_zip}</ZipOrigination>
@@ -12,7 +12,9 @@
           <Length>{length}</Length>
           <Height>{height}</Height>
           <Girth>{girth}</Girth>
+          <Value>{value}</Value>
           <Machinable>true</Machinable>
           <ShipDate>{ship_date}</ShipDate>
+          {insurance}
      </Package>
 </RateV4Request>

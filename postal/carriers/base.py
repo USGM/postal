@@ -42,6 +42,9 @@ class Carrier(object):
     # residential fees are being picked up and abstracted away, since a fair
     # comparison would not be possible.
     auto_residential = False
+    # Most carriers allow a multiship option, where one request can have
+    # multiple packages under a master tracking number.
+    multiship = True
     cache = {}
 
     def __init__(self, postal_configuration):
@@ -131,6 +134,32 @@ class Carrier(object):
         that service, an exception should be raised.
         """
         raise NotImplementedError
+
+    def get_param(self, request, param, *args):
+        """
+        Get carrier-specific extra configuration information from request
+        object.
+        """
+        default = None
+        raise_exception = False
+        try:
+            default = args[0]
+        except IndexError:
+            raise_exception = True
+        if len(args) > 1:
+            # To make it a bit more like a dict's .get()
+            raise TypeError("get_param expected at most 3 arguments, got %i." %
+                            (len(args) + 2))
+        if self not in request.extra_params:
+            if raise_exception:
+                raise KeyError(
+                    "%s not found in extra_params for this request object." %
+                    self)
+            else:
+                return default
+        if raise_exception:
+            return request.extra_params[self][param]
+        return request.extra_params[self].get(param, default)
 
 
 class Service(object):

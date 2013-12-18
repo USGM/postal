@@ -30,7 +30,7 @@ class USPSApi(Carrier):
     Implements calls to the USPS web API.
     """
     name = 'USPS'
-
+    multiship = False
     def __init__(
             self, user_id, password, test_mode, postal_configuration=None):
         super(USPSApi, self).__init__(postal_configuration)
@@ -68,11 +68,31 @@ class USPSApi(Carrier):
     def get_services(self, request):
         self.no_multiship(request)
         package = request.packages[0]
-        template = load_template('usps', 'rates.xml')
+        if request.origin.country.alpha2 != 'US':
+            raise ExceedsLimitsError("USPS only ships from the US.")
+        if request.destination.country.alpha2 == 'US':
+            template = load_template('usps', 'rates_domestic.xml')
+            international = False
+        else:
+            template = load_template('usps', 'rates_international.xml')
+            international = True
+        commercial = self.get_param(request, 'commercial', True)
+        if commercial:
+            commercial = 'Y'
+            gift = 'N'
+        else:
+            commercial = 'N'
+            gift = 'Y'
+
+        if request.insure:
+            insurance = '<ExtraServices><ExtraService>1' \
+                        '<ExtraService></ExtraService>'
+        else:
+            insurance = ''
         pounds = int(floor(package.weight))
         ounces = int(ceil((package.weight - pounds) * 16))
         dims = sorted([package.width, package.height, package.length])
-        if dims[0] > 12:
+        if (dims[0] > 12) or international:
             size = "LARGE"
             container = '<Container>RECTANGULAR</Container>'
         else:
@@ -81,6 +101,10 @@ class USPSApi(Carrier):
         girth = (dims[0] + dims[1]) * 2
         target_date = request.ship_datetime or datetime.now()
         ship_date = self.ship_date(target_date)
+        value = request.get_total_declared_value()
+        if str(value.currency) != 'USD':
+            raise CarrierError("Value of goods must be in USD.")
+        country = request.destination.country.name
         escape_dict = {
             'height': int(ceil(package.height)),
             'width': int(ceil(package.width)),
@@ -92,11 +116,22 @@ class USPSApi(Carrier):
             'user_id': self.user_id,
             'origin_zip': request.origin.postal_code,
             'destination_zip': request.destination.postal_code,
-            'ship_date': ship_date}
+            'ship_date': ship_date,
+            'commercial': commercial,
+            'gift': gift,
+            'value': value.amount,
+            'country': country}
+        non_escape_dict = {
+            'insurance': insurance,
+            'container': container}
         call = populate_template(
-            template, escape_dict, {'container': container})
+            template, escape_dict, non_escape_dict)
 
-        result = self.make_call(self.rate_url, 'RateV4', call)
+        if international:
+            result = self.make_call(self.rate_url, 'IntlRateV2', call)
+        else:
+            result = self.make_call(self.rate_url, 'RateV4', call)
+        print result
 
 
 # Need to find a way to dynamically get all carriers.
