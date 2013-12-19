@@ -183,6 +183,8 @@ class UPSApi(base.Carrier):
             timeout=postal_configuration['timeout'])
 
     def ship(self, service, request, receiver_account_number=None):
+        _ensure_request_supported(request)
+
         origin = request.origin or self.postal_configuration['shipper_address']
 
         api_request = self._Ship.factory.create('ns0:RequestType')
@@ -308,6 +310,8 @@ class UPSApi(base.Carrier):
         return Shipment(self, master_tracking_number, packages)
 
     def get_services(self, request):
+        _ensure_request_supported(request)
+
         rates = self._request_rates(request, 'Shop')
 
         shipment_info = Queue()
@@ -372,6 +376,8 @@ class UPSApi(base.Carrier):
         ship_from:data.Address|None = The address of the warehouse to
             ship from or None if same as shipper's office
         """
+        _ensure_request_supported(request)
+
         pickup_type = '01'
         customer_type = '00'
 
@@ -546,6 +552,8 @@ class UPSApi(base.Carrier):
             return False, result
 
     def delivery_datetime(self, service, request):
+        _ensure_request_supported(request)
+
         api_request = self._TNTWS.factory.create('ns0:RequestType')
 
         # Does not seem to matter what its
@@ -644,6 +652,8 @@ class UPSApi(base.Carrier):
         return None
 
     def quote(self, service, request):
+        _ensure_request_supported(request)
+
         rates = self._request_rates(request, 'Rate', service)
 
         if len(rates.RatedShipment) != 1:
@@ -675,7 +685,12 @@ def is_large(package):
     return get_length_plus_girth(package) > 130
 
 
-def ensure_supported(package):
+def _ensure_request_supported(request):
+    for package in request.packages:
+        _ensure_package_supported(package)
+
+
+def _ensure_package_supported(package):
     if get_length_plus_girth(package) > 165:
         raise NotSupportedError('UPS does not support packages of that size.')
     if package.weight > 150:
