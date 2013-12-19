@@ -142,7 +142,7 @@ class DHLApi(Carrier):
 
     def get_services(self, request):
         self._ensure_international(request)
-        
+
         pieces = self.enumerate_pieces('rates_piece.xml', request)
         duties = self.money_snippet('rates_dutiable.xml', request)
 

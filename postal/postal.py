@@ -6,6 +6,7 @@ import threading
 from Queue import Queue
 import sys
 import traceback
+from .exceptions import PostalError
 
 
 class Postal:
@@ -31,9 +32,9 @@ class Postal:
                 postal_configuration=configuration_dict,
                 **carrier_configs[name])
 
-    def options(self, package):
+    def options(self, request):
         for carrier in self.carriers.values():
-            for service, data in carrier.get_services(package).iteritems():
+            for service, data in carrier.get_services(request).iteritems():
 
                 ### copy before modifying in case a carrier binding does
                 ### something odd
@@ -42,12 +43,12 @@ class Postal:
                 if 'service' in result:
                     ### Don't silently overwrite something that might
                     ### be important
-                    raise Exception()
+                    raise PostalError()
 
                 result['service'] = service
                 yield result
 
-    def options_async(self, package):
+    def options_async(self, request):
         results = Queue()
         for carrier in self.carriers.values():
             ### The implementation of this loop currently assumes that the
@@ -56,7 +57,7 @@ class Postal:
             def task(carrier):
                 try:
                     for service, data in \
-                            carrier.get_services(package).iteritems():
+                            carrier.get_services(request).iteritems():
 
                         ### copy before modifying in case a carrier binding
                         ### does something odd
@@ -65,7 +66,7 @@ class Postal:
                         if 'service' in info:
                             ### Don't silently overwrite something that might
                             ### be important
-                            raise Exception()
+                            raise PostalError()
 
                         info['service'] = service
                         results.put(info)
