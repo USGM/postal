@@ -192,7 +192,10 @@ class TestCarrier(object):
 
         self.carrier.cache = {}
 
-        self.request.insure = True
+        for pak in self.request.packages:
+            for dec in pak.declarations:
+                dec.insure = True
+
         services = self.carrier.get_services(self.request)
         insured_total = sum(
             [service.price(self.request) for service in services])

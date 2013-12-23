@@ -5,7 +5,6 @@ Front-end for the Postal Library.
 import threading
 from Queue import Queue
 import sys
-import traceback
 from .exceptions import PostalError
 
 
@@ -72,10 +71,7 @@ class Postal:
                         results.put(info)
 
                 except Exception as err:
-                    if hasattr(err, 'traceback'):
-                        print str(type(err)) + ': ' + str(err)
-                        traceback.print_tb(err.traceback)
-                    else:
+                    if not hasattr(err, 'traceback'):
                         err.traceback = sys.exc_info()[2]
                     err.carrier = carrier
                     results.put(err)

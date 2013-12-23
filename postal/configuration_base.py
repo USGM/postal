@@ -5,6 +5,8 @@ from carriers.usps import USPSApi
 
 
 base_postal_configuration = {
+    'timeout': None,
+
     # Any carriers you don't want to include should be removed from this list.
     # Any extra carriers you create or import should be added to this list.
     'enabled_carriers': [USPSApi, FedExApi, UPSApi, DHLApi],
