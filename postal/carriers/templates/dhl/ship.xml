@@ -26,7 +26,7 @@
         </Pieces>
         <Weight>{total_weight}</Weight>
         <WeightUnit>L</WeightUnit>
-        <GlobalProductCode>P</GlobalProductCode>
+        <GlobalProductCode>{product_code}</GlobalProductCode>
         <Date>{ship_date}</Date>
         <Contents>{contents}</Contents>
         <DimensionUnit>I</DimensionUnit>

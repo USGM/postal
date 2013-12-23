@@ -95,6 +95,10 @@ class Carrier(object):
         """
         return {}
 
+    def get_service(self, service_id):
+        return Service(
+            self, service_id, _service_code_to_description[service_id])
+
     def validate_address(self, address):
         """
         If the carrier implements address validation services, you can set

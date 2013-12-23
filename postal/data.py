@@ -23,8 +23,7 @@ class Address(object):
     def __init__(
             self, contact_name=None, phone_number=None,
             street_lines=None, city=None, subdivision=None,
-            postal_code=None, country=None, residential=False,
-            urbanization=None):
+            postal_code=None, country=None, residential=False):
         """
         contact_name:string
         phone_number:string
@@ -39,15 +38,11 @@ class Address(object):
         country:string:len=2 = 2-letter abbreviation of the country name
             (the alpha2 code)
         residential:bool = true if this object represents a residential address
-        urbanization:string|None = sub-city political division; must be None
-            if country is not 'PR'/Puerto Rico (required for UPS)
         """
         # The following should always be needed for any country.
         if not all([street_lines, city, country]):
             raise AddressError(
                 "Not enough information to construct an address.")
-        if urbanization is not None and country != 'PR':
-            raise AddressError('Urbanization given for non-PR address.')
 
         self.contact_name = contact_name
         self.phone_number = phone_number
@@ -60,19 +55,13 @@ class Address(object):
         self.subdivision = subdivision
         self.residential = residential
         self.country = get_country(country)
-        self.urbanization = urbanization
 
     def __str__(self):
         return (
             self.contact_name + ' ' + self.phone_number + '\n' +
             str(self.street_lines) + '\n' +
             self.city + ', ' + self.subdivision + ' ' +
-            str(self.postal_code) +
-            (
-                ' urbanization: ' + self.urbanization
-                if self.urbanization is not None else
-                ''
-            ) + ' ' + self.country.alpha2 + '\n' +
+            str(self.postal_code) + ' ' + self.country.alpha2 + '\n' +
             'Residential: ' + str(self.residential)
         )
 
@@ -100,11 +89,9 @@ class Request(object):
     each carrier in order to allow for filing claims with the carriers if
     something should go wrong.
     """
-    def __init__(self, origin, destination,
-                 packages, ship_datetime=None, insure=False):
+    def __init__(self, origin, destination, packages, ship_datetime=None):
         self.origin = origin
         self.destination = destination
-        self.insure = insure
 
         self.packages = list(packages)  # Calling list() to raise exception
         # immediately if parameter is not iterable.
@@ -117,6 +104,14 @@ class Request(object):
             result += pak.get_total_declared_value()
         if result == 0:
             return money.Money(0, 'USD')  # so as not to break interface
+        return result
+
+    def get_total_insured_value(self):
+        result = 0
+        for pak in self.packages:
+            result += pak.get_total_insured_value()
+        if result == 0:
+            return money.Money(0, 'USD')
         return result
 
 
@@ -156,6 +151,15 @@ class Package(object):
             result += dec.get_total_value()
         if result == 0:
             return money.Money(0, 'USD')  # so as not to break interface
+        return result
+
+    def get_total_insured_value(self):
+        result = 0
+        for dec in self.declarations:
+            if dec.insure:
+                result += dec.get_total_value()
+        if result == 0:
+            return money.Money(0, 'USD')
         return result
 
     def __hash__(self):
@@ -206,7 +210,8 @@ class Declaration(object):
     calculates the total value and is able to request the desired insured
     value from upstream.
     """
-    def __init__(self, description, value, origin_country, units):
+    def __init__(
+            self, description, value, origin_country, units, insure=False):
         """
         description:string = Human readable name of type of item
         value:money.Money = worth of item
@@ -226,6 +231,7 @@ class Declaration(object):
         self.value = value
         self.units = units
         self.origin_country = get_country(origin_country)
+        self.insure = insure
 
     def get_total_value(self):
         return self.units * self.value

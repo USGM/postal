@@ -18,7 +18,7 @@ from ..data import Address, Shipment
 
 class FedExApi(Carrier):
     """
-    Implements calls to the USPS web API.
+    Implements calls to the FedEx web API.
     """
     name = 'FedEx'
     address_validation = True
@@ -280,11 +280,13 @@ class FedExApi(Carrier):
             dimensions.Units = 'IN'
 
             if package.declarations:
-                value = self.set_declarations(
-                    client, api_request, package)
-                if value and request.insure:
+                self.set_declarations(client, api_request, package)
+
+                value = package.get_total_insured_value()
+                if value > 0:
                     item.InsuredValue.Currency = value.currency
                     item.InsuredValue.Amount = value.amount
+
             api_request.RequestedPackageLineItems.append(item)
         if api_request.CustomsClearanceDetail.Commodities:
             detail = api_request.CustomsClearanceDetail
@@ -306,7 +308,7 @@ class FedExApi(Carrier):
 
     def set_declarations(self, client, api_request, package):
         commodities = []
-        total_value = None
+        total_value = 0
         for declaration in package.declarations:
             commodity = client.factory.create('Commodity')
             commodity.Description = declaration.description
@@ -323,17 +325,13 @@ class FedExApi(Carrier):
             commodity.QuantityUnits = 'EA'
             commodity.Quantity = declaration.units
             commodities.append(commodity)
-            if not total_value:
-                total_value = value
-            else:
-                total_value += value
+            total_value += value
         api_request.CustomsClearanceDetail.Commodities.extend(commodities)
         value = api_request.CustomsClearanceDetail.CustomsValue
         if value.Amount is None:
             value.Amount = 0
         value.Amount += total_value.amount
         value.Currency = total_value.currency
-        return total_value
 
     def requested_shipment_rate(self, request):
         api_request = self.rates_client.factory.create('RequestedShipment')

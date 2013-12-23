@@ -118,8 +118,9 @@ Void = Client(
 
 def _on_webfault(webfault):
     error = webfault.fault.detail.Errors.ErrorDetail.PrimaryErrorCode
-    return CarrierError(
-        'Webfault#%s:%s' % (error.Code, error.Description))
+    result = CarrierError('Webfault#%s:%s' % (error.Code, error.Description))
+    result.code = error.Code
+    return result
 
 
 def _on_unknown_error():
@@ -196,7 +197,7 @@ class UPSApi(base.Carrier):
 
         _populate_shipper(
             api_shipment.Shipper, origin, self.shipper_number,
-            True, True, '123456')
+            True, True)#, '123456')
         _populate_address(
             api_shipment.ShipTo, request.destination, use_phone=True,
             use_attn=True)
@@ -249,8 +250,11 @@ class UPSApi(base.Carrier):
             if is_large(package):
                 pak.LargePackageIndicator = ''
 
-            if ((len(package.declarations) > 0 and request.insure)
-                    or international):
+            #if ((len(package.declarations) > 0 and request.insure)
+            #        or international):
+            if package.get_total_insured_value() > 0:  # TODO: international
+                # can't treat Money instance as boolean
+
                 _populate_money(
                     pak.PackageServiceOptions.DeclaredValue,
                     package.get_total_declared_value())
@@ -266,7 +270,7 @@ class UPSApi(base.Carrier):
             ### flatten list of lists of declarations
             for a in sum([b.declarations for b in request.packages], [])])
 
-        # UPS does not allow descriptions greater than 50 characters.
+        # UPS does not allow descriptions longer than 50 characters.
         api_shipment.Description = description[0:50]
 
         label_spec = self._Ship.factory.create('ns3:LabelSpecificationType')
@@ -279,7 +283,7 @@ class UPSApi(base.Carrier):
             response = self._Ship.service.ProcessShipment(
                 api_request, api_shipment, label_spec, receipt_spec)
         except WebFault as err:
-            _on_webfault(err)
+            raise _on_webfault(err)
 
         published_rate = _get_money(
             response.ShipmentResults.ShipmentCharges.TotalCharges)
@@ -324,10 +328,17 @@ class UPSApi(base.Carrier):
                         _service_code_to_description.get(
                             rated_shipment.Service.Code, None))
 
+                    try:
+                        delivery = self.delivery_datetime(service, request)
+                    except CarrierError as err:
+                        if err.code == 270037:  # no time in transit info
+                            delivery = None
+                        else:
+                            raise
+
                     shipment_info.put((service, dict(
                         price=_get_money(rated_shipment.TotalCharges),
-                        delivery_datetime=self.delivery_datetime(
-                            service, request),
+                        delivery_datetime=delivery,
                         alerts=[a.Description
                             for a in rated_shipment.RatedShipmentAlert]
                     )))
@@ -404,6 +415,7 @@ class UPSApi(base.Carrier):
             shipment.Service.Description = service.name
 
         origin = request.origin or self.postal_configuration['shipper_address']
+        international = (origin.country != request.destination.country)
 
         _populate_shipper(shipment.Shipper, origin, self.shipper_number)
         _populate_address(shipment.ShipFrom, origin)
@@ -424,7 +436,9 @@ class UPSApi(base.Carrier):
             if is_large(package):
                 pak.LargePackageIndicator = ''
 
-            if len(package.declarations) > 0 and request.insure:
+            if package.get_total_insured_value() > 0:  # TODO: international
+                # can't treat Money instance as boolean
+
                 _populate_money(
                     pak.PackageServiceOptions.DeclaredValue,
                     package.get_total_declared_value())
@@ -466,7 +480,7 @@ class UPSApi(base.Carrier):
             rates = self._RateWS.service.ProcessRate(
                 api_request, _pickup_type, _customer_classification, shipment)
         except WebFault as err:
-            _on_webfault(err)
+            raise _on_webfault(err)
 
         if rates.Response.ResponseStatus.Code != '1':  # 1 = Success
             _on_unknown_error()
@@ -495,20 +509,14 @@ class UPSApi(base.Carrier):
         address_key.AddressLine = address.street_lines[0]
         address_key.PoliticalDivision2 = address.city
         address_key.PoliticalDivision1 = address.subdivision
-        address_key.Urbanization = address.urbanization
         address_key.CountryCode = address.country.alpha2
         address_key.PostcodePrimaryLow = address.postal_code
 
         try:
             response = self._XAV.service.ProcessXAV(
                 request,
-
-                # missing tag = street-level validation
-                None,
-
-                # candidate list size
-                2,
-
+                None,  # missing tag = street-level validation
+                1,  # candidate list size
                 address_key)
 
         except WebFault as err:
@@ -535,16 +543,17 @@ class UPSApi(base.Carrier):
         result = Address(
             contact_name=address.contact_name,
             phone_number=address.phone_number,
-            street_lines=candidate.AddressKeyFormat.AddressLine,
+            street_lines=candidate.AddressKeyFormat.AddressLine + (
+                [candidate.AddressKeyFormat.Urbanization]
+                if hasattr(candidate.AddressKeyFormat, 'Urbanization') else
+                []
+            ),
             subdivision=candidate.AddressKeyFormat.PoliticalDivision1,
             city=candidate.AddressKeyFormat.PoliticalDivision2,
             postal_code=postal_code,
             country=candidate.AddressKeyFormat.CountryCode,
-            residential=residential,
-            urbanization=(
-                candidate.AddressKeyFormat.Urbanization
-                if hasattr(candidate.AddressKeyFormat, 'Urbanization') else
-                None))
+            residential=residential
+        )
 
         if result == address:
             return True, result
@@ -564,13 +573,11 @@ class UPSApi(base.Carrier):
 
         req_ship_from = self._TNTWS.factory.create('ns2:RequestShipFromType')
         _populate_address(
-            req_ship_from, origin,
-            urbanization_title='Town', use_street=False, use_name=False)
+            req_ship_from, origin, use_street=False, use_name=False)
 
         req_ship_to = self._TNTWS.factory.create('ns2:RequestShipToType')
         _populate_address(
-            req_ship_to, request.destination,
-            urbanization_title='Town', use_street=False, use_name=False)
+            req_ship_to, request.destination, use_street=False, use_name=False)
 
         sticks = self._TNTWS.factory.create('ns2:PickupType')
         ship_datetime = request.ship_datetime
@@ -708,7 +715,7 @@ _test_is_large()
 
 
 def _populate_address(
-        node, address, urbanization_title='Urbanization', use_street=True,
+        node, address, use_street=True,
         use_name=True, use_phone=False, use_attn=False):
     """
     node = shipment.Shipper|shipment.ShipFrom|shipment.ShipTo
@@ -722,8 +729,6 @@ def _populate_address(
     if address.postal_code is not None:
         node.Address.PostalCode = address.postal_code.replace(' ', '')
     node.Address.CountryCode = address.country.alpha2
-    if urbanization_title is not None and address.urbanization is not None:
-        setattr(node.Address, urbanization_title, address.urbanization)
     if address.residential:
         node.Address.ResidentialAddressIndicator = ''
     if use_phone:

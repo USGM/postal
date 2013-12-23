@@ -16,7 +16,7 @@ DHL.
 from base64 import b64decode
 from datetime import datetime
 from time import timezone
-from xml.etree.ElementTree import fromstring, tostring
+from xml.etree.ElementTree import fromstring
 
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from StringIO import StringIO
@@ -76,6 +76,8 @@ class DHLApi(Carrier):
             raise CarrierError("Error %s. %s" % (
                 condition.findtext('ConditionCode'),
                 condition.findtext('ConditionData')))
+        if root.text.isspace():  # generated nothing but whitespace
+            raise CarrierError('DHL was unable to process that shipment.')
         return root
 
     @staticmethod
@@ -89,7 +91,7 @@ class DHLApi(Carrier):
                 correct_price = price
             if correct_price is not None:
                 break
-        if correct_price is None:
+        if correct_price is None or correct_price.find('CurrencyCode') is None:
             raise CarrierError(
                 "DHL gave a nonsense response to a pricing request.")
         currency = correct_price.find('CurrencyCode').text
@@ -123,7 +125,7 @@ class DHLApi(Carrier):
         """
         This is useless, but required.
         """
-        return "1111111111111111111111111111"
+        return '1' * 28
 
     @staticmethod
     def response_to_dict(quotes):
@@ -143,18 +145,20 @@ class DHLApi(Carrier):
     def get_services(self, request):
         self._ensure_international(request)
 
-        pieces = self.enumerate_pieces('rates_piece.xml', request)
-        duties = self.money_snippet('rates_dutiable.xml', request)
-
         rate_request = self.rates_request(request)
         response = self.make_call(rate_request)[0][1]
         response_dict = self.response_to_dict(response.findall('QtdShp'))
         self.cache_results(request, response_dict)
+
         return {
             Service(self, key, value['service_name']): {
                 'price': value['price'],
                 'delivery_datetime': value['delivery_datetime']}
             for key, value in response_dict.items()}
+
+    def get_service(self, service_id):
+        return Service(
+            self, service_id, _product_code_to_description[service_id])
 
     @staticmethod
     def build_address(address):
@@ -212,21 +216,20 @@ class DHLApi(Carrier):
         return summary[:90]
 
     @staticmethod
-    def money_snippet(template_name, request):
+    def money_snippet(template_name, request, insurance):
         template = load_template('dhl', template_name)
-        money = None
         for package in request.packages:
             if not package.declarations:
-                print package.__dict__
                 raise NotSupportedError(
                     "DHL requires all packages to have declarations.")
-            for declaration in package.declarations:
-                if not money:
-                    money = declaration.value
-                else:
-                    money += declaration.value
+
+        if insurance:
+            money = request.get_total_insured_value()
+        else:
+            money = request.get_total_declared_value()
         if not money:
             return ''
+
         return populate_template(
             template, {'currency': money.currency, 'value': money.amount})
 
@@ -247,16 +250,13 @@ class DHLApi(Carrier):
 
         request_header = self.create_header()
         pieces = self.enumerate_pieces('rates_piece.xml', request)
-        duties = self.money_snippet('rates_dutiable.xml', request)
+        duties = self.money_snippet('rates_dutiable.xml', request, False)
         request_template = load_template('dhl', 'rates.xml')
         ship_datetime = request.ship_datetime or datetime.now()
         ship_date = ship_datetime.strftime('%Y-%m-%d')
         hour = ship_datetime.hour
         minute = ship_datetime.minute
-        if request.insure:
-            insured = self.money_snippet('insured.xml', request)
-        else:
-            insured = ''
+
         tz_offset = self.timezone_offset()
         escape_variables = {
             'origin_country': origin.country.alpha2,
@@ -271,28 +271,18 @@ class DHLApi(Carrier):
             'duties': duties,
             'pieces': pieces,
             'request_header': request_header,
-            'insured': insured}
+            'insured': self.money_snippet('insured.xml', request, True)}
         return populate_template(
             request_template, escape_variables, non_escape_variables)
 
-    def shipment_request(self, request):
-        request_header = self.create_header()
-        duties = self.money_snippet('ship_dutiable.xml', request)
-        pieces = self.enumerate_pieces('ship_piece.xml', request)
+    def shipment_request(self, service, request):
         ship_template = load_template('dhl', 'ship.xml')
         ship_datetime = request.ship_datetime or datetime.now()
         ship_date = ship_datetime.strftime('%Y-%m-%d')
-        if request.insure:
-            insured = self.money_snippet('insured.xml', request)
-        else:
-            insured = ''
 
         origin = request.origin or self.postal_configuration['shipper_address']
         origin_address = self.build_address(origin)
         destination_address = self.build_address(request.destination)
-        number_of_packages = len(request.packages)
-
-        contents = self.contents(request)
 
         total_weight = sum([package.weight for package in request.packages])
 
@@ -303,19 +293,20 @@ class DHLApi(Carrier):
             'destination_country': request.destination.country.alpha2,
             'destination_postal_code': request.destination.postal_code,
             'account_number': self.account_number,
-            'number_of_packages': number_of_packages,
+            'number_of_packages': len(request.packages),
             'total_weight': total_weight,
             'region_code': self.region_code,
             'company_name': self.company_name,
             'default_currency': self.default_currency,
-            'contents': contents}
+            'contents': self.contents(request),
+            'product_code': service.service_id}
         non_escape_variables = {
             'origin_address': origin_address,
             'destination_address': destination_address,
-            'duties': duties,
-            'pieces': pieces,
-            'request_header': request_header,
-            'insured': insured}
+            'duties': self.money_snippet('ship_dutiable.xml', request, False),
+            'pieces': self.enumerate_pieces('ship_piece.xml', request),
+            'request_header': self.create_header(),
+            'insured': self.money_snippet('insured.xml', request, True)}
 
         return populate_template(
             ship_template, escape_variables, non_escape_variables)
@@ -344,10 +335,12 @@ class DHLApi(Carrier):
 
     def ship(self, service, request):
         self._ensure_international(request)
-        ship_request = self.shipment_request(request)
+        ship_request = self.shipment_request(service, request)
         response = self.make_call(ship_request)
         tracking_number = response.findtext('AirwayBillNumber')
         labels = response.findtext('LabelImage/OutputImage')
+        if not labels:
+            raise CarrierError('DHL generated no labels.')
         labels = self.format_labels(labels)
         package_details = {
             package: {'label': label, 'tracking_number': tracking_number}
@@ -374,3 +367,41 @@ class DHLApi(Carrier):
             raise NotSupportedError(
                 "DHL does not support shipment of that package(s).")
         return Money(data['price'].amount, data['price'].currency)
+
+
+_product_code_to_description = {
+    #'N': 'Domestic Express',
+    #'K': 'Domestic 09:00',
+    #'T': 'Domestic 12:00',
+
+    'U': 'Express Worldwide',
+    'D': 'Express Worldwide',
+    'P': 'Express Worldwide',
+
+    'K': 'Express 09:00',
+    'E': 'Express 09:00',
+
+    'T': 'Express 12:00',
+    'Y': 'Express 12:00',
+
+    'L': 'Express 10:30',
+    'M': 'Express 10:30',
+
+    'H': 'Economy Select',
+    'W': 'Economy Select'
+}
+# DHL product code (
+# D : US Overnight (>0.5 lb) and Worldwide Express Non-dutiable (>0.5 lb) ,
+
+# X : USA Express Envelope (less
+# than or = 0.5 lb) and Worldwide Express-International Express Envelope (less
+# than or = 0.5 lb),
+
+# W : Worldwide Express-Dutiable,
+
+# Y : DHL Second Day
+# Express . Must be Express Envelop with weight lessthan or = 0.5 lb,
+
+# G : DHL Second Day . Weight > 0.5 lb or not an express envelop,
+
+# T : DHL Ground Shipments)
