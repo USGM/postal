@@ -30,9 +30,9 @@
         <Date>{ship_date}</Date>
         <Contents>{contents}</Contents>
         <DimensionUnit>I</DimensionUnit>
-        {insured}
+        <InsuredAmount>{insured_amount}</InsuredAmount>
         <IsDutiable>Y</IsDutiable>
-        <CurrencyCode>{default_currency}</CurrencyCode>
+        <CurrencyCode>{insured_currency}</CurrencyCode>
     </ShipmentDetails>
     <Shipper>
         <ShipperID>{account_number}</ShipperID>
