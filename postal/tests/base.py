@@ -134,7 +134,9 @@ class TestCarrier(object):
         # hitting a holiday, of course.
         # The weekday count starts on Monday at 0.
         if ship_datetime.weekday() in [5, 6]:
-            ship_datetime += relativedelta(days=2)
+            ### roll back to Friday because USPS doesn't support rates for
+            ### shipments not within the next 3 days
+            ship_datetime += relativedelta(days=-1)
         self.request.ship_datetime = ship_datetime
 
         services = self.carrier.get_services(self.request)
@@ -142,8 +144,7 @@ class TestCarrier(object):
         for service, values in services.items():
             if values['delivery_datetime']:
                 self.assertGreater(
-                    values['delivery_datetime'],
-                    self.request.ship_datetime)
+                    values['delivery_datetime'], self.request.ship_datetime)
 
     def residential_shipment(self):
         if not self.carrier.address_validation:
