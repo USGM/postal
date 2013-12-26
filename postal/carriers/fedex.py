@@ -89,7 +89,7 @@ class FedExApi(Carrier):
 
     def service_call(self, func, *args, **kwargs):
         response = super(FedExApi, self).service_call(func, *args, **kwargs)
-        if response.HighestSeverity == "FAILURE":
+        if response.HighestSeverity in ["FAILURE", "ERROR"]:
             raise CarrierError(response.Notifications[0].Message)
         return response
 
