@@ -1,11 +1,14 @@
 from ..carriers.ups import UPSApi
 
-__author__ = 'Nathan Everitt'
-
 import unittest
 
 from base import TestCarrier
 
+"""###
+import logging
+logging.basicConfig(level=logging.INFO)
+logging.getLogger('suds.transport').setLevel(logging.DEBUG)
+###"""
 
 class TestUPS(TestCarrier, unittest.TestCase):
     carrier_class = UPSApi

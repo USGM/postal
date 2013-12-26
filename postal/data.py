@@ -225,7 +225,7 @@ class Declaration(object):
             self, description, value, origin_country, units, insure=False):
         """
         description:string = Human readable name of type of item
-        value:money.Money = worth of item
+        value:money.Money = worth of each unit
         origin_country:string:alpha2 = alpha2 abbreviation of country
         units:integer = ?
 

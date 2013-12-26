@@ -21,7 +21,7 @@ from requests import post, RequestException
 
 from base import Carrier, Service
 from ..carriers.templates.constructor import load_template, populate_template
-from ..exceptions import ExceedsLimitsError, CarrierError
+from ..exceptions import NotSupportedError, CarrierError
 from ..data import Shipment
 
 
@@ -48,7 +48,7 @@ class USPSApi(Carrier):
     @staticmethod
     def no_multiship(request):
         if len(request.packages) > 1:
-            raise ExceedsLimitsError("USPS Does not support multiship.")
+            raise NotSupportedError("USPS does not support multiship.")
 
     def make_call(self, url, api, call):
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
@@ -68,8 +68,10 @@ class USPSApi(Carrier):
     def get_services(self, request):
         self.no_multiship(request)
         package = request.packages[0]
-        if request.origin.country.alpha2 != 'US':
-            raise ExceedsLimitsError("USPS only ships from the US.")
+
+        origin = request.origin or self.postal_configuration['shipper_address']
+        if origin.country.alpha2 != 'US':
+            raise NotSupportedError("USPS only ships from the US.")
         if request.destination.country.alpha2 == 'US':
             template = load_template('usps', 'rates_domestic.xml')
             international = False
@@ -84,11 +86,16 @@ class USPSApi(Carrier):
             commercial = 'N'
             gift = 'Y'
 
-        if request.insure:
-            insurance = '<ExtraServices><ExtraService>1' \
-                        '<ExtraService></ExtraService>'
+        if package.get_total_insured_value():
+            if international:
+                insurance = '<ExtraServices><ExtraService>1' \
+                            '</ExtraService></ExtraServices>'
+            else:
+                insurance = '<SpecialServices><SpecialService>1' \
+                            '</SpecialService></SpecialServices>'
         else:
             insurance = ''
+
         pounds = int(floor(package.weight))
         ounces = int(ceil((package.weight - pounds) * 16))
         dims = sorted([package.width, package.height, package.length])
@@ -101,7 +108,8 @@ class USPSApi(Carrier):
         girth = (dims[0] + dims[1]) * 2
         target_date = request.ship_datetime or datetime.now()
         ship_date = self.ship_date(target_date)
-        value = request.get_total_declared_value()
+
+        value = request.get_total_insured_value()
         if str(value.currency) != 'USD':
             raise CarrierError("Value of goods must be in USD.")
         country = request.destination.country.name
@@ -114,7 +122,7 @@ class USPSApi(Carrier):
             'size': size,
             'girth': girth,
             'user_id': self.user_id,
-            'origin_zip': request.origin.postal_code,
+            'origin_zip': origin.postal_code,
             'destination_zip': request.destination.postal_code,
             'ship_date': ship_date,
             'commercial': commercial,

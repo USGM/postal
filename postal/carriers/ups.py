@@ -59,8 +59,8 @@ class FixMissingShipmentNegotiatedRates(MessagePlugin):
         negotiated_rates_indicator = Element('NegotiatedRatesIndicator')
         negotiated_rates_indicator.prefix = 'ns1'
 
-        context.envelope.getChild('Body').getChild('ShipmentRequest').getChild('Shipment').append(
-            shipment_rating_options)
+        context.envelope.getChild('Body').getChild('ShipmentRequest').getChild(
+            'Shipment').append(shipment_rating_options)
         shipment_rating_options.append(negotiated_rates_indicator)
 
 
@@ -71,9 +71,23 @@ class FixMissingRatesNegotiatedRates(MessagePlugin):
         negotiated_rates_indicator = Element('NegotiatedRatesIndicator')
         negotiated_rates_indicator.prefix = 'ns1'
 
-        context.envelope.getChild('Body').getChild('RateRequest').getChild('Shipment').append(
-            shipment_rating_options)
+        context.envelope.getChild('Body').getChild('RateRequest').getChild(
+            'Shipment').append(shipment_rating_options)
         shipment_rating_options.append(negotiated_rates_indicator)
+
+
+class FixInternationalNamespaces(MessagePlugin):
+    def marshalled(self, context):
+        if context.envelope.getChild('Body').getChild('ShipmentRequest') \
+                .getChild('Shipment').getChild('ShipmentServiceOptions'):
+            context.envelope.getChild('Body').getChild('ShipmentRequest') \
+                .getChild('Request').prefix = 'ns1'
+            context.envelope.getChild('Body').getChild('ShipmentRequest') \
+                .getChild('Shipment').getChild('ShipmentRatingOptions') \
+                .prefix = 'ns2'
+            context.envelope.getChild('Body').getChild('ShipmentRequest') \
+                .getChild('Shipment').getChild('ShipmentRatingOptions') \
+                .getChild('NegotiatedRatesIndicator').prefix = 'ns2'
 
 
 class AuthenticationPlugin(MessagePlugin):
@@ -169,7 +183,8 @@ class UPSApi(base.Carrier):
             cache=suds.cache.NoCache(),
             plugins=[
                 authentication, FixBrokenShipmentRequestNamespace(),
-                FixMissingShipmentNegotiatedRates()
+                FixMissingShipmentNegotiatedRates(),
+                FixInternationalNamespaces()
             ],
             timeout=postal_configuration['timeout'])
         self.TNTWS = Client(
@@ -238,7 +253,17 @@ class UPSApi(base.Carrier):
             ### in order to acquire billing information.
             bill_receiver.BillReceiver.AccountNumber = receiver_account_number
 
-        def package_to_package_type(package):
+            #api_shipment.ShipmentServiceOptions.InternationalForms.InsuranceCharges.MonetaryValue = str(request.get_total_insured_value().amount)
+
+            api_shipment.ShipmentServiceOptions.InternationalForms.FormType = '01'
+            api_shipment.ShipmentServiceOptions.InternationalForms.CurrencyCode = request.get_total_insured_value().currency
+            api_shipment.ShipmentServiceOptions.InternationalForms.InvoiceDate = datetime.now().strftime('%Y%m%d')
+
+
+        api_package = []
+        api_product = []
+
+        for package in request.packages:
             pak = self._Ship.factory.create('ns3:PackageType')
             pak.Packaging.Code = '02'  # customer-supplied packaging
             pak.Dimensions.UnitOfMeasurement.Code = 'IN'
@@ -250,27 +275,45 @@ class UPSApi(base.Carrier):
             if is_large(package):
                 pak.LargePackageIndicator = ''
 
-            #if ((len(package.declarations) > 0 and request.insure)
-            #        or international):
-            if package.get_total_insured_value() > 0:  # TODO: international
-                # can't treat Money instance as boolean
+            _populate_money(
+                pak.PackageServiceOptions.DeclaredValue,
+                package.get_total_insured_value())
 
-                _populate_money(
-                    pak.PackageServiceOptions.DeclaredValue,
-                    package.get_total_declared_value())
-            return pak
+            api_package.append(pak)
 
-        api_shipment.Package = [
-            package_to_package_type(a) for a in request.packages]
+            if international:
+                for dec in package.declarations:
+                    product = self._Ship.factory.create('ns2:ProductType')
+                    product.Description = [dec.description]
+                    product.Unit.Number = dec.units
+                    product.Unit.UnitOfMeasurement.Code = 'PCS'  # pieces
+                    product.Unit.Value = dec.value.amount
+                    product.OriginCountryCode = dec.origin_country.alpha2
 
+                    api_product.append(product)
+
+        api_shipment.Package = api_package
+
+        if international:
+            api_shipment.ShipmentServiceOptions \
+                .InternationalForms.Product = api_product
+            api_shipment.ShipmentServiceOptions.InternationalForms \
+                .ReasonForExport = 'GIFT'
+
+            _populate_address(
+                api_shipment.ShipmentServiceOptions.InternationalForms
+                    .Contacts.SoldTo,
+                request.destination, use_phone=True, use_attn=True)
+            #api_shipment.ShipmentServiceOptions.InternationalForms.Contacts.SoldTo.TaxIdentificationNumber = ?????????????
 
         description = ', '.join([
             a.description
 
             ### flatten list of lists of declarations
-            for a in sum([b.declarations for b in request.packages], [])])
+            for a in sum([b.declarations for b in request.packages], [])
+        ])
 
-        # UPS does not allow descriptions longer than 50 characters.
+        ### UPS does not allow descriptions longer than 50 characters.
         api_shipment.Description = description[0:50]
 
         label_spec = self._Ship.factory.create('ns3:LabelSpecificationType')
@@ -436,12 +479,12 @@ class UPSApi(base.Carrier):
             if is_large(package):
                 pak.LargePackageIndicator = ''
 
-            if package.get_total_insured_value() > 0:  # TODO: international
+            if package.get_total_insured_value() > 0:
                 # can't treat Money instance as boolean
 
                 _populate_money(
                     pak.PackageServiceOptions.DeclaredValue,
-                    package.get_total_declared_value())
+                    package.get_total_insured_value())
 
             # 00 = Unknown
             # 01 = UPS Letter
