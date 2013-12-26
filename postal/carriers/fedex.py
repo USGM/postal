@@ -198,7 +198,10 @@ class FedExApi(Carrier):
         api_request.ShipTimestamp = request.ship_datetime or datetime.now()
         api_request.ServiceType = service.service_id
         api_request.DropoffType = 'REGULAR_PICKUP'
-        api_request.PackagingType = 'YOUR_PACKAGING'
+        if package.document:
+            api_request.PackagingType = 'FEDEX_ENVELOPE'
+        else:
+            api_request.PackagingType = 'YOUR_PACKAGING'
         api_request.RateRequestTypes = 'ACCOUNT'
         self.set_address(api_request.Shipper, origin)
         self.set_address(api_request.Recipient, request.destination)

@@ -144,15 +144,21 @@ class Package(object):
     declarations is a list of Declaration objects, used for customs data
     and for calculating the insured value.
 
-
+    The document flag can be used to indicate if the contents are documents
+    only. In the case that they are, services offering document transport may
+    be prioritized and lower fares may apply. This may also change how height
+    is handled, but height should still be specified. You should only use this
+    flag if you have appropriate document packaging, such as the FedEx
+    envelope for FedEx.
     """
     def __init__(
             self, length, width, height, weight, declarations=None,
-            imperial=True):
+            imperial=True, document=False):
         self.length = length
         self.width = width
         self.height = height
         self.weight = weight
+        self.document = document
         if declarations is None:
             self.declarations = []
         else:
