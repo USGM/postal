@@ -1,6 +1,6 @@
 <RateV4Request USERID="{user_id}">
     <Revision>2</Revision>
-    <Package ID="1ST">
+    <Package ID="0">
         <Service>ALL</Service>
         <ZipOrigination>{origin_zip}</ZipOrigination>
         <ZipDestination>{destination_zip}</ZipDestination>

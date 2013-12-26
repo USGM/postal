@@ -59,13 +59,37 @@ class USPSApi(Carrier):
         except RequestException as err:
             raise CarrierError("%s" % err)
         root = fromstring(response.text)
-        print tostring(root)
+
+        #def remove_all(node, name):
+        #    for sub in node:
+        #        if sub.tag == name:
+        #            node.remove(sub)
+        #        else:
+        #            remove_all(sub, name)
+        #remove_all(root, 'Restrictions')
+        #remove_all(root, 'Prohibitions')
+        #remove_all(root, 'Observations')
+        #remove_all(root, 'ExpressMail')
+        #remove_all(root, 'AreasServed')
+        #remove_all(root, 'AdditionalRestrictions')
+        #remove_all(root, 'CustomsForms')
+        #remove_all(root, 'GXGLocations')
+        #remove_all(root, 'MaxDimensions')
+        #remove_all(root, 'MaxWeight')
+        #remove_all(root, 'SvcCommitments')
+        #print tostring(root)
+
+        if root.tag == 'Error':
+            raise CarrierError('Error#' + str(root.find('Number').text) + ': ' + str(root.find('Description').text))
+        return root
 
     @staticmethod
     def ship_date(date_time):
         return date_time.strftime('%d-%b-%Y')
 
     def get_services(self, request):
+        _ensure_supported(request)
+
         self.no_multiship(request)
         package = request.packages[0]
 
@@ -86,15 +110,20 @@ class USPSApi(Carrier):
             commercial = 'N'
             gift = 'Y'
 
-        if package.get_total_insured_value():
-            if international:
+        if international:
+            if package.get_total_insured_value():
                 insurance = '<ExtraServices><ExtraService>1' \
                             '</ExtraService></ExtraServices>'
             else:
-                insurance = '<SpecialServices><SpecialService>1' \
-                            '</SpecialService></SpecialServices>'
+                insurance = ''
+
         else:
+            ### Special Services prices and availability will not be returned
+            ### when Service = "ALL" or "ONLINE"
             insurance = ''
+
+            #insurance = '<SpecialServices><SpecialService>1' \
+            #            '</SpecialService></SpecialServices>'
 
         pounds = int(floor(package.weight))
         ounces = int(ceil((package.weight - pounds) * 16))
@@ -129,19 +158,87 @@ class USPSApi(Carrier):
             'gift': gift,
             'value': value.amount,
             'country': country}
-        non_escape_dict = {
-            'insurance': insurance,
-            'container': container}
+        non_escape_dict = {'insurance': insurance, 'container': container}
         call = populate_template(
             template, escape_dict, non_escape_dict)
 
+        from xml.sax.saxutils import unescape
+
+        result = {}
         if international:
-            result = self.make_call(self.rate_url, 'IntlRateV2', call)
+            response = self.make_call(self.rate_url, 'IntlRateV2', call)
+            for service_tag in response.find('Package').iterfind('Service'):
+                service = Service(
+                    self,
+                    service_tag.get('ID'),
+                    _service_code_to_description.get(service_tag.get('ID'), service_tag.get('ID') + '**' + unescape(unescape(service_tag.find('SvcDescription').text)))
+                )
+
+                result[service] = dict(
+                    price=Money(service_tag.find(
+                        'CommercialPostage'
+                        if request.destination.residential else
+                        'Postage'
+                    ).text, 'USD'),
+                    delivery_datetime=None
+                )
         else:
-            result = self.make_call(self.rate_url, 'RateV4', call)
-        print result
+            response = self.make_call(self.rate_url, 'RateV4', call)
+            for service_tag in response.find('Package').iterfind('Postage'):
+                service = Service(
+                    self,
+                    service_tag.get('CLASSID'),
+                    _service_code_to_description.get(service_tag.get('CLASSID'), service_tag.get('CLASSID') + '##' + unescape(unescape(service_tag.find('MailService').text)))
+                )
+
+                delivery = service_tag.find('CommitmentDate')
+                if delivery is not None:  # `not` operator is marked for change in a future version
+                    delivery = delivery.text.split('-')
+                    delivery = datetime(year=int(delivery[0]), month=int(delivery[1]), day=int(delivery[2]))
+
+                result[service] = dict(
+                    price=Money(service_tag.find('Rate').text, 'USD'),
+                    delivery_datetime=delivery
+                )
+
+        from pprint import pprint
+        pprint(result)
+        return result
 
 
-# Need to find a way to dynamically get all carriers.
-# Also need to find a proper way to specify their inits.
-carriers = [USPSApi]
+def _ensure_supported(request):
+    for package in request.packages:
+        if package.weight > 70:
+            raise NotSupportedError(
+                'USPS does not ship packages that weigh more than 70 pounds.')
+
+
+_service_code_to_description = {
+    '2': 'Priority Mail Express 2-Day - Hold For Pickup',
+    '3': 'Priority Mail Express 2-Day',
+    '27': 'Priority Mail Express 2-Day - Flat Rate Envelope Hold For Pickup',
+    '55': 'Priority Mail Express 2-Day - Flat Rate Boxes',
+    '56': 'Priority Mail Express 2-Day - Flat Rate Boxes Hold For Pickup',
+    '13': 'Priority Mail Express 2-Day - Flat Rate Envelope',
+    '42': 'Priority Mail 2-Day - Small Flat Rate Envelope',
+    '4': 'Standard Post',
+    '40': 'Priority Mail 2-Day Window - Flat Rate Envelope',
+    '31': 'Priority Mail Express 2-Day - Legal Flat Rate Envelope Hold For Pickup',
+    '63': 'Priority Mail Express 2-Day - Padded Flat Rate Envelope Hold For Pickup',
+    '62': 'Priority Mail Express 2-Day - Padded Flat Rate Envelope',
+    '22': 'Priority Mail 2-Day - Large Flat Rate Box',
+    '17': 'Priority Mail 2-Day - Medium Flat Rate Box',
+    '28': 'Priority Mail 2-Day - Small Flat Rate Box',
+    '16': 'Priority Mail 2-Day - Flat Rate Envelope',
+    '44': 'Priority Mail 2-Day - Legal Flat Rate Envelope',
+    '29': 'Priority Mail 2-Day - Padded Flat Rate Envelope',
+    '38': 'Priority Mail 2-Day - Gift Card Flat Rate Envelope',
+    '30': 'Priority Mail 2-Day - Legal Flat Rate Envelope',
+    '6': 'Media Mail',
+    '7': 'Library Mail',
+    '1': 'Priority Mail Express International',
+    '26': 'Priority Mail Express International Flat Rate Boxes',
+    '11': 'Priority Mail International Large Flat Rate Box',
+    '9': 'Priority Mail International Medium Flat Rate Box',
+    '12': 'GXG Envelopes'
+}
