@@ -234,7 +234,7 @@ class TestCarrier(object):
     def multiship(self):
         services = self.carrier.get_services(self.request)
         self.request.packages.append(self.package2)
-        self.assertTrue(services.keys()[0].ship(self.request))
+        self.assertIsInstance(services.keys()[0].ship(self.request), Shipment)
 
     test_domestic_services = domestic(services)
     test_domestic_services_multiship = domestic(services_multiship)

@@ -1,20 +1,20 @@
 <RateV4Request USERID="{user_id}">
-     <Revision>2</Revision>
-     <Package ID="1ST">
-          <Service>ALL</Service>
-          <ZipOrigination>{origin_zip}</ZipOrigination>
-          <ZipDestination>{destination_zip}</ZipDestination>
-          <Pounds>{pounds}</Pounds>
-          <Ounces>{ounces}</Ounces>
-          {container}
-          <Size>{size}</Size>
-          <Width>{width}</Width>
-          <Length>{length}</Length>
-          <Height>{height}</Height>
-          <Girth>{girth}</Girth>
-          <Value>{value}</Value>
-          <Machinable>true</Machinable>
-          <ShipDate>{ship_date}</ShipDate>
-          {insurance}
-     </Package>
+    <Revision>2</Revision>
+    <Package ID="1ST">
+        <Service>ALL</Service>
+        <ZipOrigination>{origin_zip}</ZipOrigination>
+        <ZipDestination>{destination_zip}</ZipDestination>
+        <Pounds>{pounds}</Pounds>
+        <Ounces>{ounces}</Ounces>
+        {container}
+        <Size>{size}</Size>
+        <Width>{width}</Width>
+        <Length>{length}</Length>
+        <Height>{height}</Height>
+        <Girth>{girth}</Girth>
+        <Value>{value}</Value>
+        <Machinable>true</Machinable>
+        <ShipDate>{ship_date}</ShipDate>
+        {insurance}
+    </Package>
 </RateV4Request>

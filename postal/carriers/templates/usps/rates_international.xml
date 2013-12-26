@@ -1,24 +1,24 @@
 <IntlRateV2Request USERID="{user_id}">
-  <Revision>2</Revision>
-  <Package ID="1ST">
-    <Pounds>{pounds}</Pounds>
-    <Ounces>{ounces}</Ounces>
-    <Machinable>True</Machinable>
-    <MailType>Package</MailType>
-    <GXG>
-          <POBoxFlag>N</POBoxFlag>
-          <GiftFlag>{gift}</GiftFlag>
-    </GXG>
-    <ValueOfContents>{value}</ValueOfContents>
-    <Country>{country}</Country>
-    {container}
-    <Size>{size}</Size>
-    <Width>{width}</Width>
-    <Length>{length}</Length>
-    <Height>{height}</Height>
-    <Girth>{girth}</Girth>
-    <OriginZip>{origin_zip}</OriginZip>
-    <CommercialFlag>{commercial}</CommercialFlag>
-    {insurance}
-  </Package>
+    <Revision>2</Revision>
+    <Package ID="1ST">
+        <Pounds>{pounds}</Pounds>
+        <Ounces>{ounces}</Ounces>
+        <Machinable>True</Machinable>
+        <MailType>Package</MailType>
+        <GXG>
+            <POBoxFlag>N</POBoxFlag>
+            <GiftFlag>{gift}</GiftFlag>
+        </GXG>
+        <ValueOfContents>{value}</ValueOfContents>
+        <Country>{country}</Country>
+        {container}
+        <Size>{size}</Size>
+        <Width>{width}</Width>
+        <Length>{length}</Length>
+        <Height>{height}</Height>
+        <Girth>{girth}</Girth>
+        <OriginZip>{origin_zip}</OriginZip>
+        <CommercialFlag>{commercial}</CommercialFlag>
+        {insurance}
+    </Package>
 </IntlRateV2Request>
