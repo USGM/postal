@@ -90,14 +90,16 @@ class TestCarrier(object):
         self.european_address = Address(**test_european)
         self.domestic_package = Package(2, 3, 4, 5)
         self.domestic_package2 = Package(4, 6, 6, 4)
+        self.documents = Package(9, 12, 0, .2, document=True)
         self.international_package = Package(3, 4, 5, 6)
         self.international_package2 = Package(4, 2, 5, 28)
 
         self.domestic_request = Request(
-            self.test_from, self.test_to, [self.domestic_package])
+            self.test_from, self.test_to, [
+                self.domestic_package, self.documents])
         self.international_request = Request(
             self.test_from, self.european_address,
-            [self.international_package])
+            [self.international_package, self.documents])
         self.declarations = [
             Declaration('McGuffin', Money('50.00', 'USD'), 'US', 7),
             Declaration('Brains', Money('60.00', 'USD'), 'US', 5)]
