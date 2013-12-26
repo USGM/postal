@@ -90,7 +90,7 @@ class TestCarrier(object):
         self.european_address = Address(**test_european)
         self.domestic_package = Package(2, 3, 4, 5)
         self.domestic_package2 = Package(4, 6, 6, 4)
-        self.documents = Package(9, 12, 0, .2, document=True)
+        self.documents = Package(9, 12, .1, .2, document=True)
         self.international_package = Package(3, 4, 5, 6)
         self.international_package2 = Package(4, 2, 5, 28)
 
@@ -106,8 +106,11 @@ class TestCarrier(object):
         self.declarations2 = [
             Declaration('Emotional Baggage', Money('49.00', 'USD'), 'US', 5),
             Declaration('Dehydrated Water', Money('53.40', 'USD'), 'US', 10)]
+        self.document_declaration = [
+            Declaration('Divorce papers', Money('0.00', 'USD'), 'US', 1)]
         self.international_package.declarations = self.declarations
         self.international_package2.declarations = self.declarations2
+        self.documents.declarations = self.document_declaration
 
     def test_get_all_services(self):
         services = list(self.carrier.get_all_services())
