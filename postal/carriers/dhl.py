@@ -15,6 +15,7 @@ DHL.
 """
 from base64 import b64decode
 from datetime import datetime
+from math import ceil
 from time import timezone
 from xml.etree.ElementTree import fromstring
 
@@ -62,16 +63,22 @@ class DHLApi(Carrier):
             raise CarrierError("%s" % err)
         root = fromstring(response.text)
         # DHL has about three or four ways to send an error message.
+        response = root
+        response_tag = response.find('Response')
+        if response_tag is not None:
+            response = response_tag
         error_tag = None
-        note = root.find('Note')
-        status = root.find('Status')
+        note = response.find('Note')
+        status = response.find('Status')
         condition = None
         if note is not None:
             error_tag = note
         if status is not None:
             error_tag = status
         if error_tag is not None:
-            if not error_tag.findtext('ActionNote') == 'Success':
+            if not (
+                    (error_tag.findtext('ActionStatus') == 'Success')
+                    or ((error_tag.findtext('ActionNote') == 'Success'))):
                 condition = error_tag.find('Condition')
         if condition is not None:
             raise CarrierError("Error %s. %s" % (
@@ -226,7 +233,7 @@ class DHLApi(Carrier):
             money = request.get_total_insured_value()
         else:
             money = request.get_total_declared_value()
-        if not money:
+        if not money and not insurance:
             return ''
 
         return populate_template(
@@ -234,19 +241,15 @@ class DHLApi(Carrier):
 
     @staticmethod
     def enumerate_pieces(template_name, request):
-        return iter_populate_template(['dhl', template_name], (
+        return iter_populate_template(
+            ['dhl', template_name],
             (
-                dict(
-                    length=package.length,
-                    width=package.width,
-                    height=package.height,
-                    weight=package.weight,
-                    number=number + 1
-                ),
-                {}
-            )
-            for number, package in enumerate(request.packages)
-        ))
+                ({'length': package.length,
+                  'width': package.width,
+                  'height': package.height,
+                  'weight': package.weight,
+                  'number': number + 1}, {})
+                for number, package in enumerate(request.packages)))
 
     def rates_request(self, request):
         origin = request.origin or self.postal_configuration['shipper_address']
@@ -277,8 +280,9 @@ class DHLApi(Carrier):
             'pieces': pieces,
             'request_header': request_header,
             'insured': self.money_snippet('insured.xml', request, True)}
-        return populate_template(
+        request = populate_template(
             request_template, escape_variables, non_escape_variables)
+        return request
 
     def shipment_request(self, service, request):
         ship_template = load_template('dhl', 'ship.xml')
@@ -290,6 +294,8 @@ class DHLApi(Carrier):
         destination_address = self.build_address(request.destination)
 
         total_weight = sum([package.weight for package in request.packages])
+
+        insured = request.get_total_insured_value()
 
         escape_variables = {
             'origin_country': origin.country.alpha2,
@@ -311,10 +317,12 @@ class DHLApi(Carrier):
             'duties': self.money_snippet('ship_dutiable.xml', request, False),
             'pieces': self.enumerate_pieces('ship_piece.xml', request),
             'request_header': self.create_header(),
-            'insured': self.money_snippet('insured.xml', request, True)}
+            'insured_amount': insured.amount,
+            'insured_currency': insured.currency}
 
-        return populate_template(
+        request = populate_template(
             ship_template, escape_variables, non_escape_variables)
+        return request
 
     @staticmethod
     def format_labels(data):
@@ -334,8 +342,9 @@ class DHLApi(Carrier):
         return labels
 
     def _ensure_international(self, request):
-        if (request.origin or self.postal_configuration['shipper_address']
-                ).country == request.destination.country:
+        if (
+                request.origin or self.postal_configuration[
+                'shipper_address']).country == request.destination.country:
             raise NotSupportedError("DHL does not support domestic shipments.")
 
     def ship(self, service, request):
@@ -398,8 +407,7 @@ _product_code_to_description = {
     'M': 'Express 10:30',
 
     'H': 'Economy Select',
-    'W': 'Economy Select'
-}
+    'W': 'Economy Select'}
 # DHL product code (
 # D : US Overnight (>0.5 lb) and Worldwide Express Non-dutiable (>0.5 lb) ,
 

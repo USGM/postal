@@ -1,5 +1,6 @@
                 <Piece>
                     <PieceID>{number}</PieceID>
+                    <PackageType>{package_type}</PackageType>
                     <Weight>{weight}</Weight>
                     <Width>{width}</Width>
                     <Height>{height}</Height>
