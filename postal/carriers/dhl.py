@@ -76,8 +76,6 @@ class DHLApi(Carrier):
             raise CarrierError("Error %s. %s" % (
                 condition.findtext('ConditionCode'),
                 condition.findtext('ConditionData')))
-        if root.text.isspace():  # generated nothing but whitespace
-            raise CarrierError('DHL was unable to process that shipment.')
         return root
 
     @staticmethod
