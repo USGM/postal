@@ -1,6 +1,5 @@
                 <Piece>
                     <PieceID>{number}</PieceID>
-                    <PackageType>{package_type}</PackageType>
                     <Height>{height}</Height>
                     <Depth>{length}</Depth>
                     <Width>{width}</Width>
