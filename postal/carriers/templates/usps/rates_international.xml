@@ -11,7 +11,7 @@
         </GXG>
         <ValueOfContents>{value}</ValueOfContents>
         <Country>{country}</Country>
-        {container}
+        <Container>{container}</Container>
         <Size>{size}</Size>
         <Width>{width}</Width>
         <Length>{length}</Length>

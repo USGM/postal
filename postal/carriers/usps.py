@@ -8,7 +8,7 @@ Like DHL, we don't bother doing anything especially elaborate with XML
 construction and instead rely on template files.
 """
 from base64 import b64decode
-from datetime import datetime
+from datetime import datetime, date
 from math import ceil, floor
 from time import timezone
 from xml.etree.ElementTree import fromstring, tostring
@@ -23,6 +23,9 @@ from base import Carrier, Service
 from ..carriers.templates.constructor import load_template, populate_template
 from ..exceptions import NotSupportedError, CarrierError
 from ..data import Shipment
+from postal.carriers.templates.constructor import iter_populate_template
+from xml.sax.saxutils import unescape
+from postal.data import Request
 
 
 class USPSApi(Carrier):
@@ -31,6 +34,7 @@ class USPSApi(Carrier):
     """
     name = 'USPS'
     multiship = False
+
     def __init__(
             self, user_id, password, test_mode, postal_configuration=None):
         super(USPSApi, self).__init__(postal_configuration)
@@ -45,12 +49,9 @@ class USPSApi(Carrier):
             # TODO: Get the production URL from USPS.
             self.ship_url = ''
 
-    @staticmethod
-    def no_multiship(request):
-        if len(request.packages) > 1:
-            raise NotSupportedError("USPS does not support multiship.")
-
     def make_call(self, url, api, call):
+        print '>>>>', call
+
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         try:
             response = post(
@@ -60,24 +61,28 @@ class USPSApi(Carrier):
             raise CarrierError("%s" % err)
         root = fromstring(response.text)
 
-        #def remove_all(node, name):
-        #    for sub in node:
-        #        if sub.tag == name:
-        #            node.remove(sub)
-        #        else:
-        #            remove_all(sub, name)
-        #remove_all(root, 'Restrictions')
-        #remove_all(root, 'Prohibitions')
-        #remove_all(root, 'Observations')
-        #remove_all(root, 'ExpressMail')
-        #remove_all(root, 'AreasServed')
-        #remove_all(root, 'AdditionalRestrictions')
-        #remove_all(root, 'CustomsForms')
-        #remove_all(root, 'GXGLocations')
-        #remove_all(root, 'MaxDimensions')
-        #remove_all(root, 'MaxWeight')
+        #"""###
+        def remove_all(node, name):
+            for sub in node:
+                if sub.tag == name:
+                    node.remove(sub)
+                else:
+                    remove_all(sub, name)
+        remove_all(root, 'Restrictions')
+        remove_all(root, 'Prohibitions')
+        remove_all(root, 'Observations')
+        remove_all(root, 'ExpressMail')
+        remove_all(root, 'AreasServed')
+        remove_all(root, 'AdditionalRestrictions')
+        remove_all(root, 'CustomsForms')
+        remove_all(root, 'GXGLocations')
+        remove_all(root, 'MaxDimensions')
+        remove_all(root, 'MaxWeight')
         #remove_all(root, 'SvcCommitments')
-        #print tostring(root)
+        remove_all(root, 'Location')
+        remove_all(root, 'CommitmentName')
+        print '<<<<', tostring(root)
+        ###"""
 
         if root.tag == 'Error':
             raise CarrierError('Error#' + str(root.find('Number').text) + ': ' + str(root.find('Description').text))
@@ -87,21 +92,32 @@ class USPSApi(Carrier):
     def ship_date(date_time):
         return date_time.strftime('%d-%b-%Y')
 
-    def get_services(self, request):
-        _ensure_supported(request)
+    def get_all_services(self):
+        return [
+            Service(self, 'EXPRESS', 'Express'),
+            Service(self, 'FIRST CLASS', 'First Class'),
+            Service(self, 'PRIORITY', 'Priority'),
+            Service(self, 'EXPRESS COMMERCIAL', 'Express Commercial'),
+            Service(self, 'FIRST CLASS COMMERCIAL', 'First Class Commercial'),
+            Service(self, 'PRIORITY COMMERCIAL', 'Priority Commercial')
+        ]
 
-        self.no_multiship(request)
-        package = request.packages[0]
+    def get_services(self, request):
+        self._ensure_supported(request)
 
         origin = request.origin or self.postal_configuration['shipper_address']
-        if origin.country.alpha2 != 'US':
-            raise NotSupportedError("USPS only ships from the US.")
+
         if request.destination.country.alpha2 == 'US':
-            template = load_template('usps', 'rates_domestic.xml')
-            international = False
+            return self._get_rates_domestic(request, origin)
         else:
-            template = load_template('usps', 'rates_international.xml')
-            international = True
+            return self._get_rates_international(request, origin)
+
+    def _get_rates_international(self, request, origin):
+        if request.ship_datetime and \
+                request.ship_datetime.date() != date.today():
+            raise NotSupportedError(
+                'USPS does not support delayed international shipments.')
+
         commercial = self.get_param(request, 'commercial', True)
         if commercial:
             commercial = 'Y'
@@ -110,112 +126,232 @@ class USPSApi(Carrier):
             commercial = 'N'
             gift = 'Y'
 
-        if international:
-            if package.get_total_insured_value():
-                insurance = '<ExtraServices><ExtraService>1' \
-                            '</ExtraService></ExtraServices>'
-            else:
-                insurance = ''
+        size = 'LARGE'
+        container = 'RECTANGULAR'
 
-        else:
-            ### Special Services prices and availability will not be returned
-            ### when Service = "ALL" or "ONLINE"
-            insurance = ''
-
-            #insurance = '<SpecialServices><SpecialService>1' \
-            #            '</SpecialService></SpecialServices>'
-
-        pounds = int(floor(package.weight))
-        ounces = int(ceil((package.weight - pounds) * 16))
-        dims = sorted([package.width, package.height, package.length])
-        if (dims[0] > 12) or international:
-            size = "LARGE"
-            container = '<Container>RECTANGULAR</Container>'
-        else:
-            size = "REGULAR"
-            container = '<Container>VARIABLE</Container>'
-        girth = (dims[0] + dims[1]) * 2
-        target_date = request.ship_datetime or datetime.now()
-        ship_date = self.ship_date(target_date)
-
-        value = request.get_total_insured_value()
-        if str(value.currency) != 'USD':
-            raise CarrierError("Value of goods must be in USD.")
-        country = request.destination.country.name
         escape_dict = {
-            'height': int(ceil(package.height)),
-            'width': int(ceil(package.width)),
-            'length': int(ceil(package.length)),
-            'pounds': pounds,
-            'ounces': ounces,
+            'user_id': self.user_id,
+            'origin_zip': origin.postal_code,
+            'destination_zip': request.destination.postal_code,
+            'commercial': commercial,
+            'gift': gift,
+            'country': request.destination.country.name,
             'size': size,
-            'girth': girth,
+            'container': container
+        }
+
+        package_escape, package_nonescape = _get_package_parameters(
+            request.packages[0], 0, origin, request.destination)
+        escape_dict.update(package_escape)
+
+        escape_dict['value'] = request.get_total_insured_value().amount
+
+        non_escape_dict = package_nonescape
+        call = populate_template(load_template('usps', 'rates_international.xml'), escape_dict, non_escape_dict)
+        response = self.make_call(self.rate_url, 'IntlRateV2', call)
+
+        result = {}
+        for service_tag in response.find('Package').iterfind('Service'):
+
+            if request.get_total_insured_value() > 0:
+                insurance_price = None
+
+                for extra_service in service_tag.find('ExtraServices'):
+                    if extra_service.find('ServiceID').text.strip() != '1':
+                        ### 1 = insurance
+                        continue
+
+                    if extra_service.find('OnlineAvailable') \
+                            .text.strip().lower() != 'true':
+                        continue
+
+                    insurance_price = Money(
+                        extra_service.find('PriceOnline').text, 'USD'
+                    ) * ceil(
+                        request.get_total_insured_value().amount / 100
+                    )
+
+                if insurance_price is None:
+                    continue  # this is not the service we're looking for
+
+            else:
+                insurance_price = Money(0, 'USD')
+
+            service = Service(
+                self,
+                service_tag.get('ID'),
+                _service_code_to_description.get(service_tag.get('ID'), service_tag.get('ID') + '**' + unescape(unescape(service_tag.find('SvcDescription').text)))
+            )
+
+            result[service] = dict(
+                price=(Money(service_tag.find(
+                    'CommercialPostage'
+                    if request.destination.residential else
+                    'Postage'
+                ).text, 'USD') + insurance_price),
+                delivery_datetime=None
+            )
+
+        return result
+
+    def _get_rates_domestic(self, request, origin, services=None):
+        ship_date = self.ship_date(request.ship_datetime or datetime.now())
+
+        escape_dict = {
             'user_id': self.user_id,
             'origin_zip': origin.postal_code,
             'destination_zip': request.destination.postal_code,
             'ship_date': ship_date,
-            'commercial': commercial,
-            'gift': gift,
-            'value': value.amount,
-            'country': country}
-        non_escape_dict = {'insurance': insurance, 'container': container}
-        call = populate_template(
-            template, escape_dict, non_escape_dict)
+            'value': request.get_total_insured_value().amount}
+        non_escape_dict = {
+            'packages': iter_populate_template(['usps', 'package_domestic.xml'], (
+                _get_package_parameters(
+                    package, index, origin, request.destination, ship_date,
+                    services[index] if services else 'ALL'
+                )
+                for index, package in enumerate(request.packages)
+            ))
+        }
+        call = populate_template(load_template('usps', 'rates_domestic.xml'), escape_dict, non_escape_dict)
 
-        from xml.sax.saxutils import unescape
+        response = self.make_call(self.rate_url, 'RateV4', call)
 
         result = {}
-        if international:
-            response = self.make_call(self.rate_url, 'IntlRateV2', call)
-            for service_tag in response.find('Package').iterfind('Service'):
-                service = Service(
-                    self,
-                    service_tag.get('ID'),
-                    _service_code_to_description.get(service_tag.get('ID'), service_tag.get('ID') + '**' + unescape(unescape(service_tag.find('SvcDescription').text)))
-                )
-
-                result[service] = dict(
-                    price=Money(service_tag.find(
-                        'CommercialPostage'
-                        if request.destination.residential else
-                        'Postage'
-                    ).text, 'USD'),
-                    delivery_datetime=None
-                )
-        else:
-            response = self.make_call(self.rate_url, 'RateV4', call)
-            for service_tag in response.find('Package').iterfind('Postage'):
-                service = Service(
-                    self,
+        for service_tag in response.find('Package').iterfind('Postage'):
+            service = Service(
+                self,
+                service_tag.get('CLASSID'),
+                _service_code_to_description.get(
                     service_tag.get('CLASSID'),
-                    _service_code_to_description.get(service_tag.get('CLASSID'), service_tag.get('CLASSID') + '##' + unescape(unescape(service_tag.find('MailService').text)))
+                    service_tag.get('CLASSID') + '##' + unescape(unescape(service_tag.find('MailService').text))
+                )
+            )
+
+            delivery = service_tag.find('CommitmentDate')
+            if delivery is not None:  # `not` operator is marked for change in a future version
+                delivery = delivery.text.split('-')
+                delivery = datetime(
+                    year=int(delivery[0]),
+                    month=int(delivery[1]),
+                    day=int(delivery[2])
                 )
 
-                delivery = service_tag.find('CommitmentDate')
-                if delivery is not None:  # `not` operator is marked for change in a future version
-                    delivery = delivery.text.split('-')
-                    delivery = datetime(year=int(delivery[0]), month=int(delivery[1]), day=int(delivery[2]))
+            result[service] = dict(
+                price=Money(service_tag.find('Rate').text, 'USD'),
+                delivery_datetime=delivery
+            )
 
-                result[service] = dict(
-                    price=Money(service_tag.find('Rate').text, 'USD'),
-                    delivery_datetime=delivery
-                )
+        if not services and request.get_total_insured_value():
+            insurance_request = request.shallow_copy()
+            insurance_request.packages = []
+            insurance_services = []
 
-        from pprint import pprint
-        pprint(result)
+            for service, info in result.items():
+                ### not supporting external queries of more than one package
+                insurance_request.packages.append(request.packages[0])
+                insurance_services.append('PRIORITY')
+
+                # Service must be Priority Express, Priority Express SH, Priority Express Commercial, Priority Express SH Commercial, First Class, Priority, Priority Commercial,
+                # Standard Post, Library, BPM, Media, ALL, or ONLINE
+
+            print self._get_rates_domestic(insurance_request, origin, insurance_services)#service.service_id)
+
+                #result[service][price] +=
+
+
+
+        #from pprint import pprint
+        #pprint(result)
         return result
 
-
-def _ensure_supported(request):
-    for package in request.packages:
-        if package.weight > 70:
+    def quote(self, service, request):
+        try:
+            return self.get_services(request)[service]['price']
+        except KeyError:
             raise NotSupportedError(
-                'USPS does not ship packages that weigh more than 70 pounds.')
+                'USPS has no rates for that service and request.')
+
+    def _ensure_supported(self, request):
+        origin = request.origin or self.postal_configuration['shipper_address']
+        if origin.country.alpha2 != 'US':
+            raise NotSupportedError("USPS only ships from the US.")
+
+        if len(request.packages) > 1:
+            raise NotSupportedError("USPS does not support multiship.")
+
+        for package in request.packages:
+            if package.weight > 70:
+                raise NotSupportedError(
+                    'USPS does not ship packages that weigh more '
+                    'than 70 pounds.')
+
+        if str(request.get_total_insured_value().currency) != 'USD':
+            raise NotSupportedError("Value of goods must be in USD.")
+
+
+def _get_package_parameters(package, index, origin, destination, ship_date=None, service='ALL'):
+    """
+    returns: (escape:{...}, nonescape:{...})
+    """
+    international = (origin.country != destination.country)
+    if international:
+        if package.get_total_insured_value() > 0:
+            ### can't treat Money as boolean
+
+            insurance = \
+                '<ExtraServices><ExtraService>1</ExtraService></ExtraServices>'
+        else:
+            insurance = ''
+    else:
+        ### Special Services prices and availability will not be returned
+        ### when Service = "ALL" or "ONLINE"
+        insurance = ''
+
+        #insurance = '<SpecialServices><SpecialService>1' \
+        #            '</SpecialService></SpecialServices>'
+
+    length, width, height = sorted([package.width, package.height, package.length])
+    if length > 12 or international:
+        size = 'LARGE'
+        container = 'RECTANGULAR'
+    else:
+        size = 'REGULAR'
+        container = 'VARIABLE'
+
+    girth = (width + height) * 2
+
+    pounds = int(floor(package.weight))
+    ounces = int(ceil((package.weight - pounds) * 16))
+
+    return (
+        dict(
+            service=service,
+            origin_zip=origin.postal_code,
+            destination_zip=destination.postal_code,
+            length=length,
+            width=width,
+            height=height,
+            pounds=pounds,
+            ounces=ounces,
+            id=index,
+            size=size,
+            container=container,
+            girth=girth,
+            value=(
+                package.get_total_declared_value().amount
+                if international else
+                package.get_total_insured_value().amount
+            ),
+            ship_date=ship_date
+        ),
+        dict(insurance=insurance)
+    )
 
 
 _service_code_to_description = {
     '2': 'Priority Mail Express 2-Day - Hold For Pickup',
-    '3': 'Priority Mail Express 2-Day',
+    '3': 'Priority Mail Express 2-Day', ######################################################################################################################
+    '5': 'Priority Mail Express 2-Day', ######################################################################################################################
     '27': 'Priority Mail Express 2-Day - Flat Rate Envelope Hold For Pickup',
     '55': 'Priority Mail Express 2-Day - Flat Rate Boxes',
     '56': 'Priority Mail Express 2-Day - Flat Rate Boxes Hold For Pickup',
@@ -242,3 +378,87 @@ _service_code_to_description = {
     '9': 'Priority Mail International Medium Flat Rate Box',
     '12': 'GXG Envelopes'
 }
+
+#_domestic_service_code_to_description = {
+#    '1':
+#}
+
+_service_code_to_other_service_code = {  # domestic
+    '': 'FIRST CLASS',#
+
+    #'FIRST CLASS COMMERCIAL',
+    #'FIRST CLASS HFP COMMERCIAL',
+    '': 'PRIORITY',#
+    #'PRIORITY COMMERCIAL',
+    #'PRIORITY CPP',
+    #'PRIORITY HFP COMMERCIAL',
+    #'PRIORITY HFP CPP',
+    '3': 'EXPRESS',#
+    #'EXPRESS COMMERCIAL',
+    #'EXPRESS CPP',
+    #'EXPRESS SH',
+    #'EXPRESS SH COMMERCIAL',
+    #'EXPRESS HFP',
+    #'EXPRESS HFP COMMERCIAL',
+    #'EXPRESS HFP CPP',
+    #'STANDARD POST',
+    #'MEDIA',
+    #'LIBRARY',
+    #'ALL',
+    #'ONLINE',
+    #'PLUS'
+}
+
+
+# Domestic First Class
+# First Class Mail Int'l
+
+# Domestic Priority
+# Priority Mail Int'l
+
+# Express Mail Int'l
+
+# Priority Mail Flat Rate Envelope
+
+
+{
+    'FIRST CLASS',
+    'FIRST CLASS COMMERCIAL',
+    'PRIORITY',
+    'PRIORITY COMMERCIAL',
+    'EXPRESS',
+    'EXPRESS COMMERCIAL'
+}
+
+
+#whiteSpace=collapse
+#enumeration=FIRST CLASS
+#enumeration=FIRST CLASS COMMERCIAL
+#
+#enumeration=FIRST CLASS  HFP COMMERCIAL
+#
+#enumeration=PRIORITY
+#enumeration=PRIORITY COMMERCIAL
+#
+#enumeration=PRIORITY CPP
+#
+#enumeration=PRIORITY HFP COMMERCIAL
+#
+#enumeration=PRIORITY HFP CPP
+#enumeration=EXPRESS
+#enumeration=EXPRESS COMMERCIAL
+#enumeration=EXPRESS CPP
+#
+#enumeration=EXPRESS SH
+#enumeration=EXPRESS SH COMMERCIAL
+#enumeration=EXPRESS HFP
+#enumeration=EXPRESS HFP COMMERCIAL
+#
+#enumeration=EXPRESS HFP CPP
+#enumeration=STANDARD POST
+#enumeration=MEDIA
+#enumeration=LIBRARY
+#enumeration=ALL
+#enumeration=ONLINE
+#
+#enumeration=PLUS

@@ -125,6 +125,11 @@ class Request(object):
             return money.Money(0, 'USD')
         return result
 
+    def shallow_copy(self):
+        return Request(
+            self.origin, self.destination, self.packages, self.ship_datetime,
+            self.extra_params)
+
 
 class Package(object):
     """
@@ -246,6 +251,13 @@ class Declaration(object):
 
     def get_total_value(self):
         return self.units * self.value
+
+    def __str__(self):
+        return str(self.description) + ' x' + str(self.units) + ', ' \
+            + str(self.value) + ' each'
+
+    def __repr__(self):
+        return '<Declaration: ' + str(self) + '>'
 
 
 class Shipment(object):

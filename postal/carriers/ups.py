@@ -609,7 +609,7 @@ class UPSApi(base.Carrier):
         api_request = self._TNTWS.factory.create('ns0:RequestType')
 
         # Does not seem to matter what its
-        # contents are as long as the tag is not missing.
+        # contents are as long as this tag is not missing.
         api_request.RequestOption = ''
 
         origin = request.origin or self.postal_configuration['shipper_address']
@@ -707,10 +707,12 @@ class UPSApi(base.Carrier):
         rates = self._request_rates(request, 'Rate', service)
 
         if len(rates.RatedShipment) != 1:
-            raise Exception()
+            raise CarrierError(
+                'UPS has no rates available for those parameters.')
         rated_shipment = rates.RatedShipment[0]
         if rated_shipment.Service.Code != service.service_id:
-            raise Exception()
+            raise CarrierError(
+                'UPS has no rates available for those parameters.')
 
         ### If no negotiated rates:
         #return _get_money(rated_shipment.TotalCharges)

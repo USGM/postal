@@ -108,15 +108,19 @@ class TestCarrier(object):
         self.international_package2.declarations = self.declarations2
 
     def test_get_all_services(self):
-        services = self.carrier.get_all_services()
+        services = list(self.carrier.get_all_services())
+        self.assertGreater(len(services), 0)
         for service in services:
             self.assertIsInstance(service, Service)
 
     def services(self):
         services = self.carrier.get_services(self.request)
         self.assertTrue(services)
-        for service in services.keys():
+        for service, info in services.items():
             self.assertTrue(isinstance(service, Service))
+            self.assertIsInstance(info['price'], Money)
+            if info['delivery_datetime'] is not None:
+                self.assertIsInstance(info['delivery_datetime'], datetime)
 
     def services_multiship(self):
         if not self.carrier.multiship:
@@ -182,28 +186,27 @@ class TestCarrier(object):
         self.assertGreater(residential, commercial)
 
     def insurance(self):
-        services = self.carrier.get_services(self.request)
-        normal_total = sum(
-            [service.price(self.request) for service in services])
-
-        self.carrier.cache = {}
+        normal_rates = self.carrier.get_services(self.request)
 
         self.package.declarations = self.declarations
-        services = self.carrier.get_services(self.request)
-        declarations_total = sum(
-            [service.price(self.request) for service in services])
 
         self.carrier.cache = {}
+        declaration_rates = self.carrier.get_services(self.request)
 
         for pak in self.request.packages:
             for dec in pak.declarations:
                 dec.insure = True
 
-        services = self.carrier.get_services(self.request)
-        insured_total = sum(
-            [service.price(self.request) for service in services])
-        self.assertEqual(normal_total, declarations_total)
-        self.assertGreater(insured_total, normal_total)
+        self.carrier.cache = {}
+        insurance_rates = self.carrier.get_services(self.request)
+
+        for service, info in normal_rates.items():
+            self.assertEqual(
+                info['price'], declaration_rates[service]['price'])
+
+            if service in insurance_rates:
+                self.assertLess(
+                    info['price'], insurance_rates[service]['price'])
 
     def address_validation(self):
         if not self.carrier.address_validation:
@@ -249,6 +252,7 @@ class TestCarrier(object):
     test_international_services_multiship = international(services_multiship)
     test_international_delayed_shipment = international(delayed_shipment)
     test_international_residential_shipment = international(delayed_shipment)
+    test_international_insurance = international(insurance)
     test_international_address_validation = international(address_validation)
     test_international_ship_package = international(ship_package)
     test_international_multiship = international(multiship)

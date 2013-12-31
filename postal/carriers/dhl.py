@@ -25,6 +25,7 @@ from money import Money
 from requests import post, RequestException
 
 from .base import Carrier, Service
+from postal.carriers.templates.constructor import iter_populate_template
 from .templates.constructor import load_template, populate_template
 from ..exceptions import CarrierError, NotSupportedError
 from ..data import Shipment
@@ -233,21 +234,27 @@ class DHLApi(Carrier):
 
     @staticmethod
     def enumerate_pieces(template_name, request):
-        result = []
-        template = load_template('dhl', template_name)
-        for number, package in enumerate(request.packages):
-            result.append(populate_template(
-                template, {
-                    'length': package.length, 'width': package.width,
-                    'height': package.height, 'weight': package.weight,
-                    'number': number + 1}))
-        return ''.join(result)
+        return iter_populate_template(['dhl', template_name], (
+            (
+                dict(
+                    length=package.length,
+                    width=package.width,
+                    height=package.height,
+                    weight=package.weight,
+                    number=number + 1
+                ),
+                {}
+            )
+            for number, package in enumerate(request.packages)
+        ))
 
     def rates_request(self, request):
         origin = request.origin or self.postal_configuration['shipper_address']
 
         request_header = self.create_header()
+
         pieces = self.enumerate_pieces('rates_piece.xml', request)
+
         duties = self.money_snippet('rates_dutiable.xml', request, False)
         request_template = load_template('dhl', 'rates.xml')
         ship_datetime = request.ship_datetime or datetime.now()
@@ -365,6 +372,11 @@ class DHLApi(Carrier):
             raise NotSupportedError(
                 "DHL does not support shipment of that package(s).")
         return Money(data['price'].amount, data['price'].currency)
+
+    def get_all_services(self):
+        return (
+            Service(self, code, name)
+            for code, name in _product_code_to_description.items())
 
 
 _product_code_to_description = {
