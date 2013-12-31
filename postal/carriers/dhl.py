@@ -359,7 +359,11 @@ class DHLApi(Carrier):
         package_details = {
             package: {'label': label, 'tracking_number': tracking_number}
             for package, label in zip(request.packages, labels)}
-        return Shipment(self, tracking_number, package_details)
+        shipment_dict = {
+            'shipment': Shipment(self, tracking_number),
+            'packages': package_details,
+            'price': Money(0, 'USD')}
+        return shipment_dict
 
     def delivery_datetime(self, service, request):
         self._ensure_international(request)

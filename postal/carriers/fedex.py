@@ -216,7 +216,7 @@ class FedExApi(Carrier):
             api_request.MasterTrackingId = tracking_number
         if not tracking_number:
             api_request.TotalWeight.Value = sum(
-                [package.weight for package in request.packages])
+                [int(ceil(pack.weight)) for pack in request.packages])
             api_request.TotalWeight.Units = 'LB'
         api_request.PackageCount = len(request.packages)
         self.line_items(
@@ -248,7 +248,7 @@ class FedExApi(Carrier):
         for sequence_num, package in enumerate(request.packages[1:]):
             sequence_num += 2
             requested_shipment = self.requested_shipment(
-                service, request, package, sequence_num,
+                service, request, package, sequence_num=sequence_num,
                 tracking_number=master_tracking_id)
             result = self.service_call(
                 self.ship_client.service.processShipment, auth, client_detail,
@@ -258,9 +258,20 @@ class FedExApi(Carrier):
                 'tracking_number': (
                     detail.TrackingIds[0].TrackingNumber),
                 'label': self.format_label(detail.Label.Parts[0].Image)}
+        tracking_number = master_tracking_id.TrackingNumber
 
-        return Shipment(
-            self, master_tracking_id.TrackingNumber, package_details)
+        try:
+            rating = result.CompletedShipmentDetail.ShipmentRating
+            price = self.get_real_price(rating, rating.ShipmentRateDetails)
+        except CarrierError:
+            raise CarrierError("FedEx returned a nonsense price. Please "
+                               "contact their customer service about tracking "
+                               "number %s." % tracking_number)
+        shipment_dict = {
+            'shipment': Shipment(self, tracking_number),
+            'packages': package_details,
+            'price': price}
+        return shipment_dict
 
     def carrier_codes(self):
         codes = self.rates_client.factory.create('CarrierCodeType')
@@ -294,7 +305,6 @@ class FedExApi(Carrier):
         if api_request.CustomsClearanceDetail.Commodities:
             detail = api_request.CustomsClearanceDetail
             detail.DutiesPayment.PaymentType = 'RECIPIENT'
-
 
     @staticmethod
     def set_address(target, address):
@@ -353,14 +363,34 @@ class FedExApi(Carrier):
         return api_request
 
     @staticmethod
+    def get_real_price(info, method_details):
+        try:
+            actual_type = info.ActualRateType
+        except AttributeError as err:
+            raise err
+        price = None
+        for rating in method_details:
+            try:
+                rating = rating.ShipmentRateDetail
+            except AttributeError:
+                pass
+            if actual_type == rating.RateType:
+                price = Money(
+                    rating.TotalNetCharge.Amount,
+                    rating.TotalNetCharge.Currency)
+        if not price:
+            raise CarrierError("FedEx returned a nonsense price.")
+        return price
+
+    @staticmethod
     def rate_response_dict(response):
         if not hasattr(response, 'RateReplyDetails'):
             return {}
         return {
             method.ServiceType: {
                 #'service': method.ServiceType,
-                'price': method.RatedShipmentDetails[
-                    0].ShipmentRateDetail.TotalNetCharge,
+                'price': FedExApi.get_real_price(
+                    method, method.RatedShipmentDetails),
                 'delivery_datetime': getattr(
                     method, 'DeliveryTimestamp', None)}
             for method in response.RateReplyDetails}
@@ -395,7 +425,7 @@ class FedExApi(Carrier):
 
         final = {
             self.create_service(key): {
-                'price': Money(value['price'].Amount, value['price'].Currency),
+                'price': value['price'],
                 'delivery_datetime': value['delivery_datetime']}
             for key, value in result.items()}
 
@@ -418,7 +448,7 @@ class FedExApi(Carrier):
         if not data:
             raise NotSupportedError(
                 "FedEx does not support shipment of that package(s).")
-        return Money(data['price'].Amount, data['price'].Currency)
+        return data['price']
 
 # Need to find a way to dynamically get all carriers.
 # Also need to find a proper way to specify their inits.
