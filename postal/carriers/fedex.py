@@ -263,7 +263,7 @@ class FedExApi(Carrier):
         try:
             rating = result.CompletedShipmentDetail.ShipmentRating
             price = self.get_real_price(rating, rating.ShipmentRateDetails)
-        except CarrierError:
+        except (CarrierError, AttributeError):
             raise CarrierError("FedEx returned a nonsense price. Please "
                                "contact their customer service about tracking "
                                "number %s." % tracking_number)

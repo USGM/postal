@@ -47,6 +47,11 @@ class Carrier(object):
     multiship = True
     cache = {}
 
+    # Master dictionary of primarily supported Service Codes. Preferably, this
+    # should contain all service codes, but it may only contain ones that are
+    # known to be safe and sane to use.
+    _service_code_to_description = {}
+
     def __init__(self, postal_configuration):
         self.postal_configuration = postal_configuration
         if not postal_configuration:
@@ -100,7 +105,7 @@ class Carrier(object):
 
     def get_service(self, service_id):
         return Service(
-            self, service_id, _service_code_to_description[service_id])
+            self, service_id, self._service_code_to_description[service_id])
 
     def validate_address(self, address):
         """

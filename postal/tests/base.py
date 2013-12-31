@@ -166,7 +166,7 @@ class TestCarrier(object):
         services = self.carrier.get_services(self.request)
         cache_save = self.carrier.cache
         self.carrier.cache = {}
-        self.test_to.residential = True
+        self.request.destination.residential = True
         services_residential = self.carrier.get_services(self.request)
         self.assertTrue(services)
         for service in services.keys():
@@ -183,11 +183,11 @@ class TestCarrier(object):
         composite_set = commercial.intersection(residential)
 
         residential = [
-            service.price(self.request) for service in services_residential
+            info['price'] for service, info in services_residential.items()
             if service in composite_set]
         self.carrier.cache = cache_save
         commercial = [
-            service.price(self.request) for service in services
+            info['price'] for service, info in services.items()
             if service in composite_set]
         residential = sum(residential)
         commercial = sum(commercial)
@@ -196,12 +196,11 @@ class TestCarrier(object):
     def insurance(self):
         normal_rates = self.carrier.get_services(self.request)
 
-        self.package.declarations = self.declarations
-
         self.carrier.cache = {}
         declaration_rates = self.carrier.get_services(self.request)
 
         for pak in self.request.packages:
+            pak.declarations = self.declarations
             for dec in pak.declarations:
                 dec.insure = True
 
