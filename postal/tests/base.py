@@ -1,4 +1,5 @@
 from StringIO import StringIO
+from copy import deepcopy
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from test_configuration import config
@@ -48,9 +49,10 @@ test_european = {
 def domestic(func):
     def wrapped(self, *args, **kwargs):
         if self.carrier.domestic:
-            self.package = self.domestic_package
-            self.package2 = self.domestic_package2
-            self.request = self.domestic_request
+            self.package = deepcopy(self.domestic_package)
+            self.package2 = deepcopy(self.domestic_package2)
+            self.request = deepcopy(self.domestic_request)
+            self.declarations = deepcopy(self.declarations)
             return func(self, *args, **kwargs)
     return wrapped
 
@@ -58,9 +60,10 @@ def domestic(func):
 def international(func):
     def wrapped(self, *args, **kwargs):
         if self.carrier.international:
-            self.package = self.international_package
-            self.package2 = self.international_package2
-            self.request = self.international_request
+            self.package = deepcopy(self.international_package)
+            self.package2 = deepcopy(self.international_package2)
+            self.request = deepcopy(self.international_request)
+            self.declarations = deepcopy(self.declarations)
             return func(self, *args, **kwargs)
     return wrapped
 
@@ -96,10 +99,10 @@ class TestCarrier(object):
 
         self.domestic_request = Request(
             self.test_from, self.test_to, [
-                self.domestic_package, self.documents])
+                self.domestic_package])
         self.international_request = Request(
             self.test_from, self.european_address,
-            [self.international_package, self.documents])
+            [self.international_package])
         self.declarations = [
             Declaration('McGuffin', Money('50.00', 'USD'), 'US', 7),
             Declaration('Brains', Money('60.00', 'USD'), 'US', 5)]
@@ -232,18 +235,39 @@ class TestCarrier(object):
         services = self.carrier.get_services(self.request)
         self.assertTrue(services)
 
+    def shipment_dict_check(self, sdict):
+        self.assertIsInstance(sdict['price'], Money)
+        self.assertIsInstance(sdict['shipment'], Shipment)
+        self.assertIsInstance(sdict['shipment'].tracking_number, basestring)
+        for key, value in sdict['packages'].items():
+            self.assertIsInstance(key, Package)
+            label = value['label']
+            PdfFileReader(StringIO(label))
+            self.assertIn('tracking_number', value)
+
     def ship_package(self):
         services = self.carrier.get_services(self.request)
-        shipment = services.keys()[0].ship(self.request)
-        self.assertIsInstance(shipment, Shipment)
-        self.assertTrue(shipment.tracking_number)
-        label = shipment.package_details[self.package]['label']
-        PdfFileReader(StringIO(label))
+        sdict = services.keys()[0].ship(self.request)
+        self.shipment_dict_check(sdict)
 
     def multiship(self):
-        services = self.carrier.get_services(self.request)
         self.request.packages.append(self.package2)
-        self.assertIsInstance(services.keys()[0].ship(self.request), Shipment)
+        services = self.carrier.get_services(self.request)
+        sdict = services.keys()[0].ship(self.request)
+        self.shipment_dict_check(sdict)
+
+    def rate_ship_match(self):
+        services = self.carrier.get_services(self.request)
+        service, serv_dict = services.items()[0]
+        ship_dict = service.ship(self.request)
+        self.assertEqual(ship_dict['price'], serv_dict['price'])
+
+    def rate_ship_match_multiship(self):
+        self.request.packages.append(self.package2)
+        services = self.carrier.get_services(self.request)
+        service, serv_dict = services.items()[0]
+        ship_dict = service.ship(self.request)
+        self.assertEqual(ship_dict['price'], serv_dict['price'])
 
     test_domestic_services = domestic(services)
     test_domestic_services_multiship = domestic(services_multiship)
@@ -253,6 +277,9 @@ class TestCarrier(object):
     test_domestic_address_validation = domestic(address_validation)
     test_domestic_ship_package = domestic(ship_package)
     test_domestic_multiship = domestic(multiship)
+    test_domestic_rate_ship_match = domestic(rate_ship_match)
+    test_domestic_rate_ship_match_multiship = domestic(
+        rate_ship_match_multiship)
     test_international_services = international(services)
     test_international_services_multiship = international(services_multiship)
     test_international_delayed_shipment = international(delayed_shipment)
@@ -261,3 +288,6 @@ class TestCarrier(object):
     test_international_address_validation = international(address_validation)
     test_international_ship_package = international(ship_package)
     test_international_multiship = international(multiship)
+    test_international_rate_ship_match = international(rate_ship_match)
+    test_international_rate_ship_match_multiship = international(
+        rate_ship_match_multiship)
