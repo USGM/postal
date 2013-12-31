@@ -1,0 +1,17 @@
+    <Package ID="{id}">
+        <Service>{service}</Service>
+        <ZipOrigination>{origin_zip}</ZipOrigination>
+        <ZipDestination>{destination_zip}</ZipDestination>
+        <Pounds>{pounds}</Pounds>
+        <Ounces>{ounces}</Ounces>
+        <Container>{container}</Container>
+        <Size>{size}</Size>
+        <Width>{width}</Width>
+        <Length>{length}</Length>
+        <Height>{height}</Height>
+        <Girth>{girth}</Girth>
+        <Value>{value}</Value>
+        <Machinable>true</Machinable>
+        <ShipDate>{ship_date}</ShipDate>
+        {insurance}
+    </Package>

@@ -87,7 +87,7 @@ class Carrier(object):
         comprehensive as practical. If you want services available for a
         specific request, get_services should be used instead.
         """
-        return []
+        raise NotImplementedError
 
     def get_services(self, request):
         """
@@ -96,7 +96,7 @@ class Carrier(object):
         values which are dictionaries containing keys for price, and
         delivery_datetime.
         """
-        return {}
+        raise NotImplementedError
 
     def get_service(self, service_id):
         return Service(
