@@ -15,9 +15,9 @@ DHL.
 """
 from base64 import b64decode
 from datetime import datetime
-from math import ceil
+import random
 from time import timezone
-from xml.etree.ElementTree import fromstring
+from xml.etree.ElementTree import fromstring, tostring
 
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from StringIO import StringIO
@@ -29,8 +29,7 @@ from .base import Carrier, Service
 from postal.carriers.templates.constructor import iter_populate_template
 from .templates.constructor import load_template, populate_template
 from ..exceptions import CarrierError, NotSupportedError
-from ..data import Shipment
-
+from ..data import Shipment, TWOPLACES
 
 class DHLApi(Carrier):
     name = 'DHL'
@@ -129,9 +128,10 @@ class DHLApi(Carrier):
     @staticmethod
     def ref_number():
         """
-        This is useless, but required.
+        Generate reference number for request.
         """
-        return '1' * 28
+        return str(random.randrange(
+            1000000000000000000000000000, 9999999999999999999999999999))
 
     @staticmethod
     def response_to_dict(quotes):
@@ -237,7 +237,9 @@ class DHLApi(Carrier):
             return ''
 
         return populate_template(
-            template, {'currency': money.currency, 'value': money.amount})
+            template, {
+                'currency': money.currency,
+                'value': money.amount.quantize(TWOPLACES)})
 
     @staticmethod
     def enumerate_pieces(template_name, request):
@@ -317,7 +319,7 @@ class DHLApi(Carrier):
             'duties': self.money_snippet('ship_dutiable.xml', request, False),
             'pieces': self.enumerate_pieces('ship_piece.xml', request),
             'request_header': self.create_header(),
-            'insured_amount': insured.amount,
+            'insured_amount': insured.amount.quantize(TWOPLACES),
             'insured_currency': insured.currency}
 
         request = populate_template(
@@ -347,6 +349,12 @@ class DHLApi(Carrier):
                 'shipper_address']).country == request.destination.country:
             raise NotSupportedError("DHL does not support domestic shipments.")
 
+    @staticmethod
+    def get_shipping_charge(response):
+        charge = response.findtext('ShippingCharge')
+        currency = response.findtext('CurrencyCode')
+        return Money(charge, currency)
+
     def ship(self, service, request):
         self._ensure_international(request)
         ship_request = self.shipment_request(service, request)
@@ -356,13 +364,14 @@ class DHLApi(Carrier):
         if not labels:
             raise CarrierError('DHL generated no labels.')
         labels = self.format_labels(labels)
+        shipping_charge = self.get_shipping_charge(response)
         package_details = {
             package: {'label': label, 'tracking_number': tracking_number}
             for package, label in zip(request.packages, labels)}
         shipment_dict = {
             'shipment': Shipment(self, tracking_number),
             'packages': package_details,
-            'price': Money(0, 'USD')}
+            'price': shipping_charge}
         return shipment_dict
 
     def delivery_datetime(self, service, request):
