@@ -1,6 +1,7 @@
 from StringIO import StringIO
 from copy import deepcopy
 from datetime import datetime
+from unittest import SkipTest
 from dateutil.relativedelta import relativedelta
 from test_configuration import config
 
@@ -48,23 +49,25 @@ test_european = {
 
 def domestic(func):
     def wrapped(self, *args, **kwargs):
-        if self.carrier.domestic:
-            self.package = deepcopy(self.domestic_package)
-            self.package2 = deepcopy(self.domestic_package2)
-            self.request = deepcopy(self.domestic_request)
-            self.declarations = deepcopy(self.declarations)
-            return func(self, *args, **kwargs)
+        if not self.carrier.domestic:
+            raise SkipTest("Domestic service not supported.")
+        self.package = self.domestic_package
+        self.package2 = self.domestic_package2
+        self.request = self.domestic_request
+        self.declarations = self.declarations
+        return func(self, *args, **kwargs)
     return wrapped
 
 
 def international(func):
     def wrapped(self, *args, **kwargs):
-        if self.carrier.international:
-            self.package = deepcopy(self.international_package)
-            self.package2 = deepcopy(self.international_package2)
-            self.request = deepcopy(self.international_request)
-            self.declarations = deepcopy(self.declarations)
-            return func(self, *args, **kwargs)
+        if not self.carrier.international:
+            raise SkipTest("International service not supported.")
+        self.package = self.international_package
+        self.package2 = self.international_package2
+        self.request = self.international_request
+        self.declarations = self.declarations
+        return func(self, *args, **kwargs)
     return wrapped
 
 
@@ -132,7 +135,7 @@ class TestCarrier(object):
 
     def services_multiship(self):
         if not self.carrier.multiship:
-            return
+            raise SkipTest("Carrier does not support Multiship.")
         self.request.packages.append(self.package2)
         services = self.carrier.get_services(self.request)
         self.assertTrue(services)
@@ -160,9 +163,9 @@ class TestCarrier(object):
 
     def residential_shipment(self):
         if not self.carrier.address_validation:
-            return
+            raise SkipTest("Carrier does not support address validation.")
         if self.carrier.auto_residential:
-            return
+            raise SkipTest("Carrier auto-validates addresses on shipments.")
         services = self.carrier.get_services(self.request)
         cache_save = self.carrier.cache
         self.carrier.cache = {}
@@ -217,7 +220,7 @@ class TestCarrier(object):
 
     def address_validation(self):
         if not self.carrier.address_validation:
-            return
+            raise SkipTest("Carrier does not support address validation.")
         score, address = self.carrier.validate_address(self.test_to)
         self.assertIsNotNone(address)
         self.assertTrue(address.residential)
