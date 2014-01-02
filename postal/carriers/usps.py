@@ -179,7 +179,7 @@ class USPSApi(Carrier):
 
             service = Service(
                 self,
-                service_tag.get('ID'),
+                'I' + service_tag.get('ID'),
                 _service_code_to_description.get(service_tag.get('ID'), service_tag.get('ID') + '**' + unescape(unescape(service_tag.find('SvcDescription').text)))
             )
 
@@ -195,6 +195,17 @@ class USPSApi(Carrier):
         return result
 
     def _get_rates_domestic(self, request, origin, services=None):
+        if not services:
+            req = request.shallow_copy()
+            req.packages = []
+            serv = []
+
+            for pak in request.packages:
+                req.packages += [pak, pak]
+                serv += ['FIRST CLASS COMMERCIAL', 'PRIORITY COMMERCIAL']
+
+            return self._get_rates_domestic(req, origin, serv)
+
         ship_date = self.ship_date(request.ship_datetime or datetime.now())
 
         escape_dict = {
@@ -217,46 +228,81 @@ class USPSApi(Carrier):
         response = self.make_call(self.rate_url, 'RateV4', call)
 
         result = {}
-        for service_tag in response.find('Package').iterfind('Postage'):
-            service = Service(
-                self,
-                service_tag.get('CLASSID'),
-                _service_code_to_description.get(
-                    service_tag.get('CLASSID'),
-                    service_tag.get('CLASSID') + '##' + unescape(unescape(service_tag.find('MailService').text))
+        for package_tag in response.iterfind('Package'):
+            ### assuming multiple responses to the same package being returned
+            ### - a response to the recursive call in the first if-branch of
+            ### this method
+            for service_tag in package_tag.iterfind('Postage'):
+
+                """###
+                ### temporary early-outs to make creating the service tables easier
+                if service_tag.find('MailService').text.find('Hold For Pickup') >= 0:
+                    continue
+                if service_tag.find('MailService').text.find('Flat Rate Box') >= 0:
+                    continue
+                if service_tag.find('MailService').text.find('Window') >= 0:
+                    continue
+                if service_tag.find('MailService').text.find('Media Mail') >= 0:
+                    continue
+                if service_tag.find('MailService').text.find('Library Mail') >= 0:
+                    continue
+                if service_tag.find('MailService').text.find('Gift Card') >= 0:
+                    continue
+                if service_tag.find('MailService').text.find('Small Flat Rate Envelope') >= 0:
+                    continue
+                ###"""
+
+                service_id = 'D' + service_tag.get('CLASSID')
+
+                #if service_id not in _service_code_to_description:
+                #    continue
+
+                service = Service(
+                    self,
+                    service_id,
+                    #_service_code_to_description[service_id]
+                    _service_code_to_description.get(
+                        service_id,
+                        service_tag.get('CLASSID') + '##' + unescape(unescape(service_tag.find('MailService').text))
+                    )
                 )
-            )
 
-            delivery = service_tag.find('CommitmentDate')
-            if delivery is not None:  # `not` operator is marked for change in a future version
-                delivery = delivery.text.split('-')
-                delivery = datetime(
-                    year=int(delivery[0]),
-                    month=int(delivery[1]),
-                    day=int(delivery[2])
+                delivery = service_tag.find('CommitmentDate')
+                if delivery is not None:  # `not` operator is marked for change in a future version
+                    delivery = delivery.text.split('-')
+                    delivery = datetime(
+                        year=int(delivery[0]),
+                        month=int(delivery[1]),
+                        day=int(delivery[2]),
+                        hour=23,
+                        minute=59
+                    )
+
+                result[service] = dict(
+                    price=Money(service_tag.find('Rate').text, 'USD'),
+                    delivery_datetime=delivery
                 )
 
-            result[service] = dict(
-                price=Money(service_tag.find('Rate').text, 'USD'),
-                delivery_datetime=delivery
-            )
+                if not services and request.get_total_insured_value():
+                    insurance_request = request.shallow_copy()
+                    insurance_request.packages = []
+                    insurance_services = []
 
-        if not services and request.get_total_insured_value():
-            insurance_request = request.shallow_copy()
-            insurance_request.packages = []
-            insurance_services = []
+                    ### TODO: find a more robust solution than clipping the list
+                    #if len(list(result.items())) > 25:
+                    #   raise Exception()
 
-            for service, info in result.items():
-                ### not supporting external queries of more than one package
-                insurance_request.packages.append(request.packages[0])
-                insurance_services.append('PRIORITY')
+                    for service, info in list(result.items())[:25]:  # limited to 25 packages
+                        ### not supporting external queries of more than one package
+                        insurance_request.packages.append(request.packages[0])
+                        insurance_services.append(_service_code_to_other_service_code[service.service_id])
 
-                # Service must be Priority Express, Priority Express SH, Priority Express Commercial, Priority Express SH Commercial, First Class, Priority, Priority Commercial,
-                # Standard Post, Library, BPM, Media, ALL, or ONLINE
+                        # Service must be Priority Express, Priority Express SH, Priority Express Commercial, Priority Express SH Commercial, First Class, Priority, Priority Commercial,
+                        # Standard Post, Library, BPM, Media, ALL, or ONLINE
 
-            print self._get_rates_domestic(insurance_request, origin, insurance_services)#service.service_id)
+                    print self._get_rates_domestic(insurance_request, origin, insurance_services)#service.service_id)
 
-                #result[service][price] +=
+                        #result[service][price] +=
 
 
 
@@ -347,118 +393,24 @@ def _get_package_parameters(package, index, origin, destination, ship_date=None,
         dict(insurance=insurance)
     )
 
-
 _service_code_to_description = {
-    '2': 'Priority Mail Express 2-Day - Hold For Pickup',
-    '3': 'Priority Mail Express 2-Day', ######################################################################################################################
-    '5': 'Priority Mail Express 2-Day', ######################################################################################################################
-    '27': 'Priority Mail Express 2-Day - Flat Rate Envelope Hold For Pickup',
-    '55': 'Priority Mail Express 2-Day - Flat Rate Boxes',
-    '56': 'Priority Mail Express 2-Day - Flat Rate Boxes Hold For Pickup',
-    '13': 'Priority Mail Express 2-Day - Flat Rate Envelope',
-    '42': 'Priority Mail 2-Day - Small Flat Rate Envelope',
-    '4': 'Standard Post',
-    '40': 'Priority Mail 2-Day Window - Flat Rate Envelope',
-    '31': 'Priority Mail Express 2-Day - Legal Flat Rate Envelope Hold For Pickup',
-    '63': 'Priority Mail Express 2-Day - Padded Flat Rate Envelope Hold For Pickup',
-    '62': 'Priority Mail Express 2-Day - Padded Flat Rate Envelope',
-    '22': 'Priority Mail 2-Day - Large Flat Rate Box',
-    '17': 'Priority Mail 2-Day - Medium Flat Rate Box',
-    '28': 'Priority Mail 2-Day - Small Flat Rate Box',
-    '16': 'Priority Mail 2-Day - Flat Rate Envelope',
-    '44': 'Priority Mail 2-Day - Legal Flat Rate Envelope',
-    '29': 'Priority Mail 2-Day - Padded Flat Rate Envelope',
-    '38': 'Priority Mail 2-Day - Gift Card Flat Rate Envelope',
-    '30': 'Priority Mail 2-Day - Legal Flat Rate Envelope',
-    '6': 'Media Mail',
-    '7': 'Library Mail',
-    '1': 'Priority Mail Express International',
-    '26': 'Priority Mail Express International Flat Rate Boxes',
-    '11': 'Priority Mail International Large Flat Rate Box',
-    '9': 'Priority Mail International Medium Flat Rate Box',
-    '12': 'GXG Envelopes'
+    'D1': 'Priority Mail 2-Day',
+    'D16': 'Priority Mail 2-Day - Flat Rate Envelope',
+    'D44': 'Priority Mail 2-Day - Legal Flat Rate Envelope',
+    'D29': 'Priority Mail 2-Day - Padded Flat Rate Envelope',
+
+    #'D4': 'Standard Post',
+    #'D3': 'Priority Mail Express 2-Day',
+    #'D13': 'Priority Mail Express 2-Day - Flat Rate Envelope',
+    #'D30': 'Priority Mail Express 2-Day - Legal Flat Rate Envelope',
+    #'D62': 'Priority Mail Express 2-Day - Padded Flat Rate Envelope',
 }
 
-#_domestic_service_code_to_description = {
-#    '1':
-#}
-
-_service_code_to_other_service_code = {  # domestic
-    '': 'FIRST CLASS',#
-
-    #'FIRST CLASS COMMERCIAL',
-    #'FIRST CLASS HFP COMMERCIAL',
-    '': 'PRIORITY',#
-    #'PRIORITY COMMERCIAL',
-    #'PRIORITY CPP',
-    #'PRIORITY HFP COMMERCIAL',
-    #'PRIORITY HFP CPP',
-    '3': 'EXPRESS',#
-    #'EXPRESS COMMERCIAL',
-    #'EXPRESS CPP',
-    #'EXPRESS SH',
-    #'EXPRESS SH COMMERCIAL',
-    #'EXPRESS HFP',
-    #'EXPRESS HFP COMMERCIAL',
-    #'EXPRESS HFP CPP',
-    #'STANDARD POST',
-    #'MEDIA',
-    #'LIBRARY',
-    #'ALL',
-    #'ONLINE',
-    #'PLUS'
+_service_code_to_other_service_code = {
+    'D1': 'PRIORITY COMMERCIAL',
+    'D16': 'PRIORITY COMMERCIAL',
+    'D44': 'PRIORITY COMMERCIAL',
+    'D29': 'PRIORITY COMMERCIAL',
+    '?': 'FIRST CLASS COMMERCIAL',
+    '??': 'EXPRESS COMMERCIAL'
 }
-
-
-# Domestic First Class
-# First Class Mail Int'l
-
-# Domestic Priority
-# Priority Mail Int'l
-
-# Express Mail Int'l
-
-# Priority Mail Flat Rate Envelope
-
-
-{
-    'FIRST CLASS',
-    'FIRST CLASS COMMERCIAL',
-    'PRIORITY',
-    'PRIORITY COMMERCIAL',
-    'EXPRESS',
-    'EXPRESS COMMERCIAL'
-}
-
-
-#whiteSpace=collapse
-#enumeration=FIRST CLASS
-#enumeration=FIRST CLASS COMMERCIAL
-#
-#enumeration=FIRST CLASS  HFP COMMERCIAL
-#
-#enumeration=PRIORITY
-#enumeration=PRIORITY COMMERCIAL
-#
-#enumeration=PRIORITY CPP
-#
-#enumeration=PRIORITY HFP COMMERCIAL
-#
-#enumeration=PRIORITY HFP CPP
-#enumeration=EXPRESS
-#enumeration=EXPRESS COMMERCIAL
-#enumeration=EXPRESS CPP
-#
-#enumeration=EXPRESS SH
-#enumeration=EXPRESS SH COMMERCIAL
-#enumeration=EXPRESS HFP
-#enumeration=EXPRESS HFP COMMERCIAL
-#
-#enumeration=EXPRESS HFP CPP
-#enumeration=STANDARD POST
-#enumeration=MEDIA
-#enumeration=LIBRARY
-#enumeration=ALL
-#enumeration=ONLINE
-#
-#enumeration=PLUS
