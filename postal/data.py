@@ -2,10 +2,13 @@
 These are the data structures used by Postal in order to represent things like
 shipments.
 """
+from decimal import Decimal
 from pycountry import countries
 import money
 
 from exceptions import AddressError
+
+TWOPLACES = Decimal('0.01')
 
 
 def get_country(country_code):
@@ -13,6 +16,17 @@ def get_country(country_code):
         return countries.get(alpha2=country_code)
     except KeyError:
         raise AddressError("Could not find the requested country.")
+
+
+def stack_values(iter, func_name):
+    result = 0
+    for item in iter:
+        result += getattr(item, func_name)()
+    if result == 0:
+        return money.Money(0, 'USD')  # so as not to break interface
+    if str(result.currency) == 'XXX':
+        return money.Money(result.amount, 'USD')
+    return result
 
 
 class Address(object):
@@ -110,20 +124,10 @@ class Request(object):
         self.ship_datetime = ship_datetime
 
     def get_total_declared_value(self):
-        result = 0
-        for pak in self.packages:
-            result += pak.get_total_declared_value()
-        if result == 0:
-            return money.Money(0, 'USD')  # so as not to break interface
-        return result
+        return stack_values(self.packages, 'get_total_declared_value')
 
     def get_total_insured_value(self):
-        result = 0
-        for pak in self.packages:
-            result += pak.get_total_insured_value()
-        if result == 0:
-            return money.Money(0, 'USD')
-        return result
+        return stack_values(self.packages, 'get_total_insured_value')
 
     def shallow_copy(self):
         return Request(
@@ -168,21 +172,10 @@ class Package(object):
             self.imperialize()
 
     def get_total_declared_value(self):
-        result = 0
-        for dec in self.declarations:
-            result += dec.get_total_value()
-        if result == 0:
-            return money.Money(0, 'USD')  # so as not to break interface
-        return result
+        return stack_values(self.declarations, 'get_total_value')
 
     def get_total_insured_value(self):
-        result = 0
-        for dec in self.declarations:
-            if dec.insure:
-                result += dec.get_total_value()
-        if result == 0:
-            return money.Money(0, 'USD')
-        return result
+        return stack_values(self.declarations, 'get_insured_value')
 
     def __hash__(self):
         dimensions = 'x'.join(map(str, sorted(
@@ -257,6 +250,12 @@ class Declaration(object):
 
     def get_total_value(self):
         return self.units * self.value
+
+    def get_insured_value(self):
+        if not self.insure:
+            return 0
+        else:
+            return self.get_total_value()
 
     def __str__(self):
         return str(self.description) + ' x' + str(self.units) + ', ' \
