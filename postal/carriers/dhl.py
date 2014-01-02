@@ -17,7 +17,7 @@ from base64 import b64decode
 from datetime import datetime
 import random
 from time import timezone
-from xml.etree.ElementTree import fromstring, tostring
+from xml.etree.ElementTree import fromstring
 
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from StringIO import StringIO
@@ -356,6 +356,12 @@ class DHLApi(Carrier):
         return Money(charge, currency)
 
     def ship(self, service, request):
+        # DHL's shipment rating information from their shipment API is bogus.
+        # The rating API is the most trustworthy.
+        try:
+            price = self.quote(service, request)
+        except Exception as err:
+            raise err
         self._ensure_international(request)
         ship_request = self.shipment_request(service, request)
         response = self.make_call(ship_request)
@@ -364,14 +370,13 @@ class DHLApi(Carrier):
         if not labels:
             raise CarrierError('DHL generated no labels.')
         labels = self.format_labels(labels)
-        shipping_charge = self.get_shipping_charge(response)
         package_details = {
             package: {'label': label, 'tracking_number': tracking_number}
             for package, label in zip(request.packages, labels)}
         shipment_dict = {
             'shipment': Shipment(self, tracking_number),
             'packages': package_details,
-            'price': shipping_charge}
+            'price': price}
         return shipment_dict
 
     def delivery_datetime(self, service, request):
