@@ -17,7 +17,7 @@ from base64 import b64decode
 from datetime import datetime
 import random
 from time import timezone
-from xml.etree.ElementTree import fromstring
+from xml.etree.ElementTree import fromstring, tostring
 
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from StringIO import StringIO
@@ -26,7 +26,6 @@ from money import Money
 from requests import post, RequestException
 
 from .base import Carrier, Service
-from postal.carriers.templates.constructor import iter_populate_template
 from .templates.constructor import load_template, populate_template
 from ..exceptions import CarrierError, NotSupportedError
 from ..data import Shipment, TWOPLACES
@@ -34,6 +33,27 @@ from ..data import Shipment, TWOPLACES
 class DHLApi(Carrier):
     name = 'DHL'
     domestic = False
+
+    _service_code_to_description = {
+        #'N': 'Domestic Express',
+        #'K': 'Domestic 09:00',
+        #'T': 'Domestic 12:00',
+
+        'U': 'Express Worldwide',
+        'D': 'Express Worldwide',
+        'P': 'Express Worldwide',
+
+        'K': 'Express 09:00',
+        'E': 'Express 09:00',
+
+        'T': 'Express 12:00',
+        'Y': 'Express 12:00',
+
+        'L': 'Express 10:30',
+        'M': 'Express 10:30',
+
+        'H': 'Economy Select',
+        'W': 'Economy Select'}
 
     def __init__(
             self, account_number, region_code, company_name, default_currency,
@@ -53,13 +73,16 @@ class DHLApi(Carrier):
 
     def make_call(self, call):
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        f = open('calls.txt', 'a')
         try:
+            f.write(call + '\n')
             response = post(
                 self.url, data=call, headers=headers,
                 timeout=self.postal_configuration['timeout'])
             response.raise_for_status()
         except RequestException as err:
             raise CarrierError("%s" % err)
+
         root = fromstring(response.text)
         # DHL has about three or four ways to send an error message.
         response = root
@@ -164,7 +187,7 @@ class DHLApi(Carrier):
 
     def get_service(self, service_id):
         return Service(
-            self, service_id, _product_code_to_description[service_id])
+            self, service_id, self._service_code_to_description[service_id])
 
     @staticmethod
     def build_address(address):
@@ -243,15 +266,15 @@ class DHLApi(Carrier):
 
     @staticmethod
     def enumerate_pieces(template_name, request):
-        return iter_populate_template(
-            ['dhl', template_name],
-            (
-                ({'length': package.length,
-                  'width': package.width,
-                  'height': package.height,
-                  'weight': package.weight,
-                  'number': number + 1}, {})
-                for number, package in enumerate(request.packages)))
+        result = []
+        template = load_template('dhl', template_name)
+        for number, package in enumerate(request.packages):
+            result.append(populate_template(
+                template, {
+                    'length': package.length, 'width': package.width,
+                    'height': package.height, 'weight': package.weight,
+                    'number': number + 1}))
+        return ''.join(result)
 
     def rates_request(self, request):
         origin = request.origin or self.postal_configuration['shipper_address']
@@ -403,29 +426,8 @@ class DHLApi(Carrier):
     def get_all_services(self):
         return (
             Service(self, code, name)
-            for code, name in _product_code_to_description.items())
+            for code, name in self._service_code_to_description.items())
 
-
-_product_code_to_description = {
-    #'N': 'Domestic Express',
-    #'K': 'Domestic 09:00',
-    #'T': 'Domestic 12:00',
-
-    'U': 'Express Worldwide',
-    'D': 'Express Worldwide',
-    'P': 'Express Worldwide',
-
-    'K': 'Express 09:00',
-    'E': 'Express 09:00',
-
-    'T': 'Express 12:00',
-    'Y': 'Express 12:00',
-
-    'L': 'Express 10:30',
-    'M': 'Express 10:30',
-
-    'H': 'Economy Select',
-    'W': 'Economy Select'}
 # DHL product code (
 # D : US Overnight (>0.5 lb) and Worldwide Express Non-dutiable (>0.5 lb) ,
 

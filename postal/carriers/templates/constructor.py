@@ -20,17 +20,3 @@ def populate_template(template, escape_variables, no_escape_variables=None):
         variables.update(no_escape_variables)
 
     return template.format(**variables)
-
-
-def iter_populate_template(template_path, data):
-    """
-    data = [({...}:escape_dict, {...}:nonescape_dict), ...]
-    """
-
-    result = []
-    template = load_template(*template_path)
-
-    for escape_dict, nonescape_dict in data:
-        result.append(populate_template(template, escape_dict, nonescape_dict))
-
-    return ''.join(result)
