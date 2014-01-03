@@ -309,15 +309,23 @@ class FedExApi(Carrier):
     @staticmethod
     def set_address(target, address):
         target_address = target.Address
+        if len(address.street_lines) > 3:
+            raise NotSupportedError(
+                "FedEx does not support more than three address lines.")
         if hasattr(target, 'Contact'):
             target.Contact.PersonName = address.contact_name
             target.Contact.PhoneNumber = address.phone_number
-        target_address.StreetLines = address.street_lines
+        if len(address.street_lines) == 3:
+            target.Contact.CompanyName = address.street_lines[0]
+            target_address.StreetLines = address.street_lines[1:]
+        else:
+            target_address.StreetLines = address.street_lines
         target_address.City = address.city
         target_address.PostalCode = address.postal_code
         target_address.CountryCode = address.country.alpha2
         target_address.StateOrProvinceCode = address.subdivision
         target_address.Residential = address.residential
+        print target_address
 
     def set_declarations(self, client, api_request, package):
         commodities = []
