@@ -34,7 +34,7 @@ class DHLApi(Carrier):
     name = 'DHL'
     domestic = False
 
-    _service_code_to_description = {
+    _code_to_description = {
         #'N': 'Domestic Express',
         #'K': 'Domestic 09:00',
         #'T': 'Domestic 12:00',
@@ -73,9 +73,7 @@ class DHLApi(Carrier):
 
     def make_call(self, call):
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        f = open('calls.txt', 'a')
         try:
-            f.write(call + '\n')
             response = post(
                 self.url, data=call, headers=headers,
                 timeout=self.postal_configuration['timeout'])
@@ -187,7 +185,7 @@ class DHLApi(Carrier):
 
     def get_service(self, service_id):
         return Service(
-            self, service_id, self._service_code_to_description[service_id])
+            self, service_id, self._code_to_description[service_id])
 
     @staticmethod
     def build_address(address):
@@ -423,10 +421,6 @@ class DHLApi(Carrier):
                 "DHL does not support shipment of that package(s).")
         return Money(data['price'].amount, data['price'].currency)
 
-    def get_all_services(self):
-        return (
-            Service(self, code, name)
-            for code, name in self._service_code_to_description.items())
 
 # DHL product code (
 # D : US Overnight (>0.5 lb) and Worldwide Express Non-dutiable (>0.5 lb) ,

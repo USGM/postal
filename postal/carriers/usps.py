@@ -36,6 +36,26 @@ class USPSApi(Carrier):
     name = 'USPS'
     multiship = False
 
+    _code_to_description = {
+        'PRIORITY:DEFAULT': 'Priority',
+        'PRIORITY:FLAT RATE ENVELOPE': 'Priority Mail - Flat Rate Envelope',
+        'PRIORITY:LEGAL FLAT RATE ENVELOPE': 'Priority Mail - '
+                                             'Legal Flat Rate Envelope',
+        'PRIORITY:PADDED FLAT RATE ENVELOPE': 'Priority Mail - '
+                                              'Padded Flat Rate Envelope',
+
+        'STANDARD POST:DEFAULT': 'Standard Post',
+        'EXPRESS:DEFAULT': 'Priority Mail Express',
+        'EXPRESS:FLAT RATE ENVELOPE': 'Priority Mail Express - '
+                                      'Flat Rate Envelope',
+        'EXPRESS:LEGAL FLAT RATE ENVELOPE': 'Priority Mail Express - '
+                                            'Legal Flat Rate Envelope',
+        'EXPRESS:PADDED FLAT RATE ENVELOPE': 'Priority Mail Express - '
+                                             'Padded Flat Rate Envelope',
+        'FIRST CLASS:DEFAULT': 'First-Class Mail',
+        'FIRST CLASS:PARCEL': 'First-Class Mail - Parcel',
+        'FIRST CLASS:LARGE ENVELOPE': 'First-Class Mail - Large Envelope'}
+
     def __init__(
             self, user_id, password, test_mode, postal_configuration=None):
         super(USPSApi, self).__init__(postal_configuration)
@@ -91,15 +111,6 @@ class USPSApi(Carrier):
     def ship_date(date_time):
         return date_time.strftime('%d-%b-%Y')
 
-    def get_all_services(self):
-        return [
-            Service(self, 'EXPRESS', 'Express'),
-            Service(self, 'FIRST CLASS', 'First Class'),
-            Service(self, 'PRIORITY', 'Priority'),
-            Service(self, 'EXPRESS COMMERCIAL', 'Express Commercial'),
-            Service(self, 'FIRST CLASS COMMERCIAL', 'First Class Commercial'),
-            Service(self, 'PRIORITY COMMERCIAL', 'Priority Commercial')]
-
     def get_services(self, request):
         self._ensure_supported(request)
 
@@ -127,9 +138,9 @@ class USPSApi(Carrier):
                 insured_value.amount / 100)
             return insurance_price
 
-    @staticmethod
-    def _desc_from_tag(service_tag):
-        desc = _code_to_desc.get(service_tag.get('ID'), None)
+    @classmethod
+    def _desc_from_tag(cls, service_tag):
+        desc = cls._code_to_description.get(service_tag.get('ID'), None)
         if not desc:
             desc = "%s**%s" % (
                 service_tag.get('ID'),
@@ -190,9 +201,9 @@ class USPSApi(Carrier):
                 service_tag))
 
             if request.destination.residential:
-                postage_tag = 'CommercialPostage'
-            else:
                 postage_tag = 'Postage'
+            else:
+                postage_tag = 'CommercialPostage'
 
             postage_tag = service_tag.find(postage_tag)
             price = Money(postage_tag.text, 'USD') + insurance_price
@@ -204,7 +215,8 @@ class USPSApi(Carrier):
     def _enumerate_package(self, request, origin, ship_date):
         template = load_template('usps', 'package_domestic.xml')
         packages = ''
-        services = ['ALL', 'FIRST CLASS COMMERCIAL', 'PRIORITY COMMERCIAL']
+        services = [
+            'ALL', 'PRIORITY COMMERCIAL', 'FIRST CLASS COMMERCIAL']
         for index, service in enumerate(services):
             escape_dict, non_escape_dict = self._get_package_parameters(
                 request.packages[0], index, origin, request.destination,
@@ -279,11 +291,12 @@ class USPSApi(Carrier):
             method = 'DEFAULT'
         text = re.sub(r'[^\w]', ' ', text)
         text = re.sub(r'[\d] day', '', text, flags=re.IGNORECASE)
-        text = text.strip().upper()
-        if 'EXPRESS' in text:
-            text = text.replace('PRIORITY MAIL ', '')
-        if 'FIRST CLASS' in text:
+        text = text.upper()
+        if 'PRIORITY' in text or 'FIRST CLASS' in text:
             text = re.sub(' MAIL ?', '', text)
+        if 'EXPRESS' in text:
+            text = text.replace('PRIORITY', '')
+        text = text.strip()
         method = method.strip().upper()
         if not method:
             method = 'DEFAULT'
@@ -318,7 +331,7 @@ class USPSApi(Carrier):
                 service_code = self._derive_code(
                     service_tag.findtext('MailService'))
                 print service_code
-                service_desc = _code_to_desc.get(service_code, None)
+                service_desc = self._code_to_description.get(service_code, None)
                 if not service_desc:
                     continue
                 service = Service(self, service_code, service_desc)
@@ -387,24 +400,3 @@ class USPSApi(Carrier):
 
         if str(request.get_total_insured_value().currency) != 'USD':
             raise NotSupportedError("Value of goods must be in USD.")
-
-
-_code_to_desc = {
-    'PRIORITY MAIL:DEFAULT': 'Priority',
-    'PRIORITY MAIL:FLAT RATE ENVELOPE': 'Priority Mail - Flat Rate Envelope',
-    'PRIORITY MAIL:LEGAL FLAT RATE ENVELOPE': 'Priority Mail - '
-                                              'Legal Flat Rate Envelope',
-    'PRIORITY MAIL:PADDED FLAT RATE ENVELOPE': 'Priority Mail - '
-                                               'Padded Flat Rate Envelope',
-
-    'STANDARD POST:DEFAULT': 'Standard Post',
-    'PRIORITY:DEFAULT': 'Priority Mail Express',
-    'EXPRESS:FLAT RATE ENVELOPE': 'Priority Mail Express - Flat Rate Envelope',
-    'EXPRESS:LEGAL FLAT RATE ENVELOPE': 'Priority Mail Express - '
-                                        'Legal Flat Rate Envelope',
-    'EXPRESS:PADDED FLAT RATE ENVELOPE': 'Priority Mail Express - '
-                                         'Padded Flat Rate Envelope',
-    'FIRST CLASS:DEFAULT': 'First-Class Mail',
-    'FIRST CLASS:PARCEL': 'First-Class Mail - Parcel',
-    'FIRST CLASS:LARGE ENVELOPE': 'First-Class Mail - Large Envelope',
-    }

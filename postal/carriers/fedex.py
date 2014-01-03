@@ -22,7 +22,7 @@ class FedExApi(Carrier):
     """
     name = 'FedEx'
     address_validation = True
-    service_table = {
+    _code_to_description = {
         'FIRST_OVERNIGHT': 'First Overnight',
         'PRIORITY_OVERNIGHT': 'Priority Overnight',
         'STANDARD_OVERNIGHT': 'Standard Overnight',
@@ -397,12 +397,7 @@ class FedExApi(Carrier):
 
     def create_service(self, service):
         return Service(
-            self, service, self.service_table[service])
-
-    def get_all_services(self):
-        return [
-            Service(self, key, value)
-            for key, value in self.service_table.items()]
+            self, service, self._code_to_description[service])
 
     def get_services(self, request):
         """

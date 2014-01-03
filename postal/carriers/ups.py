@@ -145,6 +145,63 @@ class UPSApi(base.Carrier):
     name = 'UPS'
     address_validation = True
     auto_residential = True
+    _code_to_description = {
+
+        ### from docs:
+        # 01 = Next Day Air
+        # 02 = 2nd Day Air
+        # 03 = Ground
+        # 12 = 3 Day Select
+        # 13 = Next Day Air Saver
+        # 14 = Next Day Air Early AM
+        # 59 = 2nd Day Air AM
+        #
+        # Valid international values:
+        # 07 = Worldwide Express
+        # 08 = Worldwide Expedited
+        # 11 = Standard
+        # 54 = Worldwide Express Plus
+        # 65 = UPS Saver. Required for Rating and Ignored for Shopping
+        # ? = WorldWide Express Saver Freight
+        #
+        # Valid Poland to Poland Same
+        # Day values:
+        # 82 = UPS Today Standard
+        # 83 = UPS Today Dedicated
+        # Courier
+        # 84 = UPS Today Intercity
+        # 85 = UPS Today Express
+        # 86 = UPS Today Express Saver
+        # 96 = UPS Worldwide Express Freight
+        #
+        # Code for the UPS Service associated with
+        # the shipment Note: The valid service code for
+        # a FRS Rating Request is
+        # 03=Ground
+
+        # 'UPS Express' if shipping from Canada
+        # (delivers before 10:30am)
+        '01': 'Next Day Air',
+        # 524 in our DB
+        '02': 'Second Day Air',
+        # 'UPS Worldwide Expedited' - 02 Rating, 08 Shipping,
+        # if shipping from Canada
+        '03': 'Ground',
+        # different names when originating from other countries
+        '07': 'Worldwide Express',
+        # different names when originating from other countries
+        '08': 'Worldwide Expedited',
+        '11': 'Standard',
+        '12': 'Three-Day Select',
+        '13': 'Next Day Air Saver',
+        # different name when originating from Canada
+        '14': 'Next Day Air Early A.M.',
+        # different name when originating from Mexico
+        '54': 'Worldwide Express Plus',
+        '59': 'Second Day Air A.M.',
+        '65': 'Saver',
+        '96': 'Worldwide Express Freight'}
+        ### leaving out a few that are Polish-only
 
     def __init__(
             self, username, password, access_license_number, shipper_number,
@@ -368,7 +425,7 @@ class UPSApi(base.Carrier):
                     service = base.Service(
                         self,
                         rated_shipment.Service.Code,
-                        _service_code_to_description.get(
+                        self._code_to_description.get(
                             rated_shipment.Service.Code, None))
 
                     try:
@@ -535,13 +592,8 @@ class UPSApi(base.Carrier):
         return rates
 
     def get_service(self, service_id):
-        return Service(
-            self, service_id, _service_code_to_description[service_id])
-
-    def get_all_services(self):
-        return (
-            base.Service(self, code, name)
-            for code, name in _service_code_to_description.items())
+        return base.Service(
+            self, service_id, self._code_to_description[service_id])
 
     def validate_address(self, address):
         request = self._XAV.factory.create('ns0:RequestType')
@@ -799,57 +851,6 @@ def _populate_money(node, value):
     node.CurrencyCode = value.currency
     node.MonetaryValue = str(value.amount)
 
-
-_service_code_to_description = {
-
-    ### from docs:
-    # 01 = Next Day Air
-    # 02 = 2nd Day Air
-    # 03 = Ground
-    # 12 = 3 Day Select
-    # 13 = Next Day Air Saver
-    # 14 = Next Day Air Early AM
-    # 59 = 2nd Day Air AM
-    #
-    # Valid international values:
-    # 07 = Worldwide Express
-    # 08 = Worldwide Expedited
-    # 11 = Standard
-    # 54 = Worldwide Express Plus
-    # 65 = UPS Saver. Required for Rating and Ignored for Shopping
-    # ? = WorldWide Express Saver Freight
-    #
-    # Valid Poland to Poland Same
-    # Day values:
-    # 82 = UPS Today Standard
-    # 83 = UPS Today Dedicated
-    # Courier
-    # 84 = UPS Today Intercity
-    # 85 = UPS Today Express
-    # 86 = UPS Today Express Saver
-    # 96 = UPS Worldwide Express Freight
-    #
-    # Code for the UPS Service associated with
-    # the shipment Note: The valid service code for
-    # a FRS Rating Request is
-    # 03=Ground
-
-    '01': 'Next Day Air',  # 'UPS Express' if shipping from Canada (delivers before 10:30am) ----- 522 in our DB
-    '02': 'Second Day Air',  # 524 in our DB
-    # 'UPS Worldwide Expedited' - 02 Rating, 08 Shipping, if shipping from Canada
-    '03': 'Ground',  # 523 in our DB
-    '07': 'Worldwide Express',  # different names when originating from other countries ----- 520 in our DB
-    '08': 'Worldwide Expedited',  # different names when originating from other countries ----- 521 in our DB
-    '11': 'Standard',
-    '12': 'Three-Day Select',  # 525 in our DB
-    '13': 'Next Day Air Saver',  # delivers at 6pm
-    '14': 'Next Day Air Early A.M.',  # different name when originating from Canada
-    '54': 'Worldwide Express Plus',  # different name when originating from Mexico
-    '59': 'Second Day Air A.M.',
-    '65': 'Saver',
-    '96': 'Worldwide Express Freight'
-    ### leaving out a few that are Polish-only
-}
 
 _service_code_to_time_in_transit_code = {
     '14': '1DM',
