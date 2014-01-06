@@ -56,6 +56,14 @@ class USPSApi(Carrier):
         'FIRST CLASS:PARCEL': 'First-Class Mail - Parcel',
         'FIRST CLASS:LARGE ENVELOPE': 'First-Class Mail - Large Envelope'}
 
+    _parcel_codes = [
+        'PRIORITY:DEFAULT', 'STANDARD POST:DEFAULT', 'EXPRESS:DEFAULT',
+        'FIRST CLASS:DEFAULT', 'FIRST CLASS:PARCEL']
+    _document_codes = [
+        'PRIORITY:LEGAL FLAT RATE ENVELOPE',
+        'PRIORITY:PADDED FLAT RATE ENVELOPE', 'EXPRESS:FLAT RATE ENVELOPE',
+        'EXPRESS:PADDED FLAT RATE ENVELOPE', 'FIRST CLASS:LARGE ENVELOPE']
+
     def __init__(
             self, user_id, password, test_mode, postal_configuration=None):
         super(USPSApi, self).__init__(postal_configuration)
@@ -67,8 +75,8 @@ class USPSApi(Carrier):
             self.ship_url = 'https://secure.shippingapis.com/' \
                             'ShippingAPITest.dll'
         else:
-            # TODO: Get the production URL from USPS.
-            self.ship_url = ''
+            self.ship_url = 'http://production.shippingapis.com/' \
+                            'ShippingAPI.dll'
 
     @staticmethod
     def make_call(url, api, call):
@@ -122,21 +130,18 @@ class USPSApi(Carrier):
             return self._get_rates_international(request, origin)
 
     @staticmethod
-    def _get_insurance_price(service_tag, request):
-        print tostring(service_tag)
-        for extra_service in service_tag.find('ExtraServices'):
+    def _get_insurance_price(service_tag, tag_name):
+        for extra_service in service_tag.find(tag_name):
             if extra_service.find('ServiceID').text.strip() != '1':
                 # 1 = insurance
                 continue
-            if extra_service.find('OnlineAvailable') \
+            if extra_service.find('Available') \
                     .text.strip().lower() != 'true':
                 continue
-            insured_value = request.get_total_insured_value()
             price = Money(
-                extra_service.find('PriceOnline').text, 'USD')
-            insurance_price = price * ceil(
-                insured_value.amount / 100)
-            return insurance_price
+                extra_service.find('Price').text, 'USD')
+            return price
+        return None
 
     @classmethod
     def _desc_from_tag(cls, service_tag):
@@ -153,34 +158,17 @@ class USPSApi(Carrier):
             raise NotSupportedError(
                 'USPS does not support delayed international shipments.')
 
-        commercial = self.get_param(request, 'commercial', True)
-        if commercial:
-            commercial = 'Y'
-            gift = 'N'
-        else:
-            commercial = 'N'
-            gift = 'Y'
-
-        size = 'LARGE'
-        container = 'RECTANGULAR'
+        services = ['ALL:DEFAULT']
+        template = load_template('usps', 'package_international.xml')
 
         escape_dict = {
-            'user_id': self.user_id,
-            'origin_zip': origin.postal_code,
-            'destination_zip': request.destination.postal_code,
-            'commercial': commercial,
-            'gift': gift,
-            'country': request.destination.country.name,
-            'size': size,
-            'container': container}
+            'user_id': self.user_id}
 
-        package_escape, package_nonescape = self._get_package_parameters(
-            request.packages[0], 0, origin, request.destination)
-        escape_dict.update(package_escape)
+        packages = self._enumerate_package(
+            request, origin, request.ship_datetime, services, template)
 
-        escape_dict['value'] = request.get_total_insured_value().amount
+        non_escape_dict = {'packages': packages}
 
-        non_escape_dict = package_nonescape
         call = populate_template(
             load_template('usps', 'rates_international.xml'),
             escape_dict, non_escape_dict)
@@ -188,7 +176,8 @@ class USPSApi(Carrier):
 
         result = {}
         for service_tag in response.find('Package').iterfind('Service'):
-            insurance_price = self._get_insurance_price(service_tag, request)
+            insurance_price = self._get_insurance_price(
+                service_tag, 'ExtraServices')
             if (request.get_total_insured_value() > 0 and
                     insurance_price is None):
                 continue
@@ -212,43 +201,53 @@ class USPSApi(Carrier):
 
         return result
 
-    def _enumerate_package(self, request, origin, ship_date):
-        template = load_template('usps', 'package_domestic.xml')
+    def _enumerate_package(
+            self, request, origin, ship_date, services, template):
         packages = ''
-        services = [
-            'ALL', 'PRIORITY COMMERCIAL', 'FIRST CLASS COMMERCIAL']
         for index, service in enumerate(services):
             escape_dict, non_escape_dict = self._get_package_parameters(
-                request.packages[0], index, origin, request.destination,
-                ship_date=ship_date, service=service)
+                request, index, origin, ship_date=ship_date, service=service)
             packages += populate_template(
                 template, escape_dict, non_escape_dict)
         return packages
 
-    @staticmethod
     def _get_package_parameters(
-            package, index, origin, destination,
-            ship_date=None, service='ALL'):
+            self, request, index, origin,
+            ship_date=None, service=None):
         """
         returns: (escape:{...}, nonescape:{...})
         """
+        package = request.packages[0]
+        destination = request.destination
+        service, container = service.split(':')
+        default = container == 'DEFAULT'
         international = (origin.country != destination.country)
         if international and package.get_total_insured_value() > 0:
             insurance = '<ExtraServices><ExtraService>1' \
                         '</ExtraService></ExtraServices>'
         else:
-            ### Special Services prices and availability will not be returned
-            ### when Service = "ALL" or "ONLINE"
+            # Insurance is automatically included in the response for Domestic
             insurance = ''
+
+        country = request.destination.country.name
 
         length, width, height = sorted(
             [package.width, package.height, package.length])
-        if length > 12 or international:
+        if length > 12 or international and not package.document:
             size = 'LARGE'
             container = 'RECTANGULAR'
         else:
             size = 'REGULAR'
-            container = 'VARIABLE'
+            if default:
+                container = 'VARIABLE'
+
+        commercial = self.get_param(request, 'commercial', True)
+        if commercial:
+            commercial = 'Y'
+            gift = 'N'
+        else:
+            commercial = 'N'
+            gift = 'Y'
 
         girth = (width + height) * 2
 
@@ -265,8 +264,9 @@ class USPSApi(Carrier):
              'destination_zip': destination.postal_code, 'length': length,
              'width': width, 'height': height, 'pounds': pounds,
              'ounces': ounces, 'id': index, 'size': size,
-             'container': container, 'girth': girth,
-             'value': value, 'ship_date': ship_date},
+             'container': container, 'girth': girth, 'country': country,
+             'value': value, 'ship_date': ship_date, 'commercial': commercial,
+             'gift': gift},
             {'insurance': insurance})
 
     @staticmethod
@@ -303,12 +303,22 @@ class USPSApi(Carrier):
 
         return "%s:%s" % (text, method)
 
+    def _get_base_services(self, package):
+        services = self._parcel_codes[:]
+        if package.document:
+            services.extend(self._document_codes)
+        return services
+
     def _get_rates_domestic(self, request, origin):
 
         ship_date = self.ship_date(request.ship_datetime or datetime.now())
 
+        services = self._get_base_services(request.packages[0])
+
+        template = load_template('usps', 'package_domestic.xml')
+
         packages = self._enumerate_package(
-            request, origin, ship_date)
+            request, origin, ship_date, services, template)
 
         escape_dict = {
             'user_id': self.user_id,
@@ -330,8 +340,8 @@ class USPSApi(Carrier):
             for service_tag in package_tag.iterfind('Postage'):
                 service_code = self._derive_code(
                     service_tag.findtext('MailService'))
-                print service_code
-                service_desc = self._code_to_description.get(service_code, None)
+                service_desc = self._code_to_description.get(
+                    service_code, None)
                 if not service_desc:
                     continue
                 service = Service(self, service_code, service_desc)
@@ -345,36 +355,17 @@ class USPSApi(Carrier):
                         day=int(delivery[2]),
                         hour=23,
                         minute=59)
-
+                base_price = Money(service_tag.find('Rate').text, 'USD')
+                insurance_price = 0
+                if request.get_total_insured_value() > 0:
+                    insurance_price = self._get_insurance_price(
+                        service_tag, 'SpecialServices')
+                    if insurance_price is None:
+                        continue
                 result[service] = {
-                    'price': Money(service_tag.find('Rate').text, 'USD'),
+                    'price': base_price + insurance_price,
                     'delivery_datetime': delivery}
-        if request.get_total_insured_value() > 0:
-            print "I ran!"
-            insurance_request = request.shallow_copy()
-            insurance_request.packages = []
-            insurance_services = []
 
-            ### TODO: find a more robust solution than clipping the
-            # list
-            #if len(list(result.items())) > 25:
-            #   raise Exception()
-
-            # limited to 25 packages
-            #for service, info in list(result.items())[:25]:
-                # Not supporting external queries of more than one
-                # package
-            #    insurance_request.packages.append(request.packages[0])
-            #    insurance_services.append(
-            #        _short_to_long_code[service.service_id])
-
-                # Service must be Priority Express, Priority Express
-                # SH, Priority Express Commercial, Priority Express SH
-                # Commercial, First Class, Priority, Priority
-                # Commercial, Standard Post, Library, BPM, Media,
-                # ALL, or ONLINE
-
-        pprint(result)
         return result
 
     def quote(self, service, request):
