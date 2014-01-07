@@ -1,0 +1,26 @@
+  <FromName>{origin_name}</FromName>
+  {origin_company}
+  <FromAddress1>{origin_address}</FromAddress1>
+  {origin_address2}
+  <FromCity>{origin_city}</FromCity>
+  <FromState>{origin_state}</FromState>
+  <FromZip5>{origin_zip}</FromZip5>
+  <FromZip4/>
+  <ToName>{destination_name}</ToName>
+  {destination_company}
+  <ToAddress1>{destination_address}</ToAddress1>
+  {destination_address2}
+  <ToCity>{destination_city}</ToCity>
+  <ToState>{destination_state}</ToState>
+  <ToZip5>{destination_zip}</ToZip5>
+  <ToZip4 />
+  <WeightInOunces>{ounces}</WeightInOunces>
+  <ServiceType>{service}</ServiceType>
+  <SeparateReceiptPage>True</SeparateReceiptPage>
+  <ImageType>PDF</ImageType>
+<Container>{container}</Container>
+  <Size>{size}</Size>
+  <Width>{width}</Width>
+  <Length>{length}</Length>
+  <Height>{height}</Height>
+  <Girth>{girth}</Girth>

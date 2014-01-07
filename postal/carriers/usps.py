@@ -25,7 +25,7 @@ from base import Carrier, Service
 from ..carriers.templates.constructor import load_template, populate_template
 from ..exceptions import NotSupportedError, CarrierError
 from ..data import Shipment
-from xml.sax.saxutils import unescape
+from xml.sax.saxutils import unescape, escape
 from postal.data import Request
 
 
@@ -165,7 +165,7 @@ class USPSApi(Carrier):
             'user_id': self.user_id}
 
         packages = self._enumerate_package(
-            request, origin, request.ship_datetime, services, template)
+            request, origin, services, template)
 
         non_escape_dict = {'packages': packages}
 
@@ -202,18 +202,36 @@ class USPSApi(Carrier):
         return result
 
     def _enumerate_package(
-            self, request, origin, ship_date, services, template):
+            self, request, origin, services, template):
         packages = ''
         for index, service in enumerate(services):
             escape_dict, non_escape_dict = self._get_package_parameters(
-                request, index, origin, ship_date=ship_date, service=service)
+                request, index, origin, service=service)
             packages += populate_template(
                 template, escape_dict, non_escape_dict)
         return packages
 
-    def _get_package_parameters(
-            self, request, index, origin,
-            ship_date=None, service=None):
+    def ship(self, service, request):
+        origin = request.origin or self.postal_configuration['shipper_address']
+
+        if origin.country.alpha2 != 'US':
+            raise NotSupportedError("USPS Only ships from the United States.")
+        if origin.country == request.destination.country:
+            return self._domestic_ship(service, request, origin)
+
+    def _domestic_ship(self, service, request, origin):
+        template = load_template('usps', 'package_dom_tracking.xml')
+        package = self._enumerate_package(
+            request, origin, [service.service_id.title()], template)
+        template = load_template('usps', 'tracking_domestic.xml')
+        call = populate_template(
+            template, {'user_id': self.user_id}, {'package': package})
+        print call
+        response = self.make_call(
+            self.ship_url, 'DelivConfirmCertifyV4', call)
+        print response
+
+    def _get_package_parameters(self, request, index, origin, service=None):
         """
         returns: (escape:{...}, nonescape:{...})
         """
@@ -259,15 +277,73 @@ class USPSApi(Carrier):
         else:
             value = package.get_total_insured_value().amount
 
-        return (
-            {'service': service, 'origin_zip': origin.postal_code,
-             'destination_zip': destination.postal_code, 'length': length,
-             'width': width, 'height': height, 'pounds': pounds,
-             'ounces': ounces, 'id': index, 'size': size,
-             'container': container, 'girth': girth, 'country': country,
-             'value': value, 'ship_date': ship_date, 'commercial': commercial,
-             'gift': gift},
-            {'insurance': insurance})
+        ship_date = request.ship_datetime or datetime.now()
+        ship_date = ship_date.strftime("%Y-%m-%d")
+
+        origin_esc_data, origin_nonesc_data = self._address_data(
+            origin, 'origin', 'From')
+        destination_esc_data, destination_nonesc_data = self._address_data(
+            destination, 'destination', 'To')
+
+        escape_dict = {
+            'service': service, 'origin_zip': origin.postal_code,
+            'destination_zip': destination.postal_code, 'length': length,
+            'width': width, 'height': height, 'pounds': pounds,
+            'ounces': ounces, 'id': index, 'size': size,
+            'container': container, 'girth': girth, 'country': country,
+            'value': value, 'ship_date': ship_date, 'commercial': commercial,
+            'gift': gift}
+
+        escape_dict.update(origin_esc_data)
+        escape_dict.update(destination_esc_data)
+
+        nonescape_dict = {'insurance': insurance}
+        nonescape_dict.update(origin_nonesc_data)
+        nonescape_dict.update(destination_nonesc_data)
+
+        return escape_dict, nonescape_dict
+
+    @staticmethod
+    def _set_xml(xml_prefix, xml_string, value):
+        return xml_string.format(xml=xml_prefix, value=escape(value))
+
+    def _address_data(self, address, dict_prefix, xml_prefix):
+        data_dict = {}
+        nonescape_data_dict = {}
+        company_string = '<{xml}Firm>{value}</{xml}Firm>'
+        address2_string = '<{xml}Address2>{value}</{xml}Address2>'
+        if len(address.street_lines) > 3:
+            raise NotSupportedError(
+                "USPS does not support more than three address lines.")
+        elif len(address.street_lines) == 3:
+            nonescape_data_dict['company'] = self._set_xml(
+                xml_prefix, company_string, address.street_lines[0])
+            data_dict['address'] = address.street_lines[1]
+            nonescape_data_dict['address2'] = self._set_xml(
+                xml_prefix, address2_string, address.street_lines[1])
+        else:
+            nonescape_data_dict['company'] = '<%sFirm />' % xml_prefix
+            data_dict['address'] = address.street_lines[0]
+            try:
+                nonescape_data_dict['address2'] = self._set_xml(
+                    xml_prefix, address2_string, address.street_lines[1])
+            except IndexError:
+                nonescape_data_dict['address2'] = '<%sAddress2 />' % xml_prefix
+        data_dict['zip'] = address.postal_code
+        data_dict['city'] = address.city
+        data_dict['state'] = address.subdivision
+        data_dict['name'] = address.contact_name
+
+        escape_data = {
+            '%s_%s' % (
+                dict_prefix,
+                key): value for key, value in data_dict.items()}
+        nonescape_data = {
+            '%s_%s' % (
+                dict_prefix,
+                key): value for key, value in nonescape_data_dict.items()}
+
+        return escape_data, nonescape_data
 
     @staticmethod
     def _derive_code(text):
@@ -311,20 +387,15 @@ class USPSApi(Carrier):
 
     def _get_rates_domestic(self, request, origin):
 
-        ship_date = self.ship_date(request.ship_datetime or datetime.now())
-
         services = self._get_base_services(request.packages[0])
-
         template = load_template('usps', 'package_domestic.xml')
-
         packages = self._enumerate_package(
-            request, origin, ship_date, services, template)
+            request, origin, services, template)
 
         escape_dict = {
             'user_id': self.user_id,
             'origin_zip': origin.postal_code,
             'destination_zip': request.destination.postal_code,
-            'ship_date': ship_date,
             'value': request.get_total_insured_value().amount}
         non_escape_dict = {
             'packages': packages}

@@ -1,0 +1,5 @@
+<DelivConfirmCertifyV4.0Request USERID="{user_id}">
+  <Revision>2</Revision>
+  <ImageParameters />
+{package}
+ </DelivConfirmCertifyV4.0Request>
