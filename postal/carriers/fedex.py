@@ -403,10 +403,6 @@ class FedExApi(Carrier):
                     method, 'DeliveryTimestamp', None)}
             for method in response.RateReplyDetails}
 
-    def create_service(self, service):
-        return Service(
-            self, service, self._code_to_description[service])
-
     def get_services(self, request):
         """
         Get available services for shipping a package.

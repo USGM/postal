@@ -1,5 +1,0 @@
-<IntlRateV2Request USERID="{user_id}">
-    <Revision>2</Revision>
-    {packages}
-    </Package>
-</IntlRateV2Request>
