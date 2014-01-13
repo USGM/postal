@@ -46,14 +46,6 @@ class FedExApi(Carrier):
         'EUROPE_FIRST_INTERNATIONAL_PRIORITY': 'Europe First '
                                                'International Priority'}
 
-    @staticmethod
-    def service_url(wsdl_name):
-        base_path = os.path.split(os.path.abspath(
-            inspect.getfile(inspect.currentframe())))[0]
-        base_path = os.path.join(base_path, 'wsdl', 'fedex')
-        full_path = os.path.join(base_path, wsdl_name)
-        return "file://%s" % full_path
-
     def create_client(self, wsdl_name):
         return Client(
             self.service_url(wsdl_name), plugins=[ClearEmpty()],
@@ -220,7 +212,7 @@ class FedExApi(Carrier):
             api_request.TotalWeight.Units = 'LB'
         api_request.PackageCount = len(request.packages)
         self.line_items(
-            self.ship_client, api_request, request, [package], sequence_num)
+            self.ship_client, api_request, [package], sequence_num)
         return api_request
 
     def ship(self, service, request):
@@ -278,7 +270,7 @@ class FedExApi(Carrier):
         return [codes.FDXE, codes.FDXG]
 
     def line_items(
-            self, client, api_request, request, packages, sequence_num=None):
+            self, client, api_request, packages, sequence_num=None):
         for index, package in enumerate(packages):
             item = client.factory.create('RequestedPackageLineItem')
             item.SequenceNumber = sequence_num or index + 1
@@ -365,7 +357,7 @@ class FedExApi(Carrier):
         api_request.PackageCount = len(request.packages)
 
         self.line_items(
-            self.rates_client, api_request, request, request.packages)
+            self.rates_client, api_request, request.packages)
         api_request.ShipTimestamp = request.ship_datetime
 
         return api_request

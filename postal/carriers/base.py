@@ -7,10 +7,13 @@ This module also contains the base Service class. Service objects are
 instantiated by Carrier classes to describe a method by which a package may
 be sent.
 """
-from suds import WebFault
-from ..exceptions import CarrierError, PostalError
+import inspect
+import os
 import re
+
 from suds.plugin import MessagePlugin
+
+from ..exceptions import CarrierError, PostalError
 
 
 class ClearEmpty(MessagePlugin):
@@ -78,6 +81,14 @@ class Carrier(object):
             else:
                 raise CarrierError(err.message)
 
+    @classmethod
+    def service_url(cls, wsdl_name):
+        base_path = os.path.split(os.path.abspath(
+            inspect.getfile(inspect.currentframe())))[0]
+        base_path = os.path.join(base_path, 'wsdl', cls.name.lower())
+        full_path = os.path.join(base_path, wsdl_name)
+        return "file://%s" % full_path
+
     @staticmethod
     def cache_key(request):
         return hash(tuple(sorted(request.packages, key=hash)))
@@ -115,6 +126,9 @@ class Carrier(object):
     def get_service(self, service_id):
         return Service(
             self, service_id, self._code_to_description[service_id])
+
+    def get_origin(self, request):
+        return request.origin or self.postal_configuration['shipper_address']
 
     def validate_address(self, address):
         """
