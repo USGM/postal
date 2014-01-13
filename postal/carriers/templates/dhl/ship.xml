@@ -11,8 +11,7 @@
         <ShipperAccountNumber>{account_number}</ShipperAccountNumber>
         <ShippingPaymentType>S</ShippingPaymentType>
         <BillingAccountNumber>{account_number}</BillingAccountNumber>
-        <DutyPaymentType>S</DutyPaymentType>
-        <DutyAccountNumber>{account_number}</DutyAccountNumber>
+        <DutyPaymentType>R</DutyPaymentType>
     </Billing>
     <Consignee>
         <CompanyName>{company_name}</CompanyName>
