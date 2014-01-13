@@ -15,7 +15,8 @@ def get_country(country_code):
     try:
         return countries.get(alpha2=country_code)
     except KeyError:
-        raise AddressError("Could not find the requested country.")
+        raise AddressError(
+            '"' + str(country_code) + '" is not a valid country code.')
 
 
 def stack_values(iter, func_name):
@@ -57,6 +58,9 @@ class Address(object):
         if not all([street_lines, city, country]):
             raise AddressError(
                 "Not enough information to construct an address.")
+        if isinstance(street_lines, str):
+            raise TypeError(
+                'street_lines should be a sequence of strings, not a string')
 
         self.contact_name = contact_name
         self.phone_number = phone_number
@@ -170,7 +174,7 @@ class Package(object):
         if declarations is None:
             self.declarations = []
         else:
-            self.declarations = declarations
+            self.declarations = list(declarations)
 
         if not imperial:
             self.imperialize()

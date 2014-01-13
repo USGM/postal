@@ -132,7 +132,15 @@ Void = Client(
 
 def _on_webfault(webfault):
     error = webfault.fault.detail.Errors.ErrorDetail.PrimaryErrorCode
-    result = CarrierError('Webfault#%s:%s' % (error.Code, error.Description))
+
+    if error.Code == '111210':
+        ### 'The requested service is unavailable between the selected
+        ### locations.'
+        result = NotSupportedError(
+            'UPS does not offer that service to that destination.')
+    else:
+        result = CarrierError('Webfault#%s: %s' % (error.Code, error.Description))
+
     result.code = error.Code
     return result
 
@@ -766,11 +774,10 @@ class UPSApi(base.Carrier):
             raise CarrierError(
                 'UPS has no rates available for those parameters.')
 
-        ### If no negotiated rates:
-        #return _get_money(rated_shipment.TotalCharges)
-
-        ### otherwise:
-        return _get_money(rated_shipment.NegotiatedRateCharges.TotalCharge)
+        if hasattr(rated_shipment, 'NegotiatedRateCharges'):
+            return _get_money(rated_shipment.NegotiatedRateCharges.TotalCharge)
+        else:
+            return _get_money(rated_shipment.TotalCharges)
 
 
 def get_length_plus_girth(package):
@@ -799,7 +806,7 @@ def _ensure_package_supported(package):
         raise NotSupportedError('UPS does not support packages of that size.')
     if package.weight > 150:
         raise NotSupportedError(
-            'UPS does not support packages of that weight.')
+            'UPS does not ship packages that weigh more than 150 pounds.')
 
 
 def _test_is_large():
@@ -821,6 +828,7 @@ def _populate_address(
         node.Name = address.contact_name
     if use_street:
         node.Address.AddressLine = address.street_lines
+    #print repr(address.street_lines) + '***'
     node.Address.City = address.city
     node.Address.StateProvinceCode = address.subdivision
     if address.postal_code is not None:
