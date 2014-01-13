@@ -78,8 +78,10 @@ class Carrier(object):
         except Exception as err:
             if hasattr(err, 'document'):
                 raise CarrierError(err.document)
+            #elif str(err.message).strip():
+            #    raise CarrierError(str(err.message))
             else:
-                raise CarrierError(err.message)
+                raise CarrierError(repr(err))
 
     @classmethod
     def service_url(cls, wsdl_name):
@@ -142,8 +144,20 @@ class Carrier(object):
 
     def ship(self, service, request):
         """
-        Ship a package on the requested service. This should return a Shipment
-        object.
+        Ships a package on the requested service.
+
+        returns
+        {
+            'shipment'->Shipment,
+            'price'->Money,
+            'packages'->{
+                Package->{
+                    'tracking_number': string,
+                    'label': string
+                },
+                ...
+            }
+        }
         """
         raise NotImplementedError
 
@@ -241,3 +255,6 @@ class Service(object):
         Get the expected delivery date of a package.
         """
         return self.carrier.delivery_datetime(self, request)
+
+    def database_name(self):
+        return self.carrier.name + '|' + self.service_id
