@@ -11,5 +11,9 @@ class TestUSPS(TestCarrier, unittest.TestCase):
         raise SkipTest(
             "USPS does not support delayed international shipments.")
 
+    def test_domestic_residential_shipment(self):
+        raise SkipTest(
+            "USPS does not charge extra for domestic shipments.")
+
 if __name__ == '__main__':
     unittest.main()

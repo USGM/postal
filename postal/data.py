@@ -134,6 +134,10 @@ class Request(object):
             self.origin, self.destination, self.packages, self.ship_datetime,
             self.extra_params)
 
+    def international(self, origin=None):
+        origin = origin or self.origin
+        return origin.country.alpha2 != self.destination.country.alpha2
+
 
 class Package(object):
     """
