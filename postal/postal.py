@@ -27,9 +27,13 @@ class Postal:
                          for carrier in configuration_dict['enabled_carriers']}
         carrier_configs = configuration_dict['carrier_inits']
         for name, carrier in self.carriers.items():
-            self.carriers[name] = carrier(
-                postal_configuration=configuration_dict,
-                **carrier_configs[name])
+            try:
+                self.carriers[name] = carrier(
+                    postal_configuration=configuration_dict,
+                    **carrier_configs[name])
+            except:
+                print 'Error while constructing carrier ' + str(name)
+                raise
 
     def options_async(self, request):
         if not request.packages:

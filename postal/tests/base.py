@@ -117,7 +117,7 @@ class TestCarrier(object):
         self.international_package2.declarations = self.declarations2
         self.documents.declarations = self.document_declaration
 
-    def test_get_all_services(self):
+    def _test_get_all_services(self):
         services = list(self.carrier.get_all_services())
         self.assertGreater(len(services), 0)
         for service in services:

@@ -53,7 +53,8 @@
 			<!-- <soap:address location="https://onlinetools.ups.com/webservices/Rate"/> -->
 			<!-- CIE (Customer Integration Environment) URL -->
 			<!-- <soap:address location="https://wwwcie.ups.com/webservices/Rate"/> -->
-			<soap:address location="https://onlinetools.ups.com/webservices/Rate"/>
-		</wsdl:port>
+
+            <soap:address location="https://onlinetools.ups.com/webservices/Rate"/>
+        </wsdl:port>
 	</wsdl:service>
 </wsdl:definitions>
