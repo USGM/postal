@@ -101,6 +101,10 @@ class Carrier(object):
         return Service(
             self, service, self._code_to_description[service])
 
+    def create_service(self, service):
+        return Service(
+            self, service, self._code_to_description[service])
+
     def cache_results(self, request, response_dict):
         """
         Avoid looking up information on an object more than we must.

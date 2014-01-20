@@ -419,7 +419,11 @@ class UPSApi(base.Carrier):
                 'tracking_number': pak.TrackingNumber,
                 'label': pdf.getvalue()}
 
-        return Shipment(self, master_tracking_number, packages)
+        return {
+            'shipment': Shipment(self, master_tracking_number),
+            'packages': packages,
+            'price': negotiated_rate
+        }
 
     def get_services(self, request):
         _ensure_request_supported(request)
@@ -445,7 +449,7 @@ class UPSApi(base.Carrier):
                             raise
 
                     shipment_info.put((service, dict(
-                        price=_get_money(rated_shipment.TotalCharges),
+                        price=_get_negotiated_charge(rated_shipment),
                         delivery_datetime=delivery,
                         alerts=[a.Description
                             for a in rated_shipment.RatedShipmentAlert]
@@ -774,10 +778,14 @@ class UPSApi(base.Carrier):
             raise CarrierError(
                 'UPS has no rates available for those parameters.')
 
-        if hasattr(rated_shipment, 'NegotiatedRateCharges'):
-            return _get_money(rated_shipment.NegotiatedRateCharges.TotalCharge)
-        else:
-            return _get_money(rated_shipment.TotalCharges)
+        return _get_negotiated_charge(rated_shipment)
+
+
+def _get_negotiated_charge(rated_shipment):
+    if hasattr(rated_shipment, 'NegotiatedRateCharges'):
+        return _get_money(rated_shipment.NegotiatedRateCharges.TotalCharge)
+    else:
+        return _get_money(rated_shipment.TotalCharges)
 
 
 def get_length_plus_girth(package):

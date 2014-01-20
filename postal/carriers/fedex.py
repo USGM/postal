@@ -317,7 +317,6 @@ class FedExApi(Carrier):
         target_address.CountryCode = address.country.alpha2
         target_address.StateOrProvinceCode = address.subdivision
         target_address.Residential = address.residential
-        print target_address
 
     def set_declarations(self, client, api_request, package):
         commodities = []

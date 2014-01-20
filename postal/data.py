@@ -278,25 +278,16 @@ class Shipment(object):
     to get options for dealing with a package after a shipment has been
     requested, like cancellation.
     """
-    def __init__(self, carrier, tracking_number, package_details=None):
+    def __init__(self, carrier, tracking_number):
         """
         carrier:Carrier
         tracking_number:string = the master tracking number of the shipment
-        package_details:{
-            Package --> {
-                'tracking_number' --> string,
-                'label' --> string = raw binary data of image of shipping label
-            },
-            ...
-        }
         """
-
         self.tracking_number = tracking_number
         if carrier:
             self.carrier = carrier
         else:
             self.derive_carrier()
-        self.package_details = package_details
 
     def derive_carrier(self):
         # Reverse engineer the carrier based on the tracking number, somehow.
