@@ -80,8 +80,7 @@ class Address(object):
             str(self.street_lines) + '\n' +
             self.city + ', ' + self.subdivision + ' ' +
             str(self.postal_code) + ' ' + self.country.alpha2 + '\n' +
-            'Residential: ' + str(self.residential)
-        )
+            'Residential: ' + str(self.residential))
 
     def __repr__(self):
         return '<\n' + str(self) + '\n>'
@@ -185,7 +184,7 @@ class Package(object):
     def get_total_insured_value(self):
         return stack_values(self.declarations, 'get_insured_value')
 
-    def __hash__(self):
+    def cache_hash(self):
         dimensions = 'x'.join(map(str, sorted(
             [self.length, self.width, self.height, self.weight])))
         return hash(dimensions)

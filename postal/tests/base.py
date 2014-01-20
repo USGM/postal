@@ -96,7 +96,7 @@ class TestCarrier(object):
         self.domestic_package = Package(2, 3, 4, .3)
         self.domestic_package2 = Package(4, 6, 6, 4)
         self.documents = Package(9, 12, .1, .2, document=True)
-        self.international_package = Package(3, 4, 5, 6)
+        self.international_package = Package(3, 4, 5, .3)
         self.international_package2 = Package(4, 2, 5, 28)
 
         self.domestic_request = Request(
@@ -274,7 +274,6 @@ class TestCarrier(object):
         service, serv_dict = services.items()[0]
         ship_dict = service.ship(self.request)
         self.assertEqual(ship_dict['price'], serv_dict['price'])
-
     test_domestic_services = domestic(services)
     test_domestic_services_multiship = domestic(services_multiship)
     test_domestic_delayed_shipment = domestic(delayed_shipment)

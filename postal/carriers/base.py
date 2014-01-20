@@ -23,7 +23,8 @@ class ClearEmpty(MessagePlugin):
             if children:
                 self.clear_empty_tags(children)
             if re.match(r'^<[^>]+?/>$', tag.plain()):
-                tag.parent.remove(tag)
+                if not tag.attributes:
+                    tag.parent.remove(tag)
 
     def marshalled(self, context):
         self.clear_empty_tags(context.envelope.getChildren()[:])
@@ -93,7 +94,8 @@ class Carrier(object):
 
     @staticmethod
     def cache_key(request):
-        return hash(tuple(sorted(request.packages, key=hash)))
+        return hash(tuple(sorted(
+            request.packages, key=lambda x: x.cache_hash)))
 
     def create_service(self, service):
         return Service(
