@@ -263,7 +263,7 @@ class USPSApi(Carrier):
         self._set_address_info(label_request, request)
         label_request._ImageFormat = 'PDF'
         label_format = self._label_type(request, service)
-        if request.international():
+        if request.international(origin=self.get_origin(request)):
             label_request._LabelType = 'International'
             label_request._LabelSubtype = 'Integrated'
             label_request.IntegratedFormType = label_format
@@ -298,8 +298,6 @@ class USPSApi(Carrier):
             for image in response.Label.Image:
                 images.append(self._format_label(image.value, label_format))
             label = self._merge_labels(images)
-        f = open('test.pdf', 'w')
-        f.write(label)
         return {
             'shipment': shipment,
             'price': price,
@@ -331,7 +329,7 @@ class USPSApi(Carrier):
         self._set_creds(change_request, inset=True)
         change_request.RequestID = self.ref_number()
         change_request.NewPassPhrase = new_passphrase
-        response = self.service_call(self.client.service.ChangePassPhrase, change_request)
+        self.service_call(self.client.service.ChangePassPhrase, change_request)
         self.passphrase = new_passphrase
 
     def get_services(self, request):
@@ -348,3 +346,23 @@ class USPSApi(Carrier):
         response_dict = self._request_response_table(request, response)
         self.cache_results(request, response_dict)
         return response_dict
+
+    def delivery_datetime(self, service, request):
+        response = self.get_services(request)
+        try:
+            print response
+            return response[service]['delivery_datetime']
+        except KeyError:
+            raise NotSupportedError(
+                "USPS does not support shipment of that package on "
+                "this service.")
+
+    def quote(self, service, request):
+        response = self.get_services(request)
+        try:
+            print response
+            return response[service]['price']
+        except KeyError:
+            raise NotSupportedError(
+                "USPS does not support shipment of that package on "
+                "this service.")

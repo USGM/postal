@@ -94,12 +94,10 @@ class Carrier(object):
 
     @staticmethod
     def cache_key(request):
-        return hash(tuple(sorted(
-            request.packages, key=lambda x: x.cache_hash)))
-
-    def create_service(self, service):
-        return Service(
-            self, service, self._code_to_description[service])
+        return hash(
+            tuple(sorted(
+                request.packages, key=lambda x: x.cache_hash))
+            + (request.origin, request.destination))
 
     def create_service(self, service):
         return Service(
@@ -183,7 +181,8 @@ class Carrier(object):
         """
         raise NotImplementedError
 
-    def get_param(self, request, param, *args):
+    @classmethod
+    def get_param(cls, request, param, *args):
         """
         Get carrier-specific extra configuration information from request
         object.
@@ -198,16 +197,16 @@ class Carrier(object):
             # To make it a bit more like a dict's .get()
             raise TypeError("get_param expected at most 3 arguments, got %i." %
                             (len(args) + 2))
-        if self not in request.extra_params:
+        if cls.name not in request.extra_params:
             if raise_exception:
                 raise KeyError(
                     "%s not found in extra_params for this request object." %
-                    self)
+                    cls.name)
             else:
                 return default
         if raise_exception:
-            return request.extra_params[self][param]
-        return request.extra_params[self].get(param, default)
+            return request.extra_params[cls.name][param]
+        return request.extra_params[cls.name].get(param, default)
 
 
 class Service(object):

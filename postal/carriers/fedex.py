@@ -1,8 +1,6 @@
 """
 This is the module for interfacing with FedEx's web services APIs.
 """
-import inspect
-import os
 from base64 import b64decode
 from datetime import datetime
 from math import ceil
@@ -11,7 +9,7 @@ from StringIO import StringIO
 from suds.client import Client
 from money import Money
 
-from base import Carrier, Service, ClearEmpty
+from base import Carrier, ClearEmpty
 from ..exceptions import CarrierError, NotSupportedError
 from ..data import Address, Shipment
 
@@ -47,9 +45,10 @@ class FedExApi(Carrier):
                                                'International Priority'}
 
     def create_client(self, wsdl_name):
-        return Client(
+        client = Client(
             self.service_url(wsdl_name), plugins=[ClearEmpty()],
             timeout=self.postal_configuration['timeout'])
+        return client
 
     def __init__(
             self, key, account_number, password, meter_number,
@@ -424,10 +423,12 @@ class FedExApi(Carrier):
     def delivery_datetime(self, service, request):
         if not self.cache_key(request) in self.cache:
             self.get_services(request)
-        data = self.cache[tuple(request)].get(service.service_id, None)
+        data = self.cache[self.cache_key(request)].get(
+            service.service_id, None)
         if not data:
             raise NotSupportedError(
-                "FedEx does not support shipment of that package(s).")
+                "USPS does not support shipment of that package on "
+                "this service.")
         return data['delivery_datetime']
 
     def quote(self, service, request):
@@ -437,7 +438,8 @@ class FedExApi(Carrier):
             service.service_id, None)
         if not data:
             raise NotSupportedError(
-                "FedEx does not support shipment of that package(s).")
+                "USPS does not support shipment of that package on this "
+                "service.")
         return data['price']
 
 # Need to find a way to dynamically get all carriers.

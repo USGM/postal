@@ -35,6 +35,12 @@ class Address(object):
     Addresses for shipping. Many services have address validation, which can
     be used to determine if an address is sane or not.
     """
+
+    def __hash__(self):
+        return hash((
+            self.country.alpha2, self.city, self.subdivision, self.postal_code,
+            self.residential))
+
     def __init__(
             self, contact_name=None, phone_number=None,
             street_lines=None, city=None, subdivision=None,
@@ -284,14 +290,7 @@ class Shipment(object):
         tracking_number:string = the master tracking number of the shipment
         """
         self.tracking_number = tracking_number
-        if carrier:
-            self.carrier = carrier
-        else:
-            self.derive_carrier()
-
-    def derive_carrier(self):
-        # Reverse engineer the carrier based on the tracking number, somehow.
-        raise NotImplementedError
+        self.carrier = carrier
 
     def cancel(self):
         raise NotImplementedError

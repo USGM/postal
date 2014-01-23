@@ -5,7 +5,7 @@ Front-end for the Postal Library.
 import threading
 from Queue import Queue
 import sys
-from .exceptions import PostalError, NotSupportedError
+from .exceptions import NotSupportedError
 
 
 class Postal:
@@ -35,56 +35,32 @@ class Postal:
                 print 'Error while constructing carrier ' + str(name)
                 raise
 
-    def options_async(self, request):
+        # Give carriers a back reference to the main postal object.
+        configuration_dict['postal'] = self
+
+    def options(self, request):
+        """
+        Gets all service options from all carriers.
+
+        returns:
+
+        {carrier: 'services': {carrier.get_services() output dict}, 'error':
+            Exception, if no services were found.}
+        """
         if not request.packages:
-            try:
-                raise NotSupportedError('No packages in shipment.')
-            except Exception as err:
-                err.traceback = sys.exc_info()[2]
-                err.carrier = None
-                yield err
-                return
+            raise NotSupportedError('No packages in shipment.')
 
         results = Queue()
         for carrier in self.carriers.values():
-            ### The implementation of this loop currently assumes that the
-            ### caller will always want all of the generated data.
+            threading.Thread(
+                target=task, args=(carrier, request, results)).start()
 
-            def task(carrier):
-                try:
-                    for service, data in \
-                            carrier.get_services(request).iteritems():
+        output_dict = {}
+        while len(output_dict) < len(self.carriers):
+            carrier, data_dict = results.get()
+            output_dict[carrier] = data_dict
 
-                        ### copy before modifying in case a carrier binding
-                        ### does something odd
-                        info = dict(data)
-
-                        if 'service' in info:
-                            ### Don't silently overwrite something that might
-                            ### be important
-                            raise PostalError()
-
-                        info['service'] = service
-                        results.put(info)
-
-                except Exception as err:
-                    if not hasattr(err, 'traceback'):
-                        err.traceback = sys.exc_info()[2]
-                    err.carrier = carrier
-                    results.put(err)
-
-                finally:
-                    results.put(None)  # this carrier is done
-
-            threading.Thread(target=task, args=(carrier,)).start()
-
-        num_carriers_finished = 0
-        while num_carriers_finished < len(self.carriers):
-            result = results.get()
-            if result is None:
-                num_carriers_finished += 1
-            else:
-                yield result
+        return output_dict
 
     def get_all_services(self):
         """
@@ -99,3 +75,15 @@ class Postal:
             if key == carrier_name:
                 return self.carriers[key].get_service(service_id)
         raise Exception()
+
+
+def task(carrier, request, results):
+    data_dict = {'services': {}, 'error': None}
+    try:
+        data_dict['services'] = carrier.get_services(request)
+    except Exception as err:
+        if not hasattr(err, 'traceback'):
+            err.traceback = sys.exc_info()[2]
+        data_dict['error'] = err
+
+    results.put((carrier, data_dict))
