@@ -5,7 +5,8 @@ Front-end for the Postal Library.
 import threading
 from Queue import Queue
 import sys
-from .exceptions import NotSupportedError
+import itertools
+from .exceptions import PostalError, NotSupportedError
 
 
 class Postal:
@@ -74,7 +75,29 @@ class Postal:
         for key in self.carriers:
             if key == carrier_name:
                 return self.carriers[key].get_service(service_id)
-        raise Exception()
+        raise NotSupportedError()
+
+    def get_package_type(self, carrier_name, type_id):
+        for key in self.carriers:
+            ### if no carrier specified, check all carriers
+            if not carrier_name or key == carrier_name:
+                try:
+                    return self.carriers[key].get_package_type(type_id)
+                except NotSupportedError:
+                    continue
+        raise NotSupportedError()
+
+    def get_all_package_types(self):
+        """
+        Returns all types of containers supported by all carriers. Specifying
+        something other than the generic customer-supplied package/softpak
+        will yield limited rates results because most package types are
+        carrier-specific.
+        """
+        return set(itertools.chain(*(
+            carrier.get_all_package_types()
+            for carrier in self.carriers.values()
+        )))
 
 
 def task(carrier, request, results):
@@ -87,3 +110,4 @@ def task(carrier, request, results):
         data_dict['error'] = err
 
     results.put((carrier, data_dict))
+

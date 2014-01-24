@@ -413,7 +413,7 @@ class FedExApi(Carrier):
         self.cache_results(request, result)
 
         final = {
-            self.create_service(key): {
+            self.get_service(key): {
                 'price': value['price'],
                 'delivery_datetime': value['delivery_datetime']}
             for key, value in result.items()}

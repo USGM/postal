@@ -190,20 +190,27 @@ class UPSApi(base.Carrier):
         # 'UPS Express' if shipping from Canada
         # (delivers before 10:30am)
         '01': 'Next Day Air',
+
         # 524 in our DB
         '02': 'Second Day Air',
+
         # 'UPS Worldwide Expedited' - 02 Rating, 08 Shipping,
         # if shipping from Canada
+
         '03': 'Ground',
+
         # different names when originating from other countries
         '07': 'Worldwide Express',
+
         # different names when originating from other countries
         '08': 'Worldwide Expedited',
         '11': 'Standard',
         '12': 'Three-Day Select',
         '13': 'Next Day Air Saver',
+
         # different name when originating from Canada
         '14': 'Next Day Air Early A.M.',
+
         # different name when originating from Mexico
         '54': 'Worldwide Express Plus',
         '59': 'Second Day Air A.M.',
@@ -275,6 +282,17 @@ class UPSApi(base.Carrier):
         api_shipment.ShipmentRatingOptions.NegotiatedRatesIndicator = ''
         api_shipment.Service.Code = service.service_id
 
+        ### Other destinations require the invoice line total to be set in
+        ### one of the international tags.
+        ### From an email: this amount is not used as a declared value and does
+        ### not affect shipment charges. This is also true of any associated
+        ### amounts within the International Forms container.
+        if request.destination.country.alpha2 in ('CA', 'PR'):
+            pass#_populate_money(api_shipment.Shipment.InvoiceLineTotal, ???) TODO
+
+        if request.documents_only():
+            api_shipment.DocumentsOnlyIndicator = ''
+
         _populate_shipper(
             api_shipment.Shipper, origin, self.shipper_number,
             True, True)#, '123456')
@@ -283,7 +301,7 @@ class UPSApi(base.Carrier):
             use_attn=True)
 
         _populate_address(
-            api_shipment.ShipFrom, request.origin, use_phone=True,
+            api_shipment.ShipFrom, origin, use_phone=True,
             use_attn=True)
 
         international = (origin.country != request.destination.country)
@@ -330,7 +348,10 @@ class UPSApi(base.Carrier):
 
         for package in request.packages:
             pak = self._Ship.factory.create('ns3:PackageType')
-            pak.Packaging.Code = '02'  # customer-supplied packaging
+
+            pak.Packaging.Code = _get_package_type_code(
+                package.package_type)
+
             pak.Dimensions.UnitOfMeasurement.Code = 'IN'
             pak.Dimensions.Length = str(package.length)
             pak.Dimensions.Width = str(package.width)
@@ -516,6 +537,8 @@ class UPSApi(base.Carrier):
 
         shipment = self._RateWS.factory.create('ns2:ShipmentType')
         shipment.ShipmentRatingOptions.NegotiatedRatesIndicator = ''
+        if request.documents_only():
+            shipment.DocumentsOnlyIndicator = ''
 
         if request_type == 'Rate' and service is None:
             raise TypeError()
@@ -555,21 +578,8 @@ class UPSApi(base.Carrier):
                     pak.PackageServiceOptions.DeclaredValue,
                     package.get_total_insured_value())
 
-            # 00 = Unknown
-            # 01 = UPS Letter
-            # 02 = Package/customer supplied
-            # 03 = UPS Tube
-            # 04 = UPS Pak
-            # 21 = Express Box
-            # 24 = 25KG Box
-            # 25 = 10KG Box
-            # 30 = Pallet
-            # 2a = Small Express Box
-            # 2b = Medium Express Box
-            # 2c = Large Express Box
-            # For FRS rating requests the only valid value is customer supplied
-            #   packaging 02.
-            pak.PackagingType.Code = '02'
+            pak.PackagingType.Code = _get_package_type_code(
+                package.package_type)
 
             if pak.PackagingType.Code == '04':  # UPS Pak
                 using_ups_pak = True
@@ -716,8 +726,9 @@ class UPSApi(base.Carrier):
                 # num packages in shipment
                 str(len(request.packages)),
                 invoice,
+
                 # DocumentsOnlyIndicator (missing tag = false)
-                None,
+                ('' if request.documents_only() else None),
 
                 # BillType
                 # This field needs to be populated when UPS WorldWide
@@ -780,6 +791,25 @@ class UPSApi(base.Carrier):
 
         return _get_negotiated_charge(rated_shipment)
 
+    _package_id_to_description = dict(
+        ### UPS supports generic boxes and softpaks; they are both code '02'
+        base.Carrier._package_id_to_description.items() + {
+            '01': 'UPS: Letter',
+            '03': 'UPS: Tube',
+            '04': 'UPS: Pak',
+            '21': 'UPS: Express Box',
+            '24': 'UPS: 25kg Box',
+            '25': 'UPS: 10kg Box',
+            '30': 'UPS: Pallet',
+            '2a': 'UPS: Small Express Box',
+            '2b': 'UPS: Medium Express Box',
+            '2c': 'UPS: Large Express Box'
+            ### For FRS rating requests the
+            ### only valid value is customer
+            ### supplied packaging 02.
+        }.items()
+    )
+
 
 def _get_negotiated_charge(rated_shipment):
     if hasattr(rated_shipment, 'NegotiatedRateCharges'):
@@ -819,10 +849,13 @@ def _ensure_package_supported(package):
 
 def _test_is_large():
     from ..data import Package
-    assert is_large(Package(10, 10, 91, 0))
-    assert not is_large(Package(10, 10, 90, 0))
-    assert is_large(Package(91, 10, 10, 0))
-    assert is_large(Package(10, 91, 10, 0))
+    from .base import PackageType
+
+    t = PackageType(None, 'package', 'Package')
+    assert is_large(Package(10, 10, 91, 0, t))
+    assert not is_large(Package(10, 10, 90, 0, t))
+    assert is_large(Package(91, 10, 10, 0, t))
+    assert is_large(Package(10, 91, 10, 0, t))
 _test_is_large()
 
 
@@ -866,6 +899,14 @@ def _get_money(node):
 def _populate_money(node, value):
     node.CurrencyCode = value.currency
     node.MonetaryValue = str(value.amount)
+
+
+def _get_package_type_code(package_type):
+    if package_type.code == 'package':
+        return '02'
+    if package_type.code == 'softpak':
+        return '02'
+    return package_type.code
 
 
 _service_code_to_time_in_transit_code = {

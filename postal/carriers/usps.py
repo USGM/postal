@@ -68,7 +68,7 @@ class USPSApi(Carrier):
                 " parcel, not %s" % len(request.packages))
         if origin.country.alpha2 != 'US':
             raise NotSupportedError(
-                "The USPS only ships from the United States.")
+                "USPS only ships from the United States.")
 
 
     @staticmethod
@@ -112,11 +112,11 @@ class USPSApi(Carrier):
         try:
             response.PostagePrice
         except AttributeError:
-            return {}
+            return table
         for rate in response.PostagePrice:
             if not rate.MailClass in self._code_to_description:
                 continue
-            service = self.create_service(rate.MailClass)
+            service = self.get_service(rate.MailClass)
             table[service] = {
                 'price': Money(rate._TotalAmount, 'USD'),
                 'delivery_datetime': self._get_arrival_date(
@@ -158,7 +158,7 @@ class USPSApi(Carrier):
         phone_number = phone_number[:10]
         if len(phone_number) != 10:
             raise NotSupportedError(
-                'Phone number for USPS must be a standard US 10 digit number.')
+                'USPS requires a standard US 10 digit phone number.')
         return phone_number
 
     @staticmethod

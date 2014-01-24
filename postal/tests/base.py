@@ -93,11 +93,11 @@ class TestCarrier(object):
         self.test_from = Address(**test_from)
         self.test_to = Address(**test_to)
         self.european_address = Address(**test_european)
-        self.domestic_package = Package(2, 3, 4, .3)
-        self.domestic_package2 = Package(4, 6, 6, 4)
-        self.documents = Package(9, 12, .1, .2, document=True)
-        self.international_package = Package(3, 4, 5, 6)
-        self.international_package2 = Package(4, 2, 5, 28)
+        self.domestic_package = Package(2, 3, 4, .3, self.carrier.get_package_type('package'))
+        self.domestic_package2 = Package(4, 6, 6, 4, self.carrier.get_package_type('package'))
+        self.documents = Package(9, 12, .1, .2, self.carrier.get_package_type('package'), document=True)
+        self.international_package = Package(3, 4, 5, 6, self.carrier.get_package_type('package'))
+        self.international_package2 = Package(4, 2, 5, 28, self.carrier.get_package_type('package'))
 
         self.domestic_request = Request(
             self.test_from, self.test_to, [

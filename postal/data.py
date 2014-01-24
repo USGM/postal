@@ -8,7 +8,7 @@ import money
 
 from exceptions import AddressError
 
-TWOPLACES = Decimal('0.01')
+TWOPLACES = Decimal('0.01')  # used by DHL
 
 
 def get_country(country_code):
@@ -26,7 +26,7 @@ def stack_values(iter, func_name):
     if result == 0:
         return money.Money(0, 'USD')  # so as not to break interface
     if str(result.currency) == 'XXX':
-        return money.Money(result.amount, 'USD')
+        raise Exception("Can't compute sum of different kinds of currencies.")
     return result
 
 
@@ -147,6 +147,42 @@ class Request(object):
         origin = origin or self.origin
         return origin.country.alpha2 != self.destination.country.alpha2
 
+    def documents_only(self):
+        return not any([not a.document for a in self.packages])
+
+
+class PackageType(object):
+    """
+    Represents the type of container a particular set of items is held in,
+    like a box, pallet, envelope, or bag/softpak.
+    """
+
+    def __init__(self, carrier, code, name):
+        self.carrier = carrier
+        self.code = code
+        self.name = name
+
+    def __eq__(self, other):
+        ### TODO: this won't work if carriers use the same codes
+        ### TODO: it also won't work if it uses the carrier when it's a
+        ### generic packaging type
+        try:
+            return self.code == other.code
+        except AttributeError:
+            return False
+
+    def __ne__(self, other):
+        return not (self == other)
+
+    def __hash__(self):
+        return hash(self.code)
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return '<' + repr(self.code) + ': ' + repr(self.name) + '>'
+
 
 class Package(object):
     """
@@ -169,12 +205,13 @@ class Package(object):
     envelope for FedEx.
     """
     def __init__(
-            self, length, width, height, weight, declarations=None,
-            imperial=True, document=False):
+            self, length, width, height, weight, package_type,
+            declarations=None, imperial=True, document=False):
         self.length = length
         self.width = width
         self.height = height
         self.weight = weight
+        self.package_type = package_type
         self.document = document
         if declarations is None:
             self.declarations = []
@@ -294,3 +331,10 @@ class Shipment(object):
 
     def cancel(self):
         raise NotImplementedError
+
+    def __str__(self):
+        return 'Shipment<carrier:' + repr(self.carrier.name) \
+               + ' tracking_number:' + repr(self.tracking_number) + '>'
+
+    def __repr__(self):
+        return str(self)

@@ -14,6 +14,8 @@ import re
 from suds.plugin import MessagePlugin
 
 from ..exceptions import CarrierError, PostalError
+from postal.data import PackageType
+from postal.exceptions import NotSupportedError
 
 
 class ClearEmpty(MessagePlugin):
@@ -59,6 +61,14 @@ class Carrier(object):
     # things like get_all_services() to construct service objects.
     _code_to_description = {}
 
+    # Table of all package types supported by this carrier and the human-
+    # readable names of these codes. Codes for packaging types specific to a
+    # particular carrier should be prefixed by the carrier's name.
+    _package_id_to_description = {
+        'package': 'Package',  # generic, unmarked box
+        'softpak': 'Softpak'  # generic soft, nonrectangular packaging
+    }
+
     def __init__(self, postal_configuration):
         self.postal_configuration = postal_configuration
         if not postal_configuration:
@@ -94,14 +104,8 @@ class Carrier(object):
 
     @staticmethod
     def cache_key(request):
-        return hash(
-            tuple(sorted(
-                request.packages, key=lambda x: x.cache_hash))
-            + (request.origin, request.destination))
-
-    def create_service(self, service):
-        return Service(
-            self, service, self._code_to_description[service])
+        return hash(tuple(sorted(
+            request.packages, key=lambda x: x.cache_hash)))
 
     def cache_results(self, request, response_dict):
         """
@@ -130,8 +134,11 @@ class Carrier(object):
         raise NotImplementedError
 
     def get_service(self, service_id):
-        return Service(
-            self, service_id, self._code_to_description[service_id])
+        try:
+            return Service(
+                self, service_id, self._code_to_description[service_id])
+        except KeyError:
+            raise NotSupportedError()
 
     def get_origin(self, request):
         return request.origin or self.postal_configuration['shipper_address']
@@ -208,6 +215,28 @@ class Carrier(object):
             return request.extra_params[cls.name][param]
         return request.extra_params[cls.name].get(param, default)
 
+    def get_all_package_types(self):
+        """
+        Returns all package types supported by this carrier.
+        """
+        return (
+            PackageType(
+                (None if code in ('package', 'softpak') else self),
+                code, name
+            )
+            for code, name in self._package_id_to_description.items())
+
+    def get_package_type(self, type_id):
+        """
+        Gets a PackageType object by its type id or raises NotSupportedError
+        if this carrier doesn't support that kind of package.
+        """
+        try:
+            return PackageType(
+                self, type_id, self._package_id_to_description[type_id])
+        except KeyError:
+            raise NotSupportedError()
+
 
 class Service(object):
     def __init__(self, carrier, service_id, name):
@@ -246,8 +275,8 @@ class Service(object):
         """
         return self.carrier.quote(self, request)
 
-    def ship(self, package):
-        return self.carrier.ship(self, package)
+    def ship(self, request):
+        return self.carrier.ship(self, request)
 
     def request_pickup(self, request):
         """

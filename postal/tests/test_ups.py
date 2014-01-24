@@ -10,6 +10,9 @@ logging.basicConfig(level=logging.INFO)
 logging.getLogger('suds.transport').setLevel(logging.DEBUG)
 ###"""
 
+
+
+
 class TestUPS(TestCarrier, unittest.TestCase):
     carrier_class = UPSApi
 
