@@ -70,27 +70,27 @@ class USPSApi(Carrier):
             raise NotSupportedError(
                 "USPS only ships from the United States.")
 
-
     @staticmethod
-    def _service_day(time):
+    def _service_day(proposed_datetime):
         """
         This doesn't catch all holidays, but will stop it from displaying a few
         and Sundays.
         """
         # Sundays
-        if time.weekday == 6:
+        if proposed_datetime.weekday == 6:
             return False
         # Christmas and New Years Eve
-        if time.month == 12 and time.day in [24, 25, 31]:
+        if proposed_datetime.month == 12 and proposed_datetime.day in [
+                24, 25, 31]:
             return False
         # New Years Day
-        if time.month == 1 and time.day == 1:
+        if proposed_datetime.month == 1 and proposed_datetime.day == 1:
             return False
         # Veterans Day
-        if time.month == 11 and time.day == 11:
+        if proposed_datetime.month == 11 and proposed_datetime.day == 11:
             return False
         # Independence day
-        if time.month == 7 and time.day == 4:
+        if proposed_datetime.month == 7 and proposed_datetime.day == 4:
             return False
 
         return True
