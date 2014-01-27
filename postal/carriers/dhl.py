@@ -174,7 +174,12 @@ class DHLApi(Carrier):
 
         rate_request = self.rates_request(request)
         response = self.make_call(rate_request)[0][1]
-        response_dict = self.response_to_dict(response.findall('QtdShp'))
+        try:
+            response_dict = self.response_to_dict(response.findall('QtdShp'))
+        except:
+            print 'Error while interpreting response:'
+            print tostring(response)
+            raise
         self.cache_results(request, response_dict)
 
         return {

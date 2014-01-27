@@ -45,8 +45,15 @@ class Postal:
 
         returns:
 
-        {carrier: 'services': {carrier.get_services() output dict}, 'error':
-            Exception, if no services were found.}
+        {
+            carrier:carriers.Carrier -> {
+                'services' -> dict|None= result of carrier.get_services()
+                                         or None if unsuccessful,
+                'error' -> Exception|None= the problem that occurred
+                                           or None if successful
+            },
+            ... = all loaded carriers represented exactly once
+        }
         """
         if not request.packages:
             raise NotSupportedError('No packages in shipment.')
@@ -54,14 +61,9 @@ class Postal:
         results = Queue()
         for carrier in self.carriers.values():
             threading.Thread(
-                target=task, args=(carrier, request, results)).start()
+                target=_task, args=(carrier, request, results)).start()
 
-        output_dict = {}
-        while len(output_dict) < len(self.carriers):
-            carrier, data_dict = results.get()
-            output_dict[carrier] = data_dict
-
-        return output_dict
+        return dict((results.get() for i in range(len(self.carriers))))
 
     def get_all_services(self):
         """
@@ -100,8 +102,8 @@ class Postal:
         )))
 
 
-def task(carrier, request, results):
-    data_dict = {'services': {}, 'error': None}
+def _task(carrier, request, results):
+    data_dict = {'services': None, 'error': None}
     try:
         data_dict['services'] = carrier.get_services(request)
     except Exception as err:
