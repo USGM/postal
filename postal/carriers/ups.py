@@ -290,9 +290,6 @@ class UPSApi(base.Carrier):
         if request.destination.country.alpha2 in ('CA', 'PR'):
             pass#_populate_money(api_shipment.Shipment.InvoiceLineTotal, ???) TODO
 
-        if request.documents_only():
-            api_shipment.DocumentsOnlyIndicator = ''
-
         _populate_shipper(
             api_shipment.Shipper, origin, self.shipper_number,
             True, True)#, '123456')
@@ -349,8 +346,9 @@ class UPSApi(base.Carrier):
         for package in request.packages:
             pak = self._Ship.factory.create('ns3:PackageType')
 
-            pak.Packaging.Code = _get_package_type_code(
-                package.package_type)
+            pak.Packaging.Code = self.package_type_translate(
+                package.package_type,
+                proprietary=package.carrier_conversion).code
 
             pak.Dimensions.UnitOfMeasurement.Code = 'IN'
             pak.Dimensions.Length = str(package.length)
@@ -537,8 +535,6 @@ class UPSApi(base.Carrier):
 
         shipment = self._RateWS.factory.create('ns2:ShipmentType')
         shipment.ShipmentRatingOptions.NegotiatedRatesIndicator = ''
-        if request.documents_only():
-            shipment.DocumentsOnlyIndicator = ''
 
         if request_type == 'Rate' and service is None:
             raise TypeError()
@@ -578,8 +574,9 @@ class UPSApi(base.Carrier):
                     pak.PackageServiceOptions.DeclaredValue,
                     package.get_total_insured_value())
 
-            pak.PackagingType.Code = _get_package_type_code(
-                package.package_type)
+            pak.PackagingType.Code = self.package_type_translate(
+                package.package_type,
+                proprietary=package.carrier_conversion).code
 
             if pak.PackagingType.Code == '04':  # UPS Pak
                 using_ups_pak = True
@@ -728,7 +725,7 @@ class UPSApi(base.Carrier):
                 invoice,
 
                 # DocumentsOnlyIndicator (missing tag = false)
-                ('' if request.documents_only() else None),
+                None,
 
                 # BillType
                 # This field needs to be populated when UPS WorldWide
@@ -791,19 +788,27 @@ class UPSApi(base.Carrier):
 
         return _get_negotiated_charge(rated_shipment)
 
+    _to_proprietary_packaging = {
+        'softpak': '04',
+        'envelope': '01'}
+
+    _generic_package_translation = {
+        'package': '02',
+        'softpak': '02'}
+
     _package_id_to_description = dict(
         ### UPS supports generic boxes and softpaks; they are both code '02'
         base.Carrier._package_id_to_description.items() + {
-            '01': 'UPS: Letter',
-            '03': 'UPS: Tube',
-            '04': 'UPS: Pak',
-            '21': 'UPS: Express Box',
-            '24': 'UPS: 25kg Box',
-            '25': 'UPS: 10kg Box',
-            '30': 'UPS: Pallet',
-            '2a': 'UPS: Small Express Box',
-            '2b': 'UPS: Medium Express Box',
-            '2c': 'UPS: Large Express Box'
+            '01': 'Letter',
+            '03': 'Tube',
+            '04': 'Pak',
+            '21': 'Express Box',
+            '24': '25kg Box',
+            '25': '10kg Box',
+            '30': 'Pallet',
+            '2a': 'Small Express Box',
+            '2b': 'Medium Express Box',
+            '2c': 'Large Express Box'
             ### For FRS rating requests the
             ### only valid value is customer
             ### supplied packaging 02.
@@ -899,14 +904,6 @@ def _get_money(node):
 def _populate_money(node, value):
     node.CurrencyCode = value.currency
     node.MonetaryValue = str(value.amount)
-
-
-def _get_package_type_code(package_type):
-    if package_type.code == 'package':
-        return '02'
-    if package_type.code == 'softpak':
-        return '02'
-    return package_type.code
 
 
 _service_code_to_time_in_transit_code = {

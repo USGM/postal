@@ -44,6 +44,25 @@ class FedExApi(Carrier):
         'EUROPE_FIRST_INTERNATIONAL_PRIORITY': 'Europe First '
                                                'International Priority'}
 
+    # To get FedEx's packaging advantages, you must use their packaging.
+    _generic_package_translation = {
+        'package': 'YOUR_PACKAGING'}
+
+    # We only apply these translations to envelopes/softpaks. Not to packages,
+    # since there are too many options there, and it's too easy to go out of
+    # bounds.
+    _to_proprietary_packaging = {
+        'envelope': 'FEDEX_ENVELOPE',
+        'softpak': 'FEDEX_PAK'}
+
+    _package_id_to_description = {
+        'FEDEX_10KG_BOX': '10kg Box',
+        'FEDEX_25KG_BOX': '25kg Box',
+        'FEDEX_BOX': 'Box',
+        'FEDEX_ENVELOPE': 'Envelope',
+        'FEDEX_PAK': 'Pak',
+        'FEDEX_TUBE': 'Tube'}
+
     def create_client(self, wsdl_name):
         client = Client(
             self.service_url(wsdl_name), plugins=[ClearEmpty()],
@@ -190,10 +209,13 @@ class FedExApi(Carrier):
         api_request.ShipTimestamp = request.ship_datetime or datetime.now()
         api_request.ServiceType = service.service_id
         api_request.DropoffType = 'REGULAR_PICKUP'
-        if package.document:
-            api_request.PackagingType = 'FEDEX_ENVELOPE'
+        if len(request.packages) == 1:
+            api_request.PackagingType = self.package_type_translate(
+                package.package_type,
+                proprietary=package.carrier_conversion).code
         else:
             api_request.PackagingType = 'YOUR_PACKAGING'
+
         api_request.RateRequestTypes = 'ACCOUNT'
         self.set_address(api_request.Shipper, origin)
         self.set_address(api_request.Recipient, request.destination)
@@ -208,7 +230,7 @@ class FedExApi(Carrier):
             api_request.MasterTrackingId = tracking_number
         if not tracking_number:
             api_request.TotalWeight.Value = sum(
-                [int(ceil(pack.weight)) for pack in request.packages])
+                [pack.weight for pack in request.packages])
             api_request.TotalWeight.Units = 'LB'
         api_request.PackageCount = len(request.packages)
         self.line_items(
@@ -277,13 +299,14 @@ class FedExApi(Carrier):
             item.GroupNumber = 1
             item.GroupPackageCount = 1
             item.Weight.Units.value = 'LB'
-            item.Weight.Value = int(ceil(package.weight))
+            item.Weight.Value = package.weight
 
-            dimensions = item.Dimensions
-            dimensions.Height = int(ceil(package.height))
-            dimensions.Width = int(ceil(package.width))
-            dimensions.Length = int(ceil(package.length))
-            dimensions.Units = 'IN'
+            if api_request.PackagingType == 'YOUR_PACKAGING':
+                dimensions = item.Dimensions
+                dimensions.Height = int(ceil(package.height))
+                dimensions.Width = int(ceil(package.width))
+                dimensions.Length = int(ceil(package.length))
+                dimensions.Units = 'IN'
 
             if package.declarations:
                 self.set_declarations(client, api_request, package)
@@ -354,6 +377,11 @@ class FedExApi(Carrier):
 
         api_request.RateRequestTypes = 'ACCOUNT'
         api_request.PackageCount = len(request.packages)
+        if len(request.packages) == 1:
+            package = request.packages[0]
+            api_request.PackagingType = self.package_type_translate(
+                package.package_type,
+                proprietary=package.carrier_conversion).code
 
         self.line_items(
             self.rates_client, api_request, request.packages)

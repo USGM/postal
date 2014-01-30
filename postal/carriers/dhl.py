@@ -55,16 +55,27 @@ class DHLApi(Carrier):
         'H': 'Economy Select',
         'W': 'Economy Select'}
 
+    _generic_package_translation = {
+        'softpak': 'CP',
+        'package': 'CP'}
+
+    _to_proprietary_packaging = {
+        'envelope': 'EE',
+        'softpak': 'OD'}
+
+    _package_id_to_description = {
+        'EE': 'Express Envelope',
+        'OD': 'Other DHL Packaging'}
+
     def __init__(
-            self, account_number, region_code, company_name, default_currency,
-            site_id, password, test_mode=False, postal_configuration=None):
+            self, account_number, region_code, company_name, site_id,
+            password, test_mode=False, postal_configuration=None):
         super(DHLApi, self).__init__(postal_configuration)
         self.site_id = site_id
         self.password = password
         self.account_number = account_number
         self.region_code = region_code
         self.company_name = company_name
-        self.default_currency = default_currency
 
         if test_mode:
             self.url = 'https://xmlpitest-ea.dhl.com/XMLShippingServlet'
@@ -336,7 +347,7 @@ class DHLApi(Carrier):
             'total_weight': total_weight,
             'region_code': self.region_code,
             'company_name': self.company_name,
-            'default_currency': self.default_currency,
+            'default_currency': self.postal_configuration['default_currency'],
             'contents': self.contents(request),
             'product_code': service.service_id}
         non_escape_variables = {

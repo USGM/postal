@@ -49,8 +49,11 @@ class Carrier(object):
     # comparison would not be possible.
     auto_residential = False
     # Most carriers allow a multiship option, where one request can have
-    # multiple packages under a master tracking number.
-    multiship = True
+    # multiple packages under a master tracking number. If a carrier doesn't
+    # offer that, it should be noted that shipping isn't transaction safe.
+    # You will have to handle these carriers differently to clean up after
+    # them.
+    atomic_multiship = True
     cache = {}
 
     # Master dictionary of primarily supported Service Codes. Preferably, this
@@ -61,13 +64,24 @@ class Carrier(object):
     # things like get_all_services() to construct service objects.
     _code_to_description = {}
 
-    # Table of all package types supported by this carrier and the human-
-    # readable names of these codes. Codes for packaging types specific to a
-    # particular carrier should be prefixed by the carrier's name.
-    _package_id_to_description = {
-        'package': 'Package',  # generic, unmarked box
-        'softpak': 'Softpak'  # generic soft, nonrectangular packaging
-    }
+    # Generic packaging types that are usually shippable on all services.
+    generic_packaging_table = {
+        # Generic box
+        'package': 'Package',
+        # Bubble wrapped envelope
+        'softpak': 'Softpak',
+        'envelope': 'Envelope'}
+
+    # Table for all supported packaging types, aside from the generics.
+    _package_id_to_description = {}
+
+    # Translate generic package id types into their IDs for this carrier.
+    _generic_package_translation = {}
+
+    # Used to 'convert' generic packaging types to their proprietary types for
+    # this carrier. For instance, a normal envelope shipping on FedEx should be
+    # stuffed inside a branded FedEx envelope.
+    _to_proprietary_packaging = {}
 
     def __init__(self, postal_configuration):
         self.postal_configuration = postal_configuration
@@ -215,27 +229,67 @@ class Carrier(object):
             return request.extra_params[cls.name][param]
         return request.extra_params[cls.name].get(param, default)
 
-    def get_all_package_types(self):
+    @staticmethod
+    def get_generic_package_types():
+        return [
+            PackageType(
+                None, code, name)
+            for code, name in Carrier.generic_packaging_table.items()]
+
+    def get_package_type(self, code):
+        name = self._package_id_to_description.get(code, None)
+        if not name:
+            raise NotSupportedError(
+                "No packaging code '%s' for %s." % (code, self.name))
+        return PackageType(self, code, name)
+
+    def get_all_package_types(self, generics=True):
         """
         Returns all package types supported by this carrier.
         """
-        return (
+        package_types = [
             PackageType(
-                (None if code in ('package', 'softpak') else self),
-                code, name
-            )
-            for code, name in self._package_id_to_description.items())
+                self, code, name)
+            for code, name in self._package_id_to_description.items()]
+        if generics:
+            package_types += [
+                PackageType(None, code, name)
+                for code, name in self.generic_packaging_table.items()]
+        return package_types
 
-    def get_package_type(self, type_id):
+    def package_type_translate(self, package_type, proprietary=False):
         """
-        Gets a PackageType object by its type id or raises NotSupportedError
-        if this carrier doesn't support that kind of package.
+        Takes a package type, verifies it can be used on this carrier, and
+        converts it to a version that can be used with this carrier if it's
+        generic. If proprietary is true, will attempt to bump up to proprietary
+        packaging.
         """
-        try:
+        code = package_type.code
+        supported_types = self._generic_package_translation.keys()
+        supported_types += self._package_id_to_description.keys()
+        supported_types += self._to_proprietary_packaging.keys()
+        if code not in supported_types:
+            raise NotSupportedError(
+                "Packaging type %s is not available on %s." % (
+                    package_type, self.name))
+        if package_type.carrier != self and package_type.carrier is not None:
+            raise NotSupportedError(
+                "Packaging type %s is not available on %s." % (
+                    package_type, self.name))
+        elif package_type.carrier == self:
+            return package_type
+        prop_code = self._to_proprietary_packaging.get(code, None)
+        if proprietary and prop_code:
             return PackageType(
-                self, type_id, self._package_id_to_description[type_id])
-        except KeyError:
-            raise NotSupportedError()
+                self, prop_code, self._package_id_to_description[prop_code])
+        generic_code = self._generic_package_translation.get(code, None)
+        if not generic_code:
+            raise NotSupportedError(
+                "Package type %s is not available on %s." % (
+                    package_type, self.name))
+        # If we're here, we're just changing the code to the carrier's
+        # proprietary one.
+        return PackageType(self, generic_code, package_type.name)
 
 
 class Service(object):

@@ -3,6 +3,7 @@ These are the data structures used by Postal in order to represent things like
 shipments.
 """
 from decimal import Decimal
+from datetime import datetime
 from pycountry import countries
 import money
 
@@ -131,6 +132,11 @@ class Request(object):
         # immediately if parameter is not iterable.
 
         self.ship_datetime = ship_datetime
+        if ship_datetime is not None and (ship_datetime < datetime.now()):
+            # Ship datetime is in the past. Set to None. Carriers should
+            # interpret this as 'now', or the next available shipping
+            # opportunity.
+            self.ship_datetime = None
 
     def get_total_declared_value(self):
         return stack_values(self.packages, 'get_total_declared_value')
@@ -147,8 +153,8 @@ class Request(object):
         origin = origin or self.origin
         return origin.country.alpha2 != self.destination.country.alpha2
 
-    def documents_only(self):
-        return not any([not a.document for a in self.packages])
+    def total_weight(self):
+        return sum([package.weight for package in self.packages])
 
 
 class PackageType(object):
@@ -163,13 +169,11 @@ class PackageType(object):
         self.name = name
 
     def __eq__(self, other):
-        ### TODO: this won't work if carriers use the same codes
-        ### TODO: it also won't work if it uses the carrier when it's a
-        ### generic packaging type
-        try:
-            return self.code == other.code
-        except AttributeError:
-            return False
+        if not isinstance(other, PackageType):
+            return NotImplemented
+        carrier = getattr(self.carrier, None) == getattr(other.carrier, None)
+        code = self.code == other.code
+        return carrier and code
 
     def __ne__(self, other):
         return not (self == other)
@@ -178,10 +182,10 @@ class PackageType(object):
         return hash(self.code)
 
     def __str__(self):
-        return self.name
+        return "%s %s" % (getattr(self.carrier, 'name', 'Generic'), self.name)
 
     def __repr__(self):
-        return '<' + repr(self.code) + ': ' + repr(self.name) + '>'
+        return '<%s:%s>' % (self.code, str(self))
 
 
 class Package(object):
@@ -205,18 +209,21 @@ class Package(object):
     envelope for FedEx.
     """
     def __init__(
-            self, length, width, height, weight, package_type,
-            declarations=None, imperial=True, document=False):
+            self, length, width, height, weight, package_type=None,
+            carrier_conversion=False, declarations=None, imperial=True):
         self.length = length
         self.width = width
         self.height = height
         self.weight = weight
-        self.package_type = package_type
-        self.document = document
+        self.carrier_conversion = carrier_conversion
         if declarations is None:
             self.declarations = []
         else:
             self.declarations = list(declarations)
+
+        if package_type is None:
+            package_type = PackageType(None, 'package', 'Package')
+        self.package_type = package_type
 
         if not imperial:
             self.imperialize()
@@ -259,8 +266,7 @@ class Package(object):
             'Package(length=' + repr(self.length) + ', width=' +
             repr(self.width) + ', height=' + repr(self.height) + ', weight=' +
             repr(self.weight) + ', declarations=' + repr(self.declarations) +
-            ')'
-        )
+            ')')
 
     def __repr__(self):
         return str(self)
@@ -321,13 +327,16 @@ class Shipment(object):
     to get options for dealing with a package after a shipment has been
     requested, like cancellation.
     """
-    def __init__(self, carrier, tracking_number):
+    def __init__(self, carrier, tracking_number, transaction_id=None):
         """
         carrier:Carrier
         tracking_number:string = the master tracking number of the shipment
+        transaction_id:string = Transaction ID. Used when a tracking number is
+        not provided, but a shipment can still be referenced via API.
         """
         self.tracking_number = tracking_number
         self.carrier = carrier
+        self.transaction_id = transaction_id
 
     def cancel(self):
         raise NotImplementedError
