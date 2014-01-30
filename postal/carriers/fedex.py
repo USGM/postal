@@ -116,7 +116,8 @@ class FedExApi(Carrier):
         addr = result.Address
         return Address(
             contact_name=original.contact_name,
-            street_lines=list(addr.StreetLines),
+            street_lines=list(
+                getattr(addr, 'StreetLines', original.street_lines)),
             city=addr.City,
             subdivision=addr.StateOrProvinceCode,
             postal_code=addr.PostalCode,
@@ -362,10 +363,7 @@ class FedExApi(Carrier):
 
     @staticmethod
     def get_real_price(info, method_details):
-        try:
-            actual_type = info.ActualRateType
-        except AttributeError as err:
-            raise err
+        actual_type = info.ActualRateType  # May raise AttributeError
         price = None
         for rating in method_details:
             try:
@@ -427,7 +425,7 @@ class FedExApi(Carrier):
             service.service_id, None)
         if not data:
             raise NotSupportedError(
-                "USPS does not support shipment of that package on "
+                "FedEx does not support shipment of that package on "
                 "this service.")
         return data['delivery_datetime']
 
@@ -438,7 +436,7 @@ class FedExApi(Carrier):
             service.service_id, None)
         if not data:
             raise NotSupportedError(
-                "USPS does not support shipment of that package on this "
+                "FedEx does not support shipment of that package on this "
                 "service.")
         return data['price']
 
