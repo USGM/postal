@@ -5,8 +5,9 @@ Front-end for the Postal Library.
 import threading
 from Queue import Queue
 import sys
-import itertools
 from .exceptions import PostalError, NotSupportedError
+from carriers import Carrier
+from data import PackageType
 
 
 class Postal:
@@ -63,7 +64,7 @@ class Postal:
             threading.Thread(
                 target=_task, args=(carrier, request, results)).start()
 
-        return dict((results.get() for i in range(len(self.carriers))))
+        return dict((results.get() for _ in range(len(self.carriers))))
 
     def get_all_services(self):
         """
@@ -74,20 +75,20 @@ class Postal:
                 yield service
 
     def get_service(self, carrier_name, service_id):
-        for key in self.carriers:
-            if key == carrier_name:
-                return self.carriers[key].get_service(service_id)
-        raise NotSupportedError()
+        if carrier_name not in self.carriers:
+            raise PostalError(
+                "A carrier named '%s' does not exist." % carrier_name)
+        return self.carriers[carrier_name].get_service(service_id)
 
-    def get_package_type(self, carrier_name, type_id):
-        for key in self.carriers:
-            ### if no carrier specified, check all carriers
-            if not carrier_name or key == carrier_name:
-                try:
-                    return self.carriers[key].get_package_type(type_id)
-                except NotSupportedError:
-                    continue
-        raise NotSupportedError()
+    def get_package_type(self, carrier_name, code):
+        if not carrier_name:
+            carrier = None
+        else:
+            carrier = self.carriers[carrier_name]
+        if not carrier:
+            name = Carrier.generic_packaging_table[code]
+            return PackageType(None, code, name)
+        return carrier.get_package_type(code)
 
     def get_all_package_types(self):
         """
@@ -96,10 +97,11 @@ class Postal:
         will yield limited rates results because most package types are
         carrier-specific.
         """
-        return set(itertools.chain(*(
-            carrier.get_all_package_types()
-            for carrier in self.carriers.values()
-        )))
+        for carrier in self.carriers.values():
+            for package_type in carrier.get_all_package_types(generics=False):
+                yield package_type
+        for package_type in Carrier.get_generic_package_types():
+            yield package_type
 
 
 def _task(carrier, request, results):

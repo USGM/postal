@@ -1,5 +1,19 @@
 """
-This is the module for interfacing with FedEx's web services APIs.
+This is the module for interfacing with USPS via the Endicia Lable Server API.
+
+Multiship is supported but in a peculiar way. Because USPS does not support
+multiship directly, it must be faked by chaining transactions. As a group of
+these transactions is not atomic, it is possible to have a request return a
+shipment dictionary where some of the packages were processed and others
+weren't. These packages can then be retried.
+
+Packages that fail will have neither a tracking number nor a label when
+returned.
+
+It was considered that an exception could be raised when this happened, but to
+do so would mean that some packages would have been shipped, and others would
+not have. Automatically refunding the packages would also be problematic, as
+the cause of the original problem might also prevent the refund working.
 """
 from base64 import b64decode
 from datetime import datetime
@@ -23,7 +37,6 @@ class USPSApi(Carrier):
     """
     name = 'USPS'
     address_validation = False
-    multiship = False
     _code_to_description = {
         'PriorityExpress': 'Priority Mail Express',
         'First': 'First-Class Mail',
@@ -36,6 +49,29 @@ class USPSApi(Carrier):
         'FirstClassPackageInternationalService': 'First Class Package '
                                                  'International Service',
         'PriorityMailInternational': 'Priority Mail International'}
+
+    _generic_package_translation = {
+        'envelope': 'Letter',
+        'softpak': 'Parcel',
+        'package': 'Parcel'}
+
+    _to_proprietary_packaging = {
+        'envelope': 'FlatRateEnvelope',
+        'softpak': 'FlatRatePaddedEnvelope'}
+
+    _package_id_to_description = {
+        'FlatRateEnvelope': 'Flat Rate Envelope',
+        'FlatRateLegalEnvelope': 'Flat Rate Legal Envelope',
+        'FlatRatePaddedEnvelope': 'Flate Rate Padded Envelope',
+        'SmallFlatRateEnvelope': ' Small Flat Rate Envelope',
+        'SmallFlatRateBox': 'Small Flat Rate Box',
+        'MediumFlatRateBox': 'Medium Flat Rate Box',
+        'LargeFlatRateBox': 'Large Flat Rate Box'}
+
+    # Needed when figuring out what label to print.
+    _parcel_types = (
+        'softpak', 'SmallFlatRateBox', 'MediumFlatRateBox', 'LargeFlatRateBox'
+        'Parcel')
 
     def __init__(
             self, account_id, passphrase, requester_id, token,
@@ -62,10 +98,6 @@ class USPSApi(Carrier):
 
     def _sanity_check(self, request):
         origin = self.get_origin(request)
-        if len(request.packages) != 1:
-            raise NotSupportedError(
-                "USPS will only accept requests with one"
-                " parcel, not %s" % len(request.packages))
         if origin.country.alpha2 != 'US':
             raise NotSupportedError(
                 "USPS only ships from the United States.")
@@ -129,10 +161,13 @@ class USPSApi(Carrier):
             [package.length, package.width, package.height])
         api_request.WeightOz = package.weight * 16
         api_request.Machinable = True
-        if package.document:
-            api_request.MailpieceShape = 'Flat'
+        package_type = self.package_type_translate(
+            package.package_type, proprietary=package.carrier_conversion).code
+        if package_type == 'softpak':
+            api_request.PackageTypeIndicator = 'Softpak'
+            api_request.MailPieceShape = 'Package'
         else:
-            api_request.MailpieceShape = 'Parcel'
+            api_request.MailpieceShape = package_type
 
     def _set_creds(self, api_request, inset=False):
         api_request.RequesterID = self.requester_id
@@ -231,9 +266,11 @@ class USPSApi(Carrier):
         output.write(output_stream)
         return output_stream.getvalue()
 
-    def _label_type(self, request, service):
+    def _label_type(self, request, service, package):
         origin = self.get_origin(request)
-        if request.packages[0].document:
+        package_type = self.package_type_translate(
+            package.package_type, proprietary=package.carrier_conversion).code
+        if package_type not in self._parcel_types:
             package_type = 'Flat'
         else:
             package_type = 'Parcel'
@@ -251,18 +288,17 @@ class USPSApi(Carrier):
             return 'FORM2976A'
         return 'FORM2976A'
 
-    def ship(self, service, request):
-        self._sanity_check(request)
+    def ship_package(self, request, service, package):
         label_request = self.client.factory.create('LabelRequest')
         label_request.MailClass = service.service_id
         label_request.PartnerTransactionID = self.ref_number()
-        package = request.packages[0]
         self._set_dims(label_request, package)
         self._insurance_params(label_request, package)
         self._set_creds(label_request)
         self._set_address_info(label_request, request)
         label_request._ImageFormat = 'PDF'
-        label_format = self._label_type(request, service)
+        label_format = self._label_type(request, service, package)
+        label_request.Stealth = 'TRUE'
         if request.international(origin=self.get_origin(request)):
             label_request._LabelType = 'International'
             label_request._LabelSubtype = 'Integrated'
@@ -289,7 +325,8 @@ class USPSApi(Carrier):
             tracking_number = response.TrackingNumber
         else:
             tracking_number = None
-        shipment = Shipment(self, tracking_number)
+        shipment = Shipment(
+            self, tracking_number, transaction_id=response.PIC)
         price = Money(response.FinalPostage, 'USD')
         try:
             label = self._format_label(response.Base64LabelImage, label_format)
@@ -305,6 +342,39 @@ class USPSApi(Carrier):
                 package: {
                     'tracking_number': tracking_number,
                     'label': label}}}
+
+    def compile_shipments(self, response_list):
+        packages_source = [response['packages'] for response in response_list]
+        packages = {}
+        for pack in packages_source:
+            packages.update(pack)
+        shipments = [
+            response['shipment'].transaction_id for response in response_list]
+        price = sum(response['price'] for response in response_list)
+        if len(packages) == 1:
+            tracking_number = packages.values()[0]['tracking_number']
+        else:
+            tracking_number = None
+        shipment = Shipment(
+            self, tracking_number or 'N/A', transaction_id=':'.join(shipments))
+        return {'shipment': shipment, 'price': price, 'packages': packages}
+
+    def ship(self, service, request):
+        self._sanity_check(request)
+        # Too dangerous to allow multiship if any packages don't work. So we
+        # force a rate check before doing anything else. This should raise
+        # an exception if there's a problem with any of the packages.
+        self.quote(service, request)
+        responses = []
+        for package in request.packages:
+            try:
+                responses.append(self.ship_package(request, service, package))
+            except CarrierError:
+                # One of the packages didn't ship correctly.
+                responses.append({
+                    'packages': {package: {
+                        'label': None, 'tracking_number': None}}})
+        return self.compile_shipments(responses)
 
     def refill(self, dollar_amount):
         """
@@ -332,25 +402,55 @@ class USPSApi(Carrier):
         self.service_call(self.client.service.ChangePassPhrase, change_request)
         self.passphrase = new_passphrase
 
+    @staticmethod
+    def compile_options(response_list):
+        service_sets = [
+            {service for service in response.keys()}
+            for response in response_list]
+        # Get services that can work on all packages.
+        try:
+            services = set.intersection(*service_sets)
+        except TypeError:
+            return {}
+        final_response = {}
+        for service in services:
+            price = sum(
+                [response[service]['price'] for response in response_list])
+            # The latest delivery date will be our estimate.
+            datetimes = []
+            for response in response_list:
+                delivery = response[service]['delivery_datetime']
+                if delivery is not None:
+                    datetimes.append(delivery)
+            if not datetimes:
+                delivery_datetime = None
+            else:
+                delivery_datetime = max(datetimes)
+            final_response[service] = {
+                'price': price, 'delivery_datetime': delivery_datetime}
+        return final_response
+
     def get_services(self, request):
         self._sanity_check(request)
-        postage_request = self.client.factory.create('PostageRatesRequest')
-        package = request.packages[0]
-        self._set_dims(postage_request, package)
-        self._set_address_info(postage_request, request, short=True)
-        self._set_creds(postage_request, inset=True)
-        self._insurance_params(postage_request, package)
-        postage_request.DeliveryTimeDays = "TRUE"
-        response = self.service_call(
-            self.client.service.CalculatePostageRates, postage_request)
-        response_dict = self._request_response_table(request, response)
-        self.cache_results(request, response_dict)
-        return response_dict
+        responses = []
+        for package in request.packages:
+            postage_request = self.client.factory.create('PostageRatesRequest')
+            self._set_dims(postage_request, package)
+            self._set_address_info(postage_request, request, short=True)
+            self._set_creds(postage_request, inset=True)
+            self._insurance_params(postage_request, package)
+            postage_request.DeliveryTimeDays = "TRUE"
+            response = self.service_call(
+                self.client.service.CalculatePostageRates, postage_request)
+            response_dict = self._request_response_table(request, response)
+            responses.append(response_dict)
+        responses = self.compile_options(responses)
+        self.cache_results(request, responses)
+        return responses
 
     def delivery_datetime(self, service, request):
         response = self.get_services(request)
         try:
-            print response
             return response[service]['delivery_datetime']
         except KeyError:
             raise NotSupportedError(
@@ -360,7 +460,6 @@ class USPSApi(Carrier):
     def quote(self, service, request):
         response = self.get_services(request)
         try:
-            print response
             return response[service]['price']
         except KeyError:
             raise NotSupportedError(

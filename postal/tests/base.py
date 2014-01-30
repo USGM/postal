@@ -9,7 +9,8 @@ from money.Money import Money
 
 from ..carriers.base import Service, Carrier
 
-from ..data import Address, Package, Declaration, Shipment, Request
+from ..data import Address, Package, Declaration, Shipment, Request, \
+    PackageType
 
 test_from = {
     'street_lines': ['1321 Upland Drive'],
@@ -93,11 +94,12 @@ class TestCarrier(object):
         self.test_from = Address(**test_from)
         self.test_to = Address(**test_to)
         self.european_address = Address(**test_european)
-        self.domestic_package = Package(2, 3, 4, .3, self.carrier.get_package_type('package'))
-        self.domestic_package2 = Package(4, 6, 6, 4, self.carrier.get_package_type('package'))
-        self.documents = Package(9, 12, .1, .2, self.carrier.get_package_type('package'), document=True)
-        self.international_package = Package(3, 4, 5, 6, self.carrier.get_package_type('package'))
-        self.international_package2 = Package(4, 2, 5, 28, self.carrier.get_package_type('package'))
+        self.domestic_package = Package(2, 3, 4, .3)
+        self.domestic_package2 = Package(4, 6, 6, 4)
+        self.documents = Package(9, 12, .1, .2, PackageType(
+            None, 'envelope', 'Envelope'))
+        self.international_package = Package(3, 4, 5, 6)
+        self.international_package2 = Package(4, 2, 5, 28)
 
         self.domestic_request = Request(
             self.test_from, self.test_to, [
@@ -133,8 +135,6 @@ class TestCarrier(object):
                 self.assertIsInstance(info['delivery_datetime'], datetime)
 
     def services_multiship(self):
-        if not self.carrier.multiship:
-            raise SkipTest("Carrier does not support Multiship.")
         self.request.packages.append(self.package2)
         services = self.carrier.get_services(self.request)
         self.assertTrue(services)
@@ -253,8 +253,6 @@ class TestCarrier(object):
         self.shipment_dict_check(sdict)
 
     def multiship(self):
-        if not self.carrier.multiship:
-            raise SkipTest
         self.request.packages.append(self.package2)
         services = self.carrier.get_services(self.request)
         sdict = services.keys()[0].ship(self.request)
@@ -267,8 +265,6 @@ class TestCarrier(object):
         self.assertEqual(ship_dict['price'], serv_dict['price'])
 
     def rate_ship_match_multiship(self):
-        if not self.carrier.multiship:
-            raise SkipTest
         self.request.packages.append(self.package2)
         services = self.carrier.get_services(self.request)
         service, serv_dict = services.items()[0]

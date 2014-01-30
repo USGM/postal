@@ -75,8 +75,10 @@ base_postal_configuration = {
         # uspstechsupport@esecurecare.net And tell them you are using third
         # party software to be allowed to use real-world transactions.
         'USPS': {
-            'user_id': '',
-            'password': '',
+            'account_id': 123456,
+            'passphrase': 'password',
+            'requester_id': 123456,
+            'token': 123456}}}
             # Like DHL, USPS uses the same credentials for both production and
             # testing.
-            'test_mode': True}}}
+            #'test_mode': True}}
