@@ -172,12 +172,16 @@ class DHLApi(Carrier):
             key = quote.findtext('GlobalProductCode')
             if not key:
                 continue
-            response_dict[key] = {
-                'service_name': quote.find('LocalProductName').text.title(),
-                'delivery_datetime': DHLApi.from_timestr(
-                    quote.findtext('DeliveryDate') or ''
-                    + quote.findtext('DeliveryTime') or ''),
-                'price': DHLApi.get_price(quote)}
+            try:
+                response_dict[key] = {
+                    'service_name': quote.find(
+                        'LocalProductName').text.title(),
+                    'delivery_datetime': DHLApi.from_timestr(
+                        quote.findtext('DeliveryDate') or ''
+                        + quote.findtext('DeliveryTime') or ''),
+                    'price': DHLApi.get_price(quote)}
+            except CarrierError:
+                continue
         return response_dict
 
     def get_services(self, request):
@@ -188,8 +192,6 @@ class DHLApi(Carrier):
         try:
             response_dict = self.response_to_dict(response.findall('QtdShp'))
         except:
-            print 'Error while interpreting response:'
-            print tostring(response)
             raise
         self.cache_results(request, response_dict)
 
