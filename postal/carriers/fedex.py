@@ -203,6 +203,7 @@ class FedExApi(Carrier):
         FedEx supports Multiship, but only one package at a time. They have to
         be 'added' to the initial request with secondary requests.
         """
+        self._ensure_supported(request)
         origin = request.origin or self.postal_configuration['shipper_address']
 
         api_request = self.ship_client.factory.create('RequestedShipment')
@@ -238,6 +239,7 @@ class FedExApi(Carrier):
         return api_request
 
     def ship(self, service, request):
+        self._ensure_supported(request)
         auth = self.authentication(self.ship_client)
         client_detail = self.user_client(self.ship_client)
         transaction_detail = self.transaction_detail(self.ship_client)
@@ -369,6 +371,7 @@ class FedExApi(Carrier):
         value.Currency = total_value.currency
 
     def requested_shipment_rate(self, request):
+        self._ensure_supported(request)
         api_request = self.rates_client.factory.create('RequestedShipment')
 
         origin = request.origin or self.postal_configuration['shipper_address']
@@ -423,6 +426,7 @@ class FedExApi(Carrier):
         """
         Get available services for shipping a package.
         """
+        self._ensure_supported(request)
         auth = self.authentication(self.rates_client)
         client = self.user_client(self.rates_client)
         transaction_detail = self.transaction_detail(self.rates_client)
@@ -447,6 +451,7 @@ class FedExApi(Carrier):
         return final
 
     def delivery_datetime(self, service, request):
+        self._ensure_supported(request)
         if not self.cache_key(request) in self.cache:
             self.get_services(request)
         data = self.cache[self.cache_key(request)].get(
@@ -458,6 +463,7 @@ class FedExApi(Carrier):
         return data['delivery_datetime']
 
     def quote(self, service, request):
+        self._ensure_supported(request)
         if not self.cache_key(request) in self.cache:
             self.get_services(request)
         data = self.cache[self.cache_key(request)].get(
@@ -467,6 +473,12 @@ class FedExApi(Carrier):
                 "FedEx does not support shipment of that package on this "
                 "service.")
         return data['price']
+
+    def _ensure_supported(self, request):
+        if request.destination.subdivision and \
+                len(request.destination.subdivision) > 2:
+            raise NotSupportedError(
+                'FedEx requires the state or province to be 2 letters long.')
 
 # Need to find a way to dynamically get all carriers.
 # Also need to find a proper way to specify their inits.

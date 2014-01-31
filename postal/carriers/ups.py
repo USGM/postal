@@ -130,7 +130,7 @@ Void = Client(
     cache=suds.cache.NoCache())
 
 
-def _on_webfault(webfault):
+def _convert_webfault(webfault):
     error = webfault.fault.detail.Errors.ErrorDetail.PrimaryErrorCode
 
     if error.Code == '111210':
@@ -213,6 +213,7 @@ class UPSApi(base.Carrier):
 
         # different name when originating from Mexico
         '54': 'Worldwide Express Plus',
+
         '59': 'Second Day Air A.M.',
         '65': 'Saver',
         '96': 'Worldwide Express Freight'}
@@ -333,11 +334,12 @@ class UPSApi(base.Carrier):
             ### in order to acquire billing information.
             bill_receiver.BillReceiver.AccountNumber = receiver_account_number
 
-            #api_shipment.ShipmentServiceOptions.InternationalForms.InsuranceCharges.MonetaryValue = str(request.get_total_insured_value().amount)
-
-            api_shipment.ShipmentServiceOptions.InternationalForms.FormType = '01'
-            api_shipment.ShipmentServiceOptions.InternationalForms.CurrencyCode = request.get_total_insured_value().currency
-            api_shipment.ShipmentServiceOptions.InternationalForms.InvoiceDate = datetime.now().strftime('%Y%m%d')
+            api_shipment.ShipmentServiceOptions.InternationalForms. \
+                FormType = '01'
+            api_shipment.ShipmentServiceOptions.InternationalForms. \
+                CurrencyCode = request.get_total_insured_value().currency
+            api_shipment.ShipmentServiceOptions.InternationalForms. \
+                InvoiceDate = datetime.now().strftime('%Y%m%d')
 
 
         api_package = []
@@ -351,11 +353,15 @@ class UPSApi(base.Carrier):
                 proprietary=package.carrier_conversion).code
 
             pak.Dimensions.UnitOfMeasurement.Code = 'IN'
-            pak.Dimensions.Length = str(package.length)
-            pak.Dimensions.Width = str(package.width)
-            pak.Dimensions.Height = str(package.height)
+
+            ### Specify too many decimal digits here and it says that
+            ### "every dimension is required and must be > zero".
+            ### Seriously, UPS?
+            pak.Dimensions.Length = '%.2f' % package.length
+            pak.Dimensions.Width = '%.2f' % package.width
+            pak.Dimensions.Height = '%.2f' % package.height
             pak.PackageWeight.UnitOfMeasurement.Code = 'LBS'
-            pak.PackageWeight.Weight = str(package.weight)
+            pak.PackageWeight.Weight = '%.1f' % package.weight
             if is_large(package):
                 pak.LargePackageIndicator = ''
 
@@ -410,7 +416,7 @@ class UPSApi(base.Carrier):
             response = self._Ship.service.ProcessShipment(
                 api_request, api_shipment, label_spec, receipt_spec)
         except WebFault as err:
-            raise _on_webfault(err)
+            raise _convert_webfault(err)
 
         published_rate = _get_money(
             response.ShipmentResults.ShipmentCharges.TotalCharges)
@@ -559,11 +565,11 @@ class UPSApi(base.Carrier):
             pak = self._RateWS.factory.create('ns2:PackageType')
 
             pak.Dimensions.UnitOfMeasurement.Code = 'IN'
-            pak.Dimensions.Length = str(package.length)
-            pak.Dimensions.Width = str(package.width)
-            pak.Dimensions.Height = str(package.height)
+            pak.Dimensions.Length = '%.2f' % package.length
+            pak.Dimensions.Width = '%.2f' % package.width
+            pak.Dimensions.Height = '%.2f' % package.height
             pak.PackageWeight.UnitOfMeasurement.Code = 'LBS'
-            pak.PackageWeight.Weight = str(package.weight)
+            pak.PackageWeight.Weight = '%.1f' % package.weight
             if is_large(package):
                 pak.LargePackageIndicator = ''
 
@@ -599,7 +605,7 @@ class UPSApi(base.Carrier):
             rates = self._RateWS.service.ProcessRate(
                 api_request, _pickup_type, _customer_classification, shipment)
         except WebFault as err:
-            raise _on_webfault(err)
+            raise _convert_webfault(err)
 
         if rates.Response.ResponseStatus.Code != '1':  # 1 = Success
             _on_unknown_error()
@@ -634,7 +640,7 @@ class UPSApi(base.Carrier):
                 address_key)
 
         except WebFault as err:
-            raise _on_webfault(err)
+            raise _convert_webfault(err)
 
         if response.Response.ResponseStatus.Code != '1':
             _on_unknown_error()
@@ -657,11 +663,11 @@ class UPSApi(base.Carrier):
         result = Address(
             contact_name=address.contact_name,
             phone_number=address.phone_number,
-            street_lines=candidate.AddressKeyFormat.AddressLine + (
+            street_lines=candidate.AddressKeyFormat.AddressLine + (((
                 [candidate.AddressKeyFormat.Urbanization]
                 if hasattr(candidate.AddressKeyFormat, 'Urbanization') else
                 []
-            ),
+            ))),
             subdivision=candidate.AddressKeyFormat.PoliticalDivision1,
             city=candidate.AddressKeyFormat.PoliticalDivision2,
             postal_code=postal_code,
@@ -751,10 +757,10 @@ class UPSApi(base.Carrier):
                 None)
 
         except WebFault as err:
-            raise _on_webfault(err)
+            raise _convert_webfault(err)
 
         if response.Response.ResponseStatus.Code != '1':
-            raise Exception()
+            _on_unknown_error()
 
         for summary in response.TransitResponse.ServiceSummary:
             if (

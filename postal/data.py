@@ -193,7 +193,7 @@ class Package(object):
     Package objects represent the parcels that will be shipped and what their
     value is.
 
-    All carriers support Imperial units, but have spotty support for Metric.
+    All carriers support imperial units, but have spotty support for metric.
     It is with great annoyance that we have therefore made the default units
     imperial. You can convert your measurements on the fly by setting imperial
     to false.
