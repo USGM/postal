@@ -70,7 +70,7 @@ class USPSApi(Carrier):
 
     # Needed when figuring out what label to print.
     _parcel_types = (
-        'softpak', 'SmallFlatRateBox', 'MediumFlatRateBox', 'LargeFlatRateBox'
+        'softpak', 'SmallFlatRateBox', 'MediumFlatRateBox', 'LargeFlatRateBox',
         'Parcel')
 
     def __init__(
@@ -276,7 +276,9 @@ class USPSApi(Carrier):
             package_type = 'Parcel'
         if not request.international(origin):
             return 'Domestic'
-        if service.service_id == 'FirstClassMailInternational':
+        if service.service_id in [
+                'FirstClassMailInternational',
+                'FirstClassPackageInternationalService']:
             return 'FORM2976'
         if (service.service_id == 'PriorityMailInternational') and (
                 package_type == 'Parcel'):
@@ -317,16 +319,25 @@ class USPSApi(Carrier):
                 float(package.weight) / len(package.declarations) /
                 declaration.units))
             label_request.CustomsInfo.CustomsItems.CustomsItem.append(item)
-            label_request.CustomsInfo.ContentsType = self.get_param(
-                request, 'contents', 'Gift')
+            if request.documents_only():
+                label_request.CustomsInfo.ContentsType = 'Documents'
+            else:
+                label_request.CustomsInfo.ContentsType = self.get_param(
+                    request, 'contents', 'Gift')
         response = self.service_call(
             self.client.service.GetPostageLabel, label_request)
         if hasattr(response, 'TrackingNumber'):
             tracking_number = response.TrackingNumber
         else:
             tracking_number = None
+        if not tracking_number and not hasattr(response, 'PIC'):
+            print label_request
+            print response
+            raise CarrierError(response.ErrorMessage)
+        elif not tracking_number:
+            tracking_number = response.PIC
         shipment = Shipment(
-            self, tracking_number, transaction_id=response.PIC)
+            self, tracking_number, transaction_id=tracking_number)
         price = Money(response.FinalPostage, 'USD')
         try:
             label = self._format_label(response.Base64LabelImage, label_format)
@@ -349,14 +360,13 @@ class USPSApi(Carrier):
         for pack in packages_source:
             packages.update(pack)
         shipments = [
-            response['shipment'].transaction_id for response in response_list]
+            response['shipment'].transaction_id for response in response_list
+            if 'shipment' in response]
         price = sum(response['price'] for response in response_list)
-        if len(packages) == 1:
-            tracking_number = packages.values()[0]['tracking_number']
-        else:
-            tracking_number = None
         shipment = Shipment(
-            self, tracking_number or 'N/A', transaction_id=':'.join(shipments))
+            self, 'N/A', transaction_id=':'.join(shipments))
+        if not shipment.transaction_id:
+            raise CarrierError("All packages failed to make it through.")
         return {'shipment': shipment, 'price': price, 'packages': packages}
 
     def ship(self, service, request):
@@ -366,10 +376,13 @@ class USPSApi(Carrier):
         # an exception if there's a problem with any of the packages.
         self.quote(service, request)
         responses = []
+        if len(request.packages) == 1:
+            return self.ship_package(request, service, request.packages[0])
         for package in request.packages:
             try:
                 responses.append(self.ship_package(request, service, package))
-            except CarrierError:
+            except CarrierError as err:
+                print "ERROR: %s" % err
                 # One of the packages didn't ship correctly.
                 responses.append({
                     'packages': {package: {

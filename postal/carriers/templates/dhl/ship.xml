@@ -30,7 +30,7 @@
         <Contents>{contents}</Contents>
         <DimensionUnit>I</DimensionUnit>
         <InsuredAmount>{insured_amount}</InsuredAmount>
-        <IsDutiable>Y</IsDutiable>
+        <IsDutiable>{is_dutiable}</IsDutiable>
         <CurrencyCode>{insured_currency}</CurrencyCode>
     </ShipmentDetails>
     <Shipper>

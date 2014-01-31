@@ -67,10 +67,15 @@ class FedExApi(Carrier):
         client = Client(
             self.service_url(wsdl_name), plugins=[ClearEmpty()],
             timeout=self.postal_configuration['timeout'])
+        for service in client.wsdl.services:
+            for port in service.ports:
+                location = port.location
+        if not self.test:
+            client.set_options(location=location.replace('beta', ''))
         return client
 
     def __init__(
-            self, key, account_number, password, meter_number,
+            self, key, account_number, password, meter_number, test=True,
             postal_configuration=None):
         super(FedExApi, self).__init__(postal_configuration)
         self.postal_configuration = postal_configuration
@@ -78,6 +83,7 @@ class FedExApi(Carrier):
         self.account_number = account_number
         self.password = password
         self.meter_number = meter_number
+        self.test = test
 
         self.rates_client = self.create_client('RateService_v14.wsdl')
 
@@ -210,6 +216,8 @@ class FedExApi(Carrier):
         api_request.ShipTimestamp = request.ship_datetime or datetime.now()
         api_request.ServiceType = service.service_id
         api_request.DropoffType = 'REGULAR_PICKUP'
+        if request.documents_only():
+            api_request.InternationalDocuments = 'DOCUMENTS_ONLY'
         if len(request.packages) == 1:
             api_request.PackagingType = self.package_type_translate(
                 package.package_type,

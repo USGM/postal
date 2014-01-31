@@ -156,6 +156,9 @@ class Request(object):
     def total_weight(self):
         return sum([package.weight for package in self.packages])
 
+    def documents_only(self):
+        return all([package.documents_only for package in self.packages])
+
 
 class PackageType(object):
     """
@@ -202,20 +205,19 @@ class Package(object):
     and for calculating the insured value.
 
     The document flag can be used to indicate if the contents are documents
-    only. In the case that they are, services offering document transport may
-    be prioritized and lower fares may apply. This may also change how height
-    is handled, but height should still be specified. You should only use this
-    flag if you have appropriate document packaging, such as the FedEx
-    envelope for FedEx.
+    only. You might need this if you're sending a bunch of printed documents in
+    a box.
     """
     def __init__(
             self, length, width, height, weight, package_type=None,
-            carrier_conversion=False, declarations=None, imperial=True):
+            documents_only=False, carrier_conversion=False, declarations=None,
+            imperial=True):
         self.length = length
         self.width = width
         self.height = height
         self.weight = weight
         self.carrier_conversion = carrier_conversion
+        self.documents_only = documents_only
         if declarations is None:
             self.declarations = []
         else:

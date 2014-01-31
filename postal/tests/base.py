@@ -96,8 +96,10 @@ class TestCarrier(object):
         self.european_address = Address(**test_european)
         self.domestic_package = Package(2, 3, 4, .3)
         self.domestic_package2 = Package(4, 6, 6, 4)
+        # sending documents in a package needs to be tested for.
         self.documents = Package(9, 12, .1, .2, PackageType(
-            None, 'envelope', 'Envelope'))
+            None, 'package', 'Package'))
+        self.documents.carrier_conversion = True
         self.international_package = Package(3, 4, 5, 6)
         self.international_package2 = Package(4, 2, 5, 28)
 
@@ -114,7 +116,7 @@ class TestCarrier(object):
             Declaration('Emotional Baggage', Money('49.00', 'USD'), 'US', 5),
             Declaration('Dehydrated Water', Money('53.40', 'USD'), 'US', 10)]
         self.document_declaration = [
-            Declaration('Divorce papers', Money('0.00', 'USD'), 'US', 1)]
+            Declaration('Divorce papers', Money('1.00', 'USD'), 'US', 1)]
         self.international_package.declarations = self.declarations
         self.international_package2.declarations = self.declarations2
         self.documents.declarations = self.document_declaration
@@ -271,6 +273,12 @@ class TestCarrier(object):
         ship_dict = service.ship(self.request)
         self.assertEqual(ship_dict['price'], serv_dict['price'])
 
+    def ship_documents(self):
+        self.request.packages = [self.documents]
+        services = self.carrier.get_services(self.request)
+        sdict = services.keys()[0].ship(self.request)
+        self.shipment_dict_check(sdict)
+
     test_domestic_services = domestic(services)
     test_domestic_services_multiship = domestic(services_multiship)
     test_domestic_delayed_shipment = domestic(delayed_shipment)
@@ -282,6 +290,7 @@ class TestCarrier(object):
     test_domestic_rate_ship_match = domestic(rate_ship_match)
     test_domestic_rate_ship_match_multiship = domestic(
         rate_ship_match_multiship)
+    test_domestic_ship_documents = domestic(ship_documents)
     test_international_services = international(services)
     test_international_services_multiship = international(services_multiship)
     test_international_delayed_shipment = international(delayed_shipment)
@@ -292,3 +301,4 @@ class TestCarrier(object):
     test_international_rate_ship_match = international(rate_ship_match)
     test_international_rate_ship_match_multiship = international(
         rate_ship_match_multiship)
+    test_international_ship_documents = international(ship_documents)

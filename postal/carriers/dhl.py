@@ -13,11 +13,13 @@ DHL rarely ships domestically, and trying to handle domestic shipments with
 them results in a lot of traps. We therefore disable domestic shipments with
 DHL.
 """
+from math import ceil
+import random
 from base64 import b64decode
 from datetime import datetime
-import random
+from decimal import Decimal
 from time import timezone
-from xml.etree.ElementTree import fromstring, tostring
+from xml.etree.ElementTree import fromstring
 
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from StringIO import StringIO
@@ -29,6 +31,11 @@ from .base import Carrier, Service
 from .templates.constructor import load_template, populate_template
 from ..exceptions import CarrierError, NotSupportedError
 from ..data import Shipment, TWOPLACES
+
+
+def sigfig(amount):
+    return Decimal(amount).quantize(TWOPLACES)
+
 
 class DHLApi(Carrier):
     name = 'DHL'
@@ -287,8 +294,10 @@ class DHLApi(Carrier):
         for number, package in enumerate(request.packages):
             result.append(populate_template(
                 template, {
-                    'length': package.length, 'width': package.width,
-                    'height': package.height, 'weight': package.weight,
+                    'length': int(ceil(package.length)),
+                    'width': int(ceil(package.width)),
+                    'height': int(ceil(package.height)),
+                    'weight': sigfig(package.weight),
                     'number': number + 1}))
         return ''.join(result)
 
@@ -305,6 +314,10 @@ class DHLApi(Carrier):
         ship_date = ship_datetime.strftime('%Y-%m-%d')
         hour = ship_datetime.hour
         minute = ship_datetime.minute
+        if request.documents_only():
+            is_dutiable = ''
+        else:
+            is_dutiable = 'Y'
 
         tz_offset = self.timezone_offset()
         escape_variables = {
@@ -313,6 +326,7 @@ class DHLApi(Carrier):
             'ship_date': ship_date,
             'hour': hour,
             'minute': minute,
+            'is_dutiable': is_dutiable,
             'destination_country': request.destination.country.alpha2,
             'destination_postal_code': request.destination.postal_code,
             'tz_offset': tz_offset}
@@ -337,6 +351,10 @@ class DHLApi(Carrier):
         total_weight = sum([package.weight for package in request.packages])
 
         insured = request.get_total_insured_value()
+        if request.documents_only():
+            is_dutiable = ''
+        else:
+            is_dutiable = 'Y'
 
         escape_variables = {
             'origin_country': origin.country.alpha2,
@@ -351,6 +369,7 @@ class DHLApi(Carrier):
             'company_name': self.company_name,
             'default_currency': self.postal_configuration['default_currency'],
             'contents': self.contents(request),
+            'is_dutiable': is_dutiable,
             'product_code': service.service_id}
         non_escape_variables = {
             'origin_address': origin_address,

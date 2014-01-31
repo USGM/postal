@@ -16,6 +16,9 @@ base_postal_configuration = {
     # http://en.wikipedia.org/wiki/ISO_4217
     'default_currency': 'USD',
 
+    # The Tax ID of your shipping organization.
+    'tax_id': '',
+
     # The following are options for setting up the default carriers. Each
     # carrier's options are paired with their key, which is their name
     # property.
@@ -34,7 +37,8 @@ base_postal_configuration = {
             # Every device using FedEx's API is expected to have its own meter
             # number. You should have received one when signing up to use the
             # API, and can ask for an additional one if needed.
-            'meter_number': 0},
+            'meter_number': 0,
+            'test': True},
 
 
         # You can request an API key from DHL at:

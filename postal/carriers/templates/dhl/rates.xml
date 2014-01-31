@@ -18,7 +18,7 @@
             <Pieces>
             {pieces}
             </Pieces>
-            <IsDutiable>Y</IsDutiable>
+            <IsDutiable>{is_dutiable}</IsDutiable>
             {insured}
         </BkgDetails>
         <To>
