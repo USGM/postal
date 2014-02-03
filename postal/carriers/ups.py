@@ -293,7 +293,8 @@ class UPSApi(base.Carrier):
 
         _populate_shipper(
             api_shipment.Shipper, origin, self.shipper_number,
-            True, True)#, '123456')
+            True, True, self.postal_configuration['tax_id']
+        )
         _populate_address(
             api_shipment.ShipTo, request.destination, use_phone=True,
             use_attn=True)
@@ -334,12 +335,12 @@ class UPSApi(base.Carrier):
             ### in order to acquire billing information.
             bill_receiver.BillReceiver.AccountNumber = receiver_account_number
 
-            api_shipment.ShipmentServiceOptions.InternationalForms. \
-                FormType = '01'
-            api_shipment.ShipmentServiceOptions.InternationalForms. \
-                CurrencyCode = request.get_total_insured_value().currency
-            api_shipment.ShipmentServiceOptions.InternationalForms. \
-                InvoiceDate = datetime.now().strftime('%Y%m%d')
+            api_shipment.ShipmentServiceOptions.InternationalForms \
+                .FormType = '01'
+            api_shipment.ShipmentServiceOptions.InternationalForms \
+                .CurrencyCode = request.get_total_insured_value().currency
+            api_shipment.ShipmentServiceOptions.InternationalForms \
+                .InvoiceDate = datetime.now().strftime('%Y%m%d')
 
 
         api_package = []
@@ -554,7 +555,8 @@ class UPSApi(base.Carrier):
         origin = request.origin or self.postal_configuration['shipper_address']
         international = (origin.country != request.destination.country)
 
-        _populate_shipper(shipment.Shipper, origin, self.shipper_number)
+        _populate_shipper(
+            shipment.Shipper, origin, self.shipper_number)
         _populate_address(shipment.ShipFrom, origin)
         _populate_address(shipment.ShipTo, request.destination)
 
@@ -597,9 +599,10 @@ class UPSApi(base.Carrier):
             # US/PR Outbound to non US/PR
             # destination with the
             # PackagingType of UPS PAK(04)
-            raise NotImplementedError()
+
             #shipment.InvoiceLineTotal.CurrencyCode = 'USD'
             #shipment.InvoiceLineTotal.MonetaryValue = '0'
+            pass  # let UPS raise a webfault if this is actually required
 
         try:
             rates = self._RateWS.service.ProcessRate(
