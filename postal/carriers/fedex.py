@@ -10,7 +10,7 @@ from suds.client import Client
 from money import Money
 
 from base import Carrier, ClearEmpty
-from ..exceptions import CarrierError, NotSupportedError
+from ..exceptions import CarrierError, NotSupportedError, PostalError
 from ..data import Address, Shipment
 
 
@@ -67,9 +67,12 @@ class FedExApi(Carrier):
         client = Client(
             self.service_url(wsdl_name), plugins=[ClearEmpty()],
             timeout=self.postal_configuration['timeout'])
+        location = ''
         for service in client.wsdl.services:
             for port in service.ports:
                 location = port.location
+        if not location:
+            raise PostalError("Couldn't load the remote URL for FedEx.")
         if not self.test:
             client.set_options(location=location.replace('beta', ''))
         return client
@@ -244,6 +247,11 @@ class FedExApi(Carrier):
         api_request.PackageCount = len(request.packages)
         self.line_items(
             self.ship_client, api_request, [package], sequence_num)
+        signature = self.sig_handler(request, self.ship_client)
+        special_services = api_request.SpecialServicesRequested
+        if signature:
+            special_services.SpecialServicesTypes = ['SIGNATURE_OPTION']
+            special_services.SignatureOptionDetail = signature
         return api_request
 
     def ship(self, service, request):
@@ -398,6 +406,12 @@ class FedExApi(Carrier):
             self.rates_client, api_request, request.packages)
         api_request.ShipTimestamp = request.ship_datetime
 
+        signature = self.sig_handler(request, self.ship_client)
+        special_services = api_request.SpecialServicesRequested
+        if signature:
+            special_services.SpecialServicesTypes = ['SIGNATURE_OPTION']
+            special_services.SignatureOptionDetail = signature
+
         return api_request
 
     @staticmethod
@@ -429,6 +443,16 @@ class FedExApi(Carrier):
                 'delivery_datetime': getattr(
                     method, 'DeliveryTimestamp', None)}
             for method in response.RateReplyDetails}
+
+    def sig_handler(self, request, client):
+        sig = self.get_param(request, 'signature', None)
+        if not sig:
+            return None
+        if not sig in ['Direct', 'Adult', 'Indirect']:
+            raise NotSupportedError("Signature type not supportedL %s." % sig)
+        sig_option = client.factory.create('SignatureOptionDetail')
+        sig_option.OptionType = sig.upper()
+        return sig_option
 
     def get_services(self, request):
         """
