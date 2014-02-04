@@ -96,11 +96,12 @@ class Address(object):
         return Address(
             contact_name=self.contact_name,
             phone_number=self.phone_number,
-            street_lines=self.street_lines,  # automatically copied by constructor
+            # automatically copied by constructor
+            street_lines=self.street_lines,
             city=self.city,
             subdivision=self.subdivision,
             postal_code=self.postal_code,
-            country=self.country,
+            country=self.country.alpha2,
             residential=self.residential
         )
 

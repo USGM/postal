@@ -147,7 +147,7 @@ class FedExApi(Carrier):
             street_lines=list(
                 getattr(addr, 'StreetLines', original.street_lines)),
             city=addr.City,
-            subdivision=addr.StateOrProvinceCode,
+            subdivision=getattr(addr, 'StateOrProvinceCode', ''),
             postal_code=addr.PostalCode,
             country=addr.CountryCode,
             residential=residential,
