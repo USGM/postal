@@ -293,13 +293,15 @@ class Carrier(object):
 
 
 class Service(object):
-    def __init__(self, carrier, service_id, name):
+    def __init__(self, carrier, service_id, name, trackable=True):
         self.carrier = carrier
         # Unique identifier for use with a carrier's get_service() method.
         # This should always be a string.
         self.service_id = service_id
         # The display name for a service, such as 'Priority Mail International'
         self.name = name
+        # Whether a shipment on this service can be fully tracked.
+        self.trackable = trackable
 
     def __str__(self):
         return "%s: %s" % (self.carrier.name, self.name)
