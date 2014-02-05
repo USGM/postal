@@ -83,9 +83,9 @@ class Address(object):
 
     def __str__(self):
         return (
-            self.contact_name + ' ' + self.phone_number + '\n' +
+            str(self.contact_name) + ' ' + str(self.phone_number) + '\n' +
             str(self.street_lines) + '\n' +
-            self.city + ', ' + self.subdivision + ' ' +
+            str(self.city) + ', ' + str(self.subdivision) + ' ' +
             str(self.postal_code) + ' ' + self.country.alpha2 + '\n' +
             'Residential: ' + str(self.residential))
 

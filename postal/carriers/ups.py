@@ -232,6 +232,7 @@ class UPSApi(base.Carrier):
             'file://' + os.path.join(
                 get_directory_of(inspect.currentframe()),
                 'wsdl', 'ups', 'RateWS.wsdl'),
+            cache=suds.cache.NoCache(),
             plugins=[
                 authentication, FixBrokenRateNamespace(),
                 FixMissingRatesNegotiatedRates()
@@ -241,12 +242,14 @@ class UPSApi(base.Carrier):
             'file://' + os.path.join(
                 get_directory_of(inspect.currentframe()),
                 'wsdl', 'ups', 'XAV.wsdl'),
+            cache=suds.cache.NoCache(),
             plugins=[authentication, FixBrokenAddressNamespace()],
             timeout=postal_configuration['timeout'])
         self._TNTWS = Client(
             'file://' + os.path.join(
                 get_directory_of(inspect.currentframe()),
                 'wsdl', 'ups', 'TNTWS.wsdl'),
+            cache=suds.cache.NoCache(),
             plugins=[authentication, FixBrokenTimeNamespace()],
             timeout=postal_configuration['timeout'])
         self._Ship = Client(
@@ -260,26 +263,21 @@ class UPSApi(base.Carrier):
                 FixInternationalNamespaces()
             ],
             timeout=postal_configuration['timeout'])
-        self.TNTWS = Client(
-            'file://' + os.path.join(
-                get_directory_of(inspect.currentframe()),
-                'wsdl', 'ups', 'TNTWS.wsdl'),
-            cache=suds.cache.NoCache(),
-            plugins=[
-                AuthenticationPlugin(
-                    username, password, access_license_number),
-                FixBrokenTimeNamespace()],
-            timeout=postal_configuration['timeout'])
 
     def ship(self, service, request, receiver_account_number=None):
         _ensure_request_supported(request)
 
         origin = request.origin or self.postal_configuration['shipper_address']
+        international = (origin.country != request.destination.country)
 
         api_request = self._Ship.factory.create('ns0:RequestType')
         api_request.RequestOption = 'validate'
 
         api_shipment = self._Ship.factory.create('ns3:ShipmentType')
+
+        if international and request.documents_only():
+            api_shipment.DocumentsOnlyIndicator = ''
+
         api_shipment.ShipmentRatingOptions.NegotiatedRatesIndicator = ''
         api_shipment.Service.Code = service.service_id
 
@@ -303,8 +301,6 @@ class UPSApi(base.Carrier):
             api_shipment.ShipFrom, origin, use_phone=True,
             use_attn=True)
 
-        international = (origin.country != request.destination.country)
-
         shipper_charge = self._Ship.factory.create('ns3:ShipmentChargeType')
         api_shipment.PaymentInformation.ShipmentCharge = [shipper_charge]
 
@@ -327,48 +323,12 @@ class UPSApi(base.Carrier):
         shipper_charge.Type = '01'
         shipper_charge.BillShipper.AccountNumber = self.shipper_number
 
-        if international:
-            bill_receiver = self._Ship.factory.create('ns3:ShipmentChargeType')
-            bill_receiver.Type = '02'
-
-            ### Evidently, if this is blank, UPS will contact the receiver
-            ### in order to acquire billing information.
-            bill_receiver.BillReceiver.AccountNumber = receiver_account_number
-
-            api_shipment.ShipmentServiceOptions.InternationalForms \
-                .FormType = '01'
-            api_shipment.ShipmentServiceOptions.InternationalForms \
-                .CurrencyCode = request.get_total_insured_value().currency
-            api_shipment.ShipmentServiceOptions.InternationalForms \
-                .InvoiceDate = datetime.now().strftime('%Y%m%d')
-
-
         api_package = []
         api_product = []
 
         for package in request.packages:
             pak = self._Ship.factory.create('ns3:PackageType')
-
-            pak.Packaging.Code = self.package_type_translate(
-                package.package_type,
-                proprietary=package.carrier_conversion).code
-
-            pak.Dimensions.UnitOfMeasurement.Code = 'IN'
-
-            ### Specify too many decimal digits here and it says that
-            ### "every dimension is required and must be > zero".
-            ### Seriously, UPS?
-            pak.Dimensions.Length = '%.2f' % package.length
-            pak.Dimensions.Width = '%.2f' % package.width
-            pak.Dimensions.Height = '%.2f' % package.height
-            pak.PackageWeight.UnitOfMeasurement.Code = 'LBS'
-            pak.PackageWeight.Weight = '%.1f' % package.weight
-            if is_large(package):
-                pak.LargePackageIndicator = ''
-
-            _populate_money(
-                pak.PackageServiceOptions.DeclaredValue,
-                package.get_total_insured_value())
+            self._populate_package(pak, package)
 
             api_package.append(pak)
 
@@ -386,6 +346,20 @@ class UPSApi(base.Carrier):
         api_shipment.Package = api_package
 
         if international:
+            bill_receiver = self._Ship.factory.create('ns3:ShipmentChargeType')
+            bill_receiver.Type = '02'
+
+            ### Evidently, if this is blank, UPS will contact the receiver
+            ### in order to acquire billing information.
+            bill_receiver.BillReceiver.AccountNumber = receiver_account_number
+
+            api_shipment.ShipmentServiceOptions.InternationalForms \
+                .FormType = '01'
+            api_shipment.ShipmentServiceOptions.InternationalForms \
+                .CurrencyCode = request.get_total_insured_value().currency
+            api_shipment.ShipmentServiceOptions.InternationalForms \
+                .InvoiceDate = datetime.now().strftime('%Y%m%d')
+
             api_shipment.ShipmentServiceOptions \
                 .InternationalForms.Product = api_product
             api_shipment.ShipmentServiceOptions.InternationalForms \
@@ -396,6 +370,27 @@ class UPSApi(base.Carrier):
                     .Contacts.SoldTo,
                 request.destination, use_phone=True, use_attn=True)
             #api_shipment.ShipmentServiceOptions.InternationalForms.Contacts.SoldTo.TaxIdentificationNumber = ?????????????
+
+        ### signature requirement upon receipt
+        # Valid values are: 1 -
+        # Delivery Confirmation
+        # Signature Required 2 -
+        # Delivery Confirmation
+        # Adult Signature
+        # Required. Forwards
+        # Only
+        signature_required = self.get_param(request, 'signature', None)
+        if signature_required:
+            if signature_required == 'Adult':
+                api_shipment.ShipmentServiceOptions \
+                    .DeliveryConfirmation.DCISType = 2
+            elif signature_required == 'Indirect':
+                api_shipment.ShipmentServiceOptions \
+                    .DeliveryConfirmation.DCISType = 1
+            else:
+                raise NotSupportedError(
+                    'UPS does not support that signature confirmation method, '
+                    'only indirect and adult-only.')
 
         description = ', '.join([
             a.description
@@ -543,6 +538,9 @@ class UPSApi(base.Carrier):
         shipment = self._RateWS.factory.create('ns2:ShipmentType')
         shipment.ShipmentRatingOptions.NegotiatedRatesIndicator = ''
 
+        if request.documents_only():
+            shipment.DocumentsOnlyIndicator = ''
+
         if request_type == 'Rate' and service is None:
             raise TypeError()
         if request_type == 'Shop' and service is not None:
@@ -565,30 +563,7 @@ class UPSApi(base.Carrier):
         paks = []
         for package in request.packages:
             pak = self._RateWS.factory.create('ns2:PackageType')
-
-            pak.Dimensions.UnitOfMeasurement.Code = 'IN'
-            pak.Dimensions.Length = '%.2f' % package.length
-            pak.Dimensions.Width = '%.2f' % package.width
-            pak.Dimensions.Height = '%.2f' % package.height
-            pak.PackageWeight.UnitOfMeasurement.Code = 'LBS'
-            pak.PackageWeight.Weight = '%.1f' % package.weight
-            if is_large(package):
-                pak.LargePackageIndicator = ''
-
-            if package.get_total_insured_value() > 0:
-                # can't treat Money instance as boolean
-
-                _populate_money(
-                    pak.PackageServiceOptions.DeclaredValue,
-                    package.get_total_insured_value())
-
-            pak.PackagingType.Code = self.package_type_translate(
-                package.package_type,
-                proprietary=package.carrier_conversion).code
-
-            if pak.PackagingType.Code == '04':  # UPS Pak
-                using_ups_pak = True
-
+            self._populate_package(pak, package)
             paks.append(pak)
         shipment.Package = paks
 
@@ -693,6 +668,7 @@ class UPSApi(base.Carrier):
         api_request.RequestOption = ''
 
         origin = request.origin or self.postal_configuration['shipper_address']
+        international = (origin.country != request.destination.country)
 
         req_ship_from = self._TNTWS.factory.create('ns2:RequestShipFromType')
         _populate_address(
@@ -734,7 +710,9 @@ class UPSApi(base.Carrier):
                 invoice,
 
                 # DocumentsOnlyIndicator (missing tag = false)
-                None,
+                (((''
+                   if international and request.documents_only() else
+                   None))),
 
                 # BillType
                 # This field needs to be populated when UPS WorldWide
@@ -797,6 +775,42 @@ class UPSApi(base.Carrier):
 
         return _get_negotiated_charge(rated_shipment)
 
+    def _populate_package(self, pak, package):
+        packaging_code = self.package_type_translate(
+            package.package_type, proprietary=package.carrier_conversion).code
+
+        try:
+            pak.Packaging.Code = packaging_code  # shipping
+        except AttributeError:
+            pak.PackagingType.Code = packaging_code  # rating
+
+        if packaging_code != '01':  # UPS Letter
+            pak.Dimensions.UnitOfMeasurement.Code = 'IN'
+
+            ### Specify too many decimal digits here and it says that
+            ### "every dimension is required and must be > zero".
+            ### Seriously, UPS?
+            pak.Dimensions.Length = '%.2f' % max(1, package.length)
+            pak.Dimensions.Width = '%.2f' % max(1, package.width)
+            pak.Dimensions.Height = '%.2f' % max(1, package.height)
+
+        pak.PackageWeight.UnitOfMeasurement.Code = 'LBS'
+        pak.PackageWeight.Weight = '%.1f' % package.weight
+        if is_large(package):
+            pak.LargePackageIndicator = ''
+
+        _populate_money(
+            pak.PackageServiceOptions.DeclaredValue,
+            package.get_total_insured_value())
+
+        if package.get_total_insured_value() > 0:  # for rates
+            # can't treat Money instance as boolean
+            _populate_money(
+                pak.PackageServiceOptions.DeclaredValue,
+                package.get_total_insured_value())
+
+        return pak
+
     _to_proprietary_packaging = {
         'softpak': '04',
         'envelope': '01'}
@@ -845,6 +859,8 @@ def is_large(package):
     # exceed the maximum UPS size of 165 inches.  An Additional Handling Charge
     # will not be assessed when a Large Package Surcharge is applied.
 
+    if package.package_type.code in ['01', 'envelope']:
+        return False
     return get_length_plus_girth(package) > 130
 
 
@@ -854,8 +870,10 @@ def _ensure_request_supported(request):
 
 
 def _ensure_package_supported(package):
-    if get_length_plus_girth(package) > 165:
-        raise NotSupportedError('UPS does not support packages of that size.')
+    if package.package_type.code not in ['01', 'envelope']:
+        if get_length_plus_girth(package) > 165:
+            raise NotSupportedError(
+                'UPS does not support packages of that size.')
     if package.weight > 150:
         raise NotSupportedError(
             'UPS does not ship packages that weigh more than 150 pounds.')

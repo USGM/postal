@@ -1,6 +1,7 @@
 """
 Front-end for the Postal Library.
 """
+from pprint import pprint
 
 import threading
 from Queue import Queue
@@ -35,6 +36,8 @@ class Postal:
                     **carrier_configs[name])
             except:
                 print 'Error while constructing carrier ' + str(name)
+                print 'with these args: ' + str(carrier_configs[name])
+                pprint(configuration_dict)
                 raise
 
         # Give carriers a back reference to the main postal object.

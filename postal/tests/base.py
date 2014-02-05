@@ -97,9 +97,10 @@ class TestCarrier(object):
         self.domestic_package = Package(2, 3, 4, .3)
         self.domestic_package2 = Package(4, 6, 6, 4)
         # sending documents in a package needs to be tested for.
-        self.documents = Package(9, 12, .1, .2, PackageType(
-            None, 'package', 'Package'))
-        self.documents.carrier_conversion = True
+        self.documents = Package(
+            9, 12, .1, .2,
+            PackageType(None, 'package', 'Package'),
+            documents_only=True)
         self.international_package = Package(3, 4, 5, 6)
         self.international_package2 = Package(4, 2, 5, 28)
 
