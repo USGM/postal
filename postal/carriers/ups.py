@@ -302,7 +302,7 @@ class UPSApi(base.Carrier):
 
         _populate_address(
             api_shipment.ShipFrom, origin, use_phone=True,
-            use_attn=True)
+            use_attn=True)#, use_name=True)
 
         shipper_charge = self._Ship.factory.create('ns3:ShipmentChargeType')
         api_shipment.PaymentInformation.ShipmentCharge = [shipper_charge]
@@ -903,11 +903,18 @@ def _populate_address(
     """
     node = shipment.Shipper|shipment.ShipFrom|shipment.ShipTo
     """
+
+    if len(address.contact_name) > 35:
+        ### TODO: confirm that keeping the contact name short enough solves a problem with shipments with long contact names
+        raise NotSupportedError('UPS requires the contact name to be under 35 '
+                                'characters long. The company name should be '
+                                'in the street lines.')
+
     if use_name:
-        node.Name = address.contact_name
+        # docs say the limit is 35 characters
+        node.Name = address.contact_name[:35]
     if use_street:
         node.Address.AddressLine = address.street_lines
-    #print repr(address.street_lines) + '***'
     node.Address.City = address.city
     if address.subdivision:
         node.Address.StateProvinceCode = address.subdivision.upper()
@@ -919,7 +926,7 @@ def _populate_address(
     if use_phone:
         node.Phone.Number = address.phone_number
     if use_attn:
-        node.AttentionName = address.contact_name
+        node.AttentionName = address.contact_name[:35]
 
 
 def _populate_shipper(
