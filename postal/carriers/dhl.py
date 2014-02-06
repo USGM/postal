@@ -17,7 +17,6 @@ from math import ceil
 import random
 from base64 import b64decode
 from datetime import datetime
-from decimal import Decimal
 from time import timezone
 from xml.etree.ElementTree import fromstring
 
@@ -267,7 +266,7 @@ class DHLApi(Carrier):
     def money_snippet(template_name, request, insurance):
         template = load_template('dhl', template_name)
         for package in request.packages:
-            if not package.declarations:
+            if not package.declarations and not request.documents_only():
                 raise NotSupportedError(
                     "DHL requires all packages to have declarations.")
 
