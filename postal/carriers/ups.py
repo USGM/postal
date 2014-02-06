@@ -221,7 +221,7 @@ class UPSApi(base.Carrier):
 
     def __init__(
             self, username, password, access_license_number, shipper_number,
-            postal_configuration=None):
+            test, postal_configuration=None):
         super(UPSApi, self).__init__(postal_configuration)
         self.shipper_number = shipper_number
 
@@ -263,6 +263,9 @@ class UPSApi(base.Carrier):
                 FixInternationalNamespaces()
             ],
             timeout=postal_configuration['timeout'])
+        if not test:
+            self._Ship.set_options(
+                location='https://onlinetools.ups.com/webservices/Ship')
 
     def ship(self, service, request, receiver_account_number=None):
         _ensure_request_supported(request)
