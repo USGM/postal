@@ -298,7 +298,7 @@ class UPSApi(base.Carrier):
         )
         _populate_address(
             api_shipment.ShipTo, request.destination, use_phone=True,
-            use_attn=True)
+            use_attn=True, use_name=True)
 
         _populate_address(
             api_shipment.ShipFrom, origin, use_phone=True,
