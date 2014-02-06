@@ -110,7 +110,7 @@ class USPSApi(Carrier):
     def service_call(self, func, *args, **kwargs):
         response = super(USPSApi, self).service_call(func, *args, **kwargs)
         try:
-            if response.status != 0:
+            if response.Status != 0:
                 raise CarrierError(response.ErrorMessage)
         except AttributeError:
             pass
@@ -179,7 +179,10 @@ class USPSApi(Carrier):
         dims = api_request.MailpieceDimensions
         dims.Length, dims.Width, dims.Height = sorted(
             [package.length, package.width, package.height])
-        api_request.WeightOz = package.weight * 16
+        ounces = int(ceil(package.weight * 16))
+        if not ounces:
+            ounces = 1
+        api_request.WeightOz = ounces
         api_request.Machinable = True
         package_type = self.package_type_translate(
             package.package_type, proprietary=package.carrier_conversion).code
@@ -244,7 +247,7 @@ class USPSApi(Carrier):
             to_state = request.destination.subdivision.upper()
         else:
             to_state = None
-            
+
         api_request.FromName = origin.contact_name
         api_request.FromState = from_state
         api_request.FromCity = origin.city
