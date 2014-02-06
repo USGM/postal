@@ -310,7 +310,7 @@ class DHLApi(Carrier):
         hour = ship_datetime.hour
         minute = ship_datetime.minute
         if request.documents_only():
-            is_dutiable = ''
+            is_dutiable = 'N'
         else:
             is_dutiable = 'Y'
 
@@ -347,7 +347,7 @@ class DHLApi(Carrier):
 
         insured = request.get_total_insured_value()
         if request.documents_only():
-            is_dutiable = ''
+            is_dutiable = 'N'
         else:
             is_dutiable = 'Y'
 
