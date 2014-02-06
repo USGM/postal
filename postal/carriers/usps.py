@@ -28,8 +28,7 @@ from money import Money
 
 from base import Carrier, ClearEmpty
 from ..exceptions import CarrierError, NotSupportedError
-from ..data import Shipment
-
+from ..data import Shipment, sigfig
 
 class USPSApi(Carrier):
     """
@@ -178,7 +177,8 @@ class USPSApi(Carrier):
     def _set_dims(self, api_request, package):
         dims = api_request.MailpieceDimensions
         dims.Length, dims.Width, dims.Height = sorted(
-            [package.length, package.width, package.height])
+            [sigfig(package.length), sigfig(package.width),
+                sigfig(package.height)])
         ounces = int(ceil(package.weight * 16))
         if not ounces:
             ounces = 1

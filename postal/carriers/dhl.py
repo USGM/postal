@@ -30,11 +30,7 @@ from requests import post, RequestException
 from .base import Carrier, Service
 from .templates.constructor import load_template, populate_template
 from ..exceptions import CarrierError, NotSupportedError
-from ..data import Shipment, TWOPLACES
-
-
-def sigfig(amount):
-    return Decimal(amount).quantize(TWOPLACES)
+from ..data import Shipment, TWOPLACES, sigfig
 
 
 class DHLApi(Carrier):
