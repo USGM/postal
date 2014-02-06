@@ -908,9 +908,16 @@ def _populate_address(
 
     if len(address.contact_name) > 35:
         ### TODO: confirm that keeping the contact name short enough solves a problem with shipments with long contact names
-        raise NotSupportedError('UPS requires the contact name to be under 35 '
-                                'characters long. The company name should be '
-                                'in the street lines.')
+        raise NotSupportedError('UPS requires the contact name to be at most '
+                                '35 characters long. The company name should '
+                                'be in the street lines.')
+    if len(address.street_lines) > 3:
+        raise NotSupportedError(
+            'UPS does not support more than 3 address lines.')
+    for line in address.street_lines:
+        if len(line) > 35:
+            raise NotSupportedError('UPS requires each address line to be '
+                                    'at most 35 characters long.')
 
     if use_name:
         # docs say the limit is 35 characters
