@@ -145,11 +145,12 @@ class FedExApi(Carrier):
         return Address(
             contact_name=original.contact_name,
             street_lines=list(
-                getattr(addr, 'StreetLines', original.street_lines)),
+                getattr(addr, 'StreetLines', original.street_lines[:])),
             city=addr.City,
-            subdivision=getattr(addr, 'StateOrProvinceCode', ''),
-            postal_code=addr.PostalCode,
-            country=addr.CountryCode,
+            subdivision=getattr(
+                addr, 'StateOrProvinceCode', original.subdivision),
+            postal_code=getattr(addr, 'PostalCode', original.postal_code),
+            country=getattr(addr, 'CountryCode', original.country.alpha2),
             residential=residential,
             phone_number=original.phone_number)
 
