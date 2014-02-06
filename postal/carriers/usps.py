@@ -235,12 +235,22 @@ class USPSApi(Carrier):
             api_request.MailClass = 'Domestic'
         if short:
             return
+        if origin.subdivision:
+            from_state = origin.subdivision.upper()
+        else:
+            from_state = None
+
+        if request.destination.subdivision:
+            to_state = request.destination.subdivision.upper()
+        else:
+            to_state = None
+            
         api_request.FromName = origin.contact_name
-        api_request.FromState = origin.subdivision.upper()
+        api_request.FromState = from_state
         api_request.FromCity = origin.city
         api_request.FromPhone = self._format_phone(origin.phone_number)
         api_request.ToName = request.destination.contact_name
-        api_request.ToState = request.destination.subdivision.upper()
+        api_request.ToState = to_state
         api_request.ToCity = request.destination.city
         api_request.ToCountryCode = request.destination.country.alpha2
         self._set_lines(api_request, origin.street_lines, 'Return')

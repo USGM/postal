@@ -219,14 +219,15 @@ class FedExApi(Carrier):
         api_request.ShipTimestamp = request.ship_datetime or datetime.now()
         api_request.ServiceType = service.service_id
         api_request.DropoffType = 'REGULAR_PICKUP'
-        if request.documents_only():
-            api_request.InternationalDocuments = 'DOCUMENTS_ONLY'
         if len(request.packages) == 1:
             api_request.PackagingType = self.package_type_translate(
                 package.package_type,
                 proprietary=package.carrier_conversion).code
         else:
             api_request.PackagingType = 'YOUR_PACKAGING'
+
+        #if request.documents_only():
+        #    api_request.InternationalDocument = 'DOCUMENTS_ONLY'
 
         api_request.RateRequestTypes = 'ACCOUNT'
         self.set_address(api_request.Shipper, origin)
@@ -348,8 +349,9 @@ class FedExApi(Carrier):
         if hasattr(target, 'Contact'):
             target.Contact.PersonName = address.contact_name
             target.Contact.PhoneNumber = address.phone_number
-        if len(address.street_lines) == 3:
+        if len(address.street_lines) == 3 and hasattr(target, 'Contact'):
             target.Contact.CompanyName = address.street_lines[0]
+        elif len(address.street_lines) == 3:
             target_address.StreetLines = address.street_lines[1:]
         else:
             target_address.StreetLines = address.street_lines
@@ -401,6 +403,8 @@ class FedExApi(Carrier):
             api_request.PackagingType = self.package_type_translate(
                 package.package_type,
                 proprietary=package.carrier_conversion).code
+        #if request.documents_only():
+        #    api_request.InternationalDocument = 'DOCUMENTS_ONLY'
 
         self.line_items(
             self.rates_client, api_request, request.packages)
