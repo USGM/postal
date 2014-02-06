@@ -44,6 +44,7 @@ class USPSApi(Carrier):
         'CriticalMail': 'Critical Mail',
         'PriorityMailExpressInternational': 'Priority Mail Express '
                                             'International',
+        'ExpressMailInternational': 'Priority Mail Express International',
         'FirstClassMailInternational': 'First-Class Mail International',
         'FirstClassPackageInternationalService': 'First Class Package '
                                                  'International Service',
