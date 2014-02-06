@@ -924,7 +924,6 @@ def _populate_address(
         node.Address.PostalCode = address.postal_code.replace(' ', '')
     node.Address.CountryCode = address.country.alpha2
     if not international and address.residential:
-        raise Exception()
         node.Address.ResidentialAddressIndicator = ''
     if use_phone:
         node.Phone.Number = address.phone_number
