@@ -90,18 +90,23 @@ class USPSApi(Carrier):
         'Parcel')
 
     def __init__(
-            self, account_id, passphrase, requester_id, token,
+            self, account_id, passphrase, requester_id, test=True,
             postal_configuration=None):
         super(USPSApi, self).__init__(postal_configuration)
         self.account_id = account_id
         self.passphrase = passphrase
         self.requester_id = requester_id
-        self.token = token
         self.postal_configuration = postal_configuration
 
-        self.client = Client(
-            'https://www.envmgr.com/LabelService/EwsLabelService.asmx?WSDL',
-            plugins=[ClearEmpty()])
+        if test:
+            url = 'https://www.envmgr.com/LabelService/EwsLabelService.' \
+                  'asmx?WSDL'
+        else:
+            url = 'https://labelserver.endicia.com/LabelService/' \
+                  'EwsLabelService.asmx?WSDL'
+
+        self.client = Client(url, plugins=[ClearEmpty()])
+
 
     def service_call(self, func, *args, **kwargs):
         response = super(USPSApi, self).service_call(func, *args, **kwargs)
@@ -193,7 +198,6 @@ class USPSApi(Carrier):
             creds = api_request
         creds.AccountID = self.account_id
         creds.PassPhrase = self.passphrase
-        creds.Token = self.token
 
     @staticmethod
     def _insurance_params(api_request, package):
@@ -347,8 +351,6 @@ class USPSApi(Carrier):
         else:
             tracking_number = None
         if not tracking_number and not hasattr(response, 'PIC'):
-            print label_request
-            print response
             raise CarrierError(response.ErrorMessage)
         elif not tracking_number:
             tracking_number = response.PIC
@@ -398,7 +400,6 @@ class USPSApi(Carrier):
             try:
                 responses.append(self.ship_package(request, service, package))
             except CarrierError as err:
-                print "ERROR: %s" % err
                 # One of the packages didn't ship correctly.
                 responses.append({
                     'packages': {package: {
@@ -428,7 +429,11 @@ class USPSApi(Carrier):
         self._set_creds(change_request, inset=True)
         change_request.RequestID = self.ref_number()
         change_request.NewPassPhrase = new_passphrase
-        self.service_call(self.client.service.ChangePassPhrase, change_request)
+        response = self.service_call(
+            self.client.service.ChangePassPhrase, change_request)
+        if response.Status != 0:
+            raise CarrierError(
+                unicode(response.ErrorMessage).encode(encoding='utf-8'))
         self.passphrase = new_passphrase
 
     @staticmethod
