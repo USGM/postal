@@ -694,8 +694,9 @@ class UPSApi(base.Carrier):
         weight = self._TNTWS.factory.create('ns2:ShipmentWeightType')
         weight.UnitOfMeasurement.Code = 'LBS'
 
+        ### UPS's TiT API won't take a weight that is zero
         weight.Weight = str(
-            sum([package.weight for package in request.packages]))
+            max(.1, sum([package.weight for package in request.packages])))
 
         invoice = self._TNTWS.factory.create('ns2:InvoiceLineTotalType')
         _populate_money(invoice, request.get_total_declared_value())
@@ -798,7 +799,9 @@ class UPSApi(base.Carrier):
             pak.Dimensions.Height = '%.2f' % max(1, package.height)
 
         pak.PackageWeight.UnitOfMeasurement.Code = 'LBS'
+
         pak.PackageWeight.Weight = '%.1f' % package.weight
+
         if is_large(package):
             pak.LargePackageIndicator = ''
 
