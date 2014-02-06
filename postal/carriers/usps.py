@@ -68,6 +68,22 @@ class USPSApi(Carrier):
         'MediumFlatRateBox': 'Medium Flat Rate Box',
         'LargeFlatRateBox': 'Large Flat Rate Box'}
 
+    _code_to_trackable = {
+        # This is the only service that is currently known to always generate
+        # a tracking number.
+        'Priority': True,
+
+        # The rest will but only sometimes, depending on the kind of packaging
+        # and its weight.
+        'PriorityExpress': False,
+        'First': False,
+        'StandardPost': False,
+        'CriticalMail': False,
+        'PriorityMailExpressInternational': False,
+        'FirstClassMailInternational': False,
+        'FirstClassPackageInternationalService': False,
+        'PriorityMailInternational': False}
+
     # Needed when figuring out what label to print.
     _parcel_types = (
         'softpak', 'SmallFlatRateBox', 'MediumFlatRateBox', 'LargeFlatRateBox',

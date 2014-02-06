@@ -105,6 +105,9 @@
   <wsdl:service name="ShipService">
     <wsdl:port name="ShipPort" binding="tns:ShipBinding">
       <soap:address location="https://wwwcie.ups.com/webservices/Ship" />
+
+        <!-- https://wwwcie.ups.com/webservices/Ship Integration Testing -->
+        <!-- https://onlinetools.ups.com/webservices/Ship Production -->
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>

@@ -64,6 +64,11 @@ class Carrier(object):
     # things like get_all_services() to construct service objects.
     _code_to_description = {}
 
+    # Maps service codes to boolean flags that indicate whether the service is
+    # trackable. Where unspecified, it is assumed that the service is
+    # trackable.
+    _code_to_trackable = {}
+
     # Generic packaging types that are usually shippable on all services.
     generic_packaging_table = {
         # Generic box
@@ -138,7 +143,7 @@ class Carrier(object):
         specific request, get_services should be used instead.
         """
         return (
-            Service(self, code, name)
+            Service(self, code, name, self._code_to_trackable.get(code, True))
             for code, name in self._code_to_description.items())
 
     def get_services(self, request):
@@ -153,7 +158,8 @@ class Carrier(object):
     def get_service(self, service_id):
         try:
             return Service(
-                self, service_id, self._code_to_description[service_id])
+                self, service_id, self._code_to_description[service_id],
+                self._code_to_trackable.get(service_id, True))
         except KeyError:
             raise NotSupportedError()
 

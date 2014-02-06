@@ -100,11 +100,11 @@ class Postal:
         will yield limited rates results because most package types are
         carrier-specific.
         """
+        for package_type in Carrier.get_generic_package_types():
+            yield package_type
         for carrier in self.carriers.values():
             for package_type in carrier.get_all_package_types(generics=False):
                 yield package_type
-        for package_type in Carrier.get_generic_package_types():
-            yield package_type
 
 
 def _task(carrier, request, results):
