@@ -508,9 +508,10 @@ class FedExApi(Carrier):
 
     def _ensure_supported(self, request):
         if request.destination.subdivision and \
-                len(request.destination.subdivision) > 2:
+                len(request.destination.subdivision) > 3:
             raise NotSupportedError(
-                'FedEx requires the state or province to be 2 letters long.')
+                'FedEx requires the use of ISO_3166-2 state/province codes, '
+                'not names.')
 
 # Need to find a way to dynamically get all carriers.
 # Also need to find a proper way to specify their inits.
