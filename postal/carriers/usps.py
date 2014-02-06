@@ -393,7 +393,8 @@ class USPSApi(Carrier):
         shipments = [
             response['shipment'].transaction_id for response in response_list
             if 'shipment' in response]
-        price = sum(response['price'] for response in response_list)
+        price = sum(response['price'] for response in response_list
+                    if 'price' in response)
         shipment = Shipment(
             self, 'N/A', transaction_id=':'.join(shipments))
         if not shipment.transaction_id:
