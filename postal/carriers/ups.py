@@ -906,7 +906,8 @@ def _populate_address(
         node.Address.AddressLine = address.street_lines
     #print repr(address.street_lines) + '***'
     node.Address.City = address.city
-    node.Address.StateProvinceCode = address.subdivision
+    if address.subdivision:
+        node.Address.StateProvinceCode = address.subdivision.upper()
     if address.postal_code is not None:
         node.Address.PostalCode = address.postal_code.replace(' ', '')
     node.Address.CountryCode = address.country.alpha2
