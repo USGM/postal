@@ -319,7 +319,12 @@ class FedExApi(Carrier):
             item.GroupNumber = 1
             item.GroupPackageCount = 1
             item.Weight.Units.value = 'LB'
-            item.Weight.Value = package.weight
+
+            # FedEx seems to have an internal error when there are too many
+            # decimal digits and it raises a more intelligent error when
+            # the weight of a package is zero. But it doesn't have these
+            # restrictions for the total weight of the shipment.
+            item.Weight.Value = '%.1f' % max(.1, package.weight)
 
             if api_request.PackagingType == 'YOUR_PACKAGING':
                 dimensions = item.Dimensions
