@@ -298,11 +298,11 @@ class UPSApi(base.Carrier):
         )
         _populate_address(
             api_shipment.ShipTo, request.destination, use_phone=True,
-            use_attn=True, use_name=True)
+            use_attn=True, use_name=True, international=international)
 
         _populate_address(
             api_shipment.ShipFrom, origin, use_phone=True,
-            use_attn=True)#, use_name=True)
+            use_attn=True, international=international)#, use_name=True)
 
         shipper_charge = self._Ship.factory.create('ns3:ShipmentChargeType')
         api_shipment.PaymentInformation.ShipmentCharge = [shipper_charge]
@@ -371,7 +371,8 @@ class UPSApi(base.Carrier):
             _populate_address(
                 api_shipment.ShipmentServiceOptions.InternationalForms
                     .Contacts.SoldTo,
-                request.destination, use_phone=True, use_attn=True)
+                request.destination, use_phone=True, use_attn=True,
+                international=True)
             #api_shipment.ShipmentServiceOptions.InternationalForms.Contacts.SoldTo.TaxIdentificationNumber = ?????????????
 
         ### signature requirement upon receipt
@@ -899,7 +900,8 @@ _test_is_large()
 
 def _populate_address(
         node, address, use_street=True,
-        use_name=True, use_phone=False, use_attn=False):
+        use_name=True, use_phone=False, use_attn=False,
+        international=False):
     """
     node = shipment.Shipper|shipment.ShipFrom|shipment.ShipTo
     """
@@ -921,7 +923,8 @@ def _populate_address(
     if address.postal_code is not None:
         node.Address.PostalCode = address.postal_code.replace(' ', '')
     node.Address.CountryCode = address.country.alpha2
-    if address.residential:
+    if not international and address.residential:
+        raise Exception()
         node.Address.ResidentialAddressIndicator = ''
     if use_phone:
         node.Phone.Number = address.phone_number
