@@ -107,7 +107,6 @@ class USPSApi(Carrier):
 
         self.client = Client(url, plugins=[ClearEmpty()])
 
-
     def service_call(self, func, *args, **kwargs):
         response = super(USPSApi, self).service_call(func, *args, **kwargs)
         try:
@@ -237,11 +236,11 @@ class USPSApi(Carrier):
         if short:
             return
         api_request.FromName = origin.contact_name
-        api_request.FromState = origin.subdivision
+        api_request.FromState = origin.subdivision.upper()
         api_request.FromCity = origin.city
         api_request.FromPhone = self._format_phone(origin.phone_number)
         api_request.ToName = request.destination.contact_name
-        api_request.ToState = request.destination.subdivision
+        api_request.ToState = request.destination.subdivision.upper()
         api_request.ToCity = request.destination.city
         api_request.ToCountryCode = request.destination.country.alpha2
         self._set_lines(api_request, origin.street_lines, 'Return')
