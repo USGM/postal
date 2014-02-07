@@ -60,6 +60,7 @@ class USPSApi(Carrier):
         'softpak': 'FlatRatePaddedEnvelope'}
 
     _package_id_to_description = {
+        'Flat': 'Flat',
         'FlatRateEnvelope': 'Flat Rate Envelope',
         'FlatRateLegalEnvelope': 'Flat Rate Legal Envelope',
         'FlatRatePaddedEnvelope': 'Flate Rate Padded Envelope',
