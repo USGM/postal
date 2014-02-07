@@ -325,6 +325,24 @@ class USPSApi(Carrier):
             return 'FORM2976A'
         return 'FORM2976A'
 
+    def tracking_filter(self, tracking_number, service, package):
+        """
+        Some services don't have real tracking numbers, but Endicia likes to
+        pretend they do.
+        """
+        if service.service_id in [
+            'First', 'FirstClassMailInternational',
+                'FirstClassPackageInternationalService']:
+            return ''
+        package_type = self.package_type_translate(
+            package.package_type, proprietary=package.carrier_conversion).code
+        if package_type in ['FlatRateEnvelope', 'FlatRateLegalEnvelope',
+                            'FlatRatePaddedEnvelope', 'SmallFlatRateEnvelope',
+                            'SmallFlatRateBox', 'MediumFlatRateBox',
+                            'LargeFlatRateBox']:
+            return ''
+        return tracking_number
+
     def ship_package(self, request, service, package):
         label_request = self.client.factory.create('LabelRequest')
         label_request.MailClass = service.service_id
@@ -364,10 +382,12 @@ class USPSApi(Carrier):
         if hasattr(response, 'TrackingNumber'):
             tracking_number = response.TrackingNumber
         else:
-            tracking_number = None
+            tracking_number = ''
         if not tracking_number and not hasattr(response, 'PIC'):
             raise CarrierError(response.ErrorMessage)
         transaction_id = None
+        tracking_number = self.tracking_filter(
+            tracking_number, service, package)
         if hasattr(response, 'PIC'):
             transaction_id = response.PIC
         transaction_id = transaction_id or tracking_number
