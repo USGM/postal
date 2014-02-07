@@ -357,7 +357,7 @@ class FedExApi(Carrier):
             target.Contact.PhoneNumber = address.phone_number
         if len(address.street_lines) == 3 and hasattr(target, 'Contact'):
             target.Contact.CompanyName = address.street_lines[0]
-            target.address.StreetLines = address.street_lines[1:]
+            target_address.StreetLines = address.street_lines[1:]
         elif len(address.street_lines) == 3:
             target_address.StreetLines = address.street_lines[1:]
         else:
