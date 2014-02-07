@@ -920,7 +920,7 @@ def _populate_address(
     if address.street_lines:
         if len(address.street_lines) > 3:
             raise NotSupportedError(
-                'UPS does not support more than 3 address lines.')
+                'UPS does not support more than three address lines.')
         for line in address.street_lines:
             if len(line) > 35:
                 raise NotSupportedError('UPS requires each address line to be '
