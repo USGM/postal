@@ -324,7 +324,8 @@ class DHLApi(Carrier):
             'is_dutiable': is_dutiable,
             'destination_country': request.destination.country.alpha2,
             'destination_postal_code': request.destination.postal_code,
-            'tz_offset': tz_offset}
+            'tz_offset': tz_offset,
+            'account_number': self.account_number}
         non_escape_variables = {
             'duties': duties,
             'pieces': pieces,
