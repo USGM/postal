@@ -30,6 +30,7 @@ from base import Carrier, ClearEmpty
 from ..exceptions import CarrierError, NotSupportedError
 from ..data import Shipment, sigfig
 
+
 class USPSApi(Carrier):
     """
     Implements calls to the FedEx web API.
@@ -366,10 +367,12 @@ class USPSApi(Carrier):
             tracking_number = None
         if not tracking_number and not hasattr(response, 'PIC'):
             raise CarrierError(response.ErrorMessage)
-        elif not tracking_number:
-            tracking_number = response.PIC
+        transaction_id = None
+        if hasattr(response, 'PIC'):
+            transaction_id = response.PIC
+        transaction_id = transaction_id or tracking_number
         shipment = Shipment(
-            self, tracking_number, transaction_id=tracking_number)
+            self, tracking_number, transaction_id=transaction_id)
         price = Money(response.FinalPostage, 'USD')
         try:
             label = self._format_label(response.Base64LabelImage, label_format)
