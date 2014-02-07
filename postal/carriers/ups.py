@@ -908,9 +908,9 @@ def _populate_address(
 
     if address.contact_name:
         if len(address.contact_name) > 35:
-            raise NotSupportedError('UPS requires the contact name to be at most '
-                                    '35 characters long. The company name should '
-                                    'be in the street lines.')
+            raise NotSupportedError('UPS requires the contact name to be at '
+                                    'most 35 characters long. The company '
+                                    'name should be in the street lines.')
         if use_name:
             # docs say the limit is 35 characters
             node.Name = address.contact_name[:35]

@@ -58,6 +58,10 @@ class Postal:
         """
         if not request.packages:
             raise NotSupportedError('No packages in shipment.')
+        for i, package in enumerate(request.packages):
+            if package.length < 0 or package.width < 0 or package.height < 0:
+                raise NotSupportedError(
+                    'The dimensions of package #' + str(i) + ' are invalid.')
 
         results = Queue()
         for carrier in self.carriers.values():
