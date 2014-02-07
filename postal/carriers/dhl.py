@@ -18,7 +18,7 @@ import random
 from base64 import b64decode
 from datetime import datetime
 from time import timezone
-from xml.etree.ElementTree import fromstring
+from xml.etree.ElementTree import fromstring, tostring
 
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from StringIO import StringIO
@@ -313,8 +313,19 @@ class DHLApi(Carrier):
             is_dutiable = 'N'
         else:
             is_dutiable = 'Y'
-
         tz_offset = self.timezone_offset()
+        if request.destination.city:
+            destination_city = '<City>%s</City>' % (
+                request.destination.city.upper())
+        else:
+            destination_city = ''
+
+        if origin.city:
+            origin_city = '<City>%s</City>' % origin.city.upper()
+        else:
+            origin_city = ''
+
+        destination_city
         escape_variables = {
             'origin_country': origin.country.alpha2,
             'origin_postal_code': origin.postal_code,
@@ -329,6 +340,8 @@ class DHLApi(Carrier):
         non_escape_variables = {
             'duties': duties,
             'pieces': pieces,
+            'destination_city': destination_city,
+            'origin_city': origin_city,
             'request_header': request_header,
             'insured': self.money_snippet('insured.xml', request, True)}
         request = populate_template(

@@ -7,6 +7,7 @@
         <From>
             <CountryCode>{origin_country}</CountryCode>
             <Postalcode>{origin_postal_code}</Postalcode>
+            {origin_city}
         </From>
         <BkgDetails>
             <PaymentCountryCode>{origin_country}</PaymentCountryCode>
@@ -25,6 +26,7 @@
         <To>
             <CountryCode>{destination_country}</CountryCode>
             <Postalcode>{destination_postal_code}</Postalcode>
+            {destination_city}
         </To>
         {duties}
     </GetQuote>
