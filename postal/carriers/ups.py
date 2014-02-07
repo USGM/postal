@@ -906,24 +906,28 @@ def _populate_address(
     node = shipment.Shipper|shipment.ShipFrom|shipment.ShipTo
     """
 
-    if len(address.contact_name) > 35:
-        ### TODO: confirm that keeping the contact name short enough solves a problem with shipments with long contact names
-        raise NotSupportedError('UPS requires the contact name to be at most '
-                                '35 characters long. The company name should '
-                                'be in the street lines.')
-    if len(address.street_lines) > 3:
-        raise NotSupportedError(
-            'UPS does not support more than 3 address lines.')
-    for line in address.street_lines:
-        if len(line) > 35:
-            raise NotSupportedError('UPS requires each address line to be '
-                                    'at most 35 characters long.')
+    if address.contact_name:
+        if len(address.contact_name) > 35:
+            raise NotSupportedError('UPS requires the contact name to be at most '
+                                    '35 characters long. The company name should '
+                                    'be in the street lines.')
+        if use_name:
+            # docs say the limit is 35 characters
+            node.Name = address.contact_name[:35]
+        if use_attn:
+            node.AttentionName = address.contact_name[:35]
 
-    if use_name:
-        # docs say the limit is 35 characters
-        node.Name = address.contact_name[:35]
-    if use_street:
-        node.Address.AddressLine = address.street_lines
+    if address.street_lines:
+        if len(address.street_lines) > 3:
+            raise NotSupportedError(
+                'UPS does not support more than 3 address lines.')
+        for line in address.street_lines:
+            if len(line) > 35:
+                raise NotSupportedError('UPS requires each address line to be '
+                                        'at most 35 characters long.')
+            if use_street:
+                node.Address.AddressLine = address.street_lines
+
     node.Address.City = address.city
     if address.subdivision:
         node.Address.StateProvinceCode = address.subdivision.upper()
@@ -934,8 +938,6 @@ def _populate_address(
         node.Address.ResidentialAddressIndicator = ''
     if use_phone:
         node.Phone.Number = address.phone_number
-    if use_attn:
-        node.AttentionName = address.contact_name[:35]
 
 
 def _populate_shipper(
