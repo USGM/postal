@@ -201,7 +201,8 @@ class DHLApi(Carrier):
         return {
             Service(self, key, value['service_name']): {
                 'price': value['price'],
-                'delivery_datetime': value['delivery_datetime']}
+                'delivery_datetime': value['delivery_datetime'],
+                'trackable': True}
             for key, value in response_dict.items()}
 
     def get_service(self, service_id):

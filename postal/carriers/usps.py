@@ -160,7 +160,7 @@ class USPSApi(Carrier):
         for delta in range(0, days + 1):
             date += relativedelta(days=delta)
             while not cls._service_day(date):
-                date += relativedelta(1)
+                date += relativedelta(days=1)
         return date
 
     def _request_response_table(self, request, response):
