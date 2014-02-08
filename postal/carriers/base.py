@@ -64,16 +64,11 @@ class Carrier(object):
     # things like get_all_services() to construct service objects.
     _code_to_description = {}
 
-    # Maps service codes to boolean flags that indicate whether the service is
-    # trackable. Where unspecified, it is assumed that the service is
-    # trackable.
-    _code_to_trackable = {}
-
-    # Generic packaging types that are usually shippable on all services.
+    # Names of generic packaging types that are usually shippable on all
+    # services.
     generic_packaging_table = {
         # Generic box
         'package': 'Package',
-        # Bubble wrapped envelope
         'softpak': 'Softpak',
         'envelope': 'Envelope'}
 
@@ -143,7 +138,7 @@ class Carrier(object):
         specific request, get_services should be used instead.
         """
         return (
-            Service(self, code, name, self._code_to_trackable.get(code, True))
+            Service(self, code, name)
             for code, name in self._code_to_description.items())
 
     def get_services(self, request):
@@ -158,8 +153,7 @@ class Carrier(object):
     def get_service(self, service_id):
         try:
             return Service(
-                self, service_id, self._code_to_description[service_id],
-                self._code_to_trackable.get(service_id, True))
+                self, service_id, self._code_to_description[service_id])
         except KeyError:
             raise NotSupportedError()
 
@@ -274,43 +268,36 @@ class Carrier(object):
         packaging.
         """
         code = package_type.code
-        supported_types = self._generic_package_translation.keys()
-        supported_types += self._package_id_to_description.keys()
-        supported_types += self._to_proprietary_packaging.keys()
-        if code not in supported_types:
-            raise NotSupportedError(
-                "Packaging type %s is not available on %s." % (
-                    package_type, self.name))
-        if package_type.carrier != self and package_type.carrier is not None:
+        if package_type.carrier and package_type.carrier != self:
             raise NotSupportedError(
                 "Packaging type %s is not available on %s." % (
                     package_type, self.name))
         elif package_type.carrier == self:
             return package_type
-        prop_code = self._to_proprietary_packaging.get(code, None)
-        if proprietary and prop_code:
-            return PackageType(
-                self, prop_code, self._package_id_to_description[prop_code])
+
+        if proprietary:
+            prop_code = self._to_proprietary_packaging.get(code, None)
+            if prop_code:
+                return PackageType(
+                    self, prop_code,
+                    self._package_id_to_description[prop_code])
+
         generic_code = self._generic_package_translation.get(code, None)
         if not generic_code:
             raise NotSupportedError(
                 "Package type %s is not available on %s." % (
                     package_type, self.name))
-        # If we're here, we're just changing the code to the carrier's
-        # proprietary one.
-        return PackageType(self, generic_code, package_type.name)
+        return PackageType(None, generic_code, package_type.name)
 
 
 class Service(object):
-    def __init__(self, carrier, service_id, name, trackable=True):
+    def __init__(self, carrier, service_id, name):
         self.carrier = carrier
         # Unique identifier for use with a carrier's get_service() method.
         # This should always be a string.
         self.service_id = service_id
         # The display name for a service, such as 'Priority Mail International'
         self.name = name
-        # Whether a shipment on this service can be fully tracked.
-        self.trackable = trackable
 
     def __str__(self):
         return "%s: %s" % (self.carrier.name, self.name)

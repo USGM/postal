@@ -71,7 +71,7 @@ class Postal:
             threading.Thread(
                 target=_task, args=(carrier, request, results)).start()
 
-        return dict((results.get() for _ in range(len(self.carriers))))
+        return dict((results.get() for _ in self.carriers))
 
     def get_all_services(self):
         """

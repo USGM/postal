@@ -46,7 +46,8 @@ class FedExApi(Carrier):
 
     # To get FedEx's packaging advantages, you must use their packaging.
     _generic_package_translation = {
-        'package': 'YOUR_PACKAGING'}
+        'package': 'YOUR_PACKAGING',
+        'envelope': 'YOUR_PACKAGING'}
 
     # We only apply these translations to envelopes/softpaks. Not to packages,
     # since there are too many options there, and it's too easy to go out of
@@ -59,7 +60,7 @@ class FedExApi(Carrier):
         'FEDEX_10KG_BOX': '10kg Box',
         'FEDEX_25KG_BOX': '25kg Box',
         'FEDEX_BOX': 'Box',
-        'FEDEX_ENVELOPE': 'Envelope',
+        'FEDEX_ENVELOPE': 'Express Envelope',
         'FEDEX_PAK': 'Pak',
         'FEDEX_TUBE': 'Tube'}
 
@@ -488,7 +489,8 @@ class FedExApi(Carrier):
         final = {
             self.get_service(key): {
                 'price': value['price'],
-                'delivery_datetime': value['delivery_datetime']}
+                'delivery_datetime': value['delivery_datetime'],
+                'trackable': True}
             for key, value in result.items()}
 
         return final

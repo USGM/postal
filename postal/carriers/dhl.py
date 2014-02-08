@@ -181,7 +181,8 @@ class DHLApi(Carrier):
                     'delivery_datetime': DHLApi.from_timestr(
                         quote.findtext('DeliveryDate') or ''
                         + quote.findtext('DeliveryTime') or ''),
-                    'price': DHLApi.get_price(quote)}
+                    'price': DHLApi.get_price(quote),
+                    'trackable': True}
             except CarrierError:
                 continue
         return response_dict

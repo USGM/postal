@@ -141,13 +141,12 @@ class Request(object):
         self.origin = origin
         self.destination = destination
 
-        self.packages = list(packages)  # Calling list() to raise exception
-        # immediately if parameter is not iterable.
+        self.packages = list(packages)  # Resolve generators, ensure iterable
 
         self.ship_datetime = ship_datetime
         if ship_datetime is not None and (ship_datetime < datetime.now()):
             # Ship datetime is in the past. Set to None. Carriers should
-            # interpret this as 'now', or the next available shipping
+            # interpret this as 'now' or the next available shipping
             # opportunity.
             self.ship_datetime = None
 
@@ -201,7 +200,7 @@ class PackageType(object):
         return "%s %s" % (getattr(self.carrier, 'name', 'Generic'), self.name)
 
     def __repr__(self):
-        return '<%s:%s>' % (self.code, str(self))
+        return '<%s|%s:%s>' % (self.carrier, self.code, str(self))
 
 
 class Package(object):
@@ -242,6 +241,13 @@ class Package(object):
 
         if not imperial:
             self.imperialize()
+
+    def copy(self):
+        return Package(
+            self.length, self.width, self.height, self.weight,
+            self.package_type, self.documents_only, self.carrier_conversion,
+            self.declarations, True
+        )
 
     def get_total_declared_value(self):
         return stack_values(self.declarations, 'get_total_value')

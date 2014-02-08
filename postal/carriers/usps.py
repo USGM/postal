@@ -61,6 +61,7 @@ class USPSApi(Carrier):
         'softpak': 'FlatRatePaddedEnvelope'}
 
     _package_id_to_description = {
+        'Letter': 'Letter',
         'Flat': 'Flat',
         'FlatRateEnvelope': 'Flat Rate Envelope',
         'FlatRateLegalEnvelope': 'Flat Rate Legal Envelope',
@@ -84,7 +85,8 @@ class USPSApi(Carrier):
         'PriorityMailExpressInternational': False,
         'FirstClassMailInternational': False,
         'FirstClassPackageInternationalService': False,
-        'PriorityMailInternational': False}
+        'PriorityMailInternational': False,
+        'ExpressMailInternational': False}
 
     # Needed when figuring out what label to print.
     _parcel_types = (
@@ -174,7 +176,8 @@ class USPSApi(Carrier):
             table[service] = {
                 'price': Money(rate._TotalAmount, 'USD'),
                 'delivery_datetime': self._get_arrival_date(
-                    request, int(rate.DeliveryTimeDays))}
+                    request, int(rate.DeliveryTimeDays)),
+                'trackable': self._code_to_trackable[service.service_id]}
         return table
 
     def _set_dims(self, api_request, package):
@@ -494,16 +497,19 @@ class USPSApi(Carrier):
                 [response[service]['price'] for response in response_list])
             # The latest delivery date will be our estimate.
             datetimes = []
+            trackable = False
             for response in response_list:
                 delivery = response[service]['delivery_datetime']
                 if delivery is not None:
                     datetimes.append(delivery)
+                trackable = response[service]['trackable']
             if not datetimes:
                 delivery_datetime = None
             else:
                 delivery_datetime = max(datetimes)
             final_response[service] = {
-                'price': price, 'delivery_datetime': delivery_datetime}
+                'price': price, 'delivery_datetime': delivery_datetime,
+                'trackable': trackable}
         return final_response
 
     def get_services(self, request):

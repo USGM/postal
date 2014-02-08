@@ -463,21 +463,15 @@ class UPSApi(base.Carrier):
                         self,
                         rated_shipment.Service.Code,
                         self._code_to_description.get(
-                            rated_shipment.Service.Code, None))
-
-                    try:
-                        delivery = self.delivery_datetime(service, request)
-                    except CarrierError as err:
-                        if err.code == 270037:  # no time in transit info
-                            delivery = None
-                        else:
-                            raise
+                            rated_shipment.Service.Code, '???'))
 
                     shipment_info.put((service, dict(
                         price=_get_negotiated_charge(rated_shipment),
-                        delivery_datetime=delivery,
+                        delivery_datetime=
+                            self.delivery_datetime(service, request),
                         alerts=[a.Description
-                            for a in rated_shipment.RatedShipmentAlert]
+                            for a in rated_shipment.RatedShipmentAlert],
+                        trackable=True
                     )))
                 except Exception as err:
                     err.traceback = sys.exc_info()[2]
@@ -486,7 +480,7 @@ class UPSApi(base.Carrier):
             threading.Thread(target=task, args=(rated_shipment,)).start()
             
         result = {}
-        for i in range(len(rates.RatedShipment)):
+        for _ in rates.RatedShipment:
             a = shipment_info.get()
             if isinstance(a, Exception):
                 raise a
@@ -743,6 +737,8 @@ class UPSApi(base.Carrier):
                 None)
 
         except WebFault as err:
+            if err.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Code == '270037':
+                return None
             raise _convert_webfault(err)
 
         if response.Response.ResponseStatus.Code != '1':
@@ -824,14 +820,17 @@ class UPSApi(base.Carrier):
 
     _generic_package_translation = {
         'package': '02',
-        'softpak': '02'}
+        'softpak': '02',
+        'envelope': '02'
+    }
 
     _package_id_to_description = dict(
-        ### UPS supports generic boxes and softpaks; they are both code '02'
+        ### UPS supports generic boxes, softpaks, and flats;
+        ### they are all code '02'
         base.Carrier._package_id_to_description.items() + {
-            '01': 'Letter',
+            '01': 'Express Envelope',
             '03': 'Tube',
-            '04': 'Pak',
+            '04': 'Pak',  # proprietary softpak, not generic
             '21': 'Express Box',
             '24': '25kg Box',
             '25': '10kg Box',
