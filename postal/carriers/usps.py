@@ -52,7 +52,7 @@ class USPSApi(Carrier):
         'PriorityMailInternational': 'Priority Mail International'}
 
     _generic_package_translation = {
-        'envelope': 'Letter',
+        'envelope': 'Flat',
         'softpak': 'Parcel',
         'package': 'Parcel'}
 
