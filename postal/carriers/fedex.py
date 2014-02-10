@@ -367,7 +367,8 @@ class FedExApi(Carrier):
         target_address.City = address.city
         target_address.PostalCode = address.postal_code
         target_address.CountryCode = address.country.alpha2
-        target_address.StateOrProvinceCode = address.subdivision
+        if len(address.subdivision or '') <= 2:
+            target_address.StateOrProvinceCode = address.subdivision
         target_address.Residential = address.residential
 
     def set_declarations(self, client, api_request, package):
