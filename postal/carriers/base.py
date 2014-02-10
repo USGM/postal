@@ -282,12 +282,12 @@ class Carrier(object):
                     self, prop_code,
                     self._package_id_to_description[prop_code])
 
-        generic_code = self._generic_package_translation.get(code, None)
-        if not generic_code:
+        converted_generic_code = self._generic_package_translation.get(code, None)
+        if not converted_generic_code:
             raise NotSupportedError(
                 "Package type %s is not available on %s." % (
                     package_type, self.name))
-        return PackageType(None, generic_code, package_type.name)
+        return PackageType(self, converted_generic_code, package_type.name)
 
 
 class Service(object):

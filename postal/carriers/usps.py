@@ -61,15 +61,16 @@ class USPSApi(Carrier):
         'softpak': 'FlatRatePaddedEnvelope'}
 
     _package_id_to_description = {
-        'Letter': 'Letter',
-        'Flat': 'Flat',
+        'Letter': 'Generic Letter',
+        'Flat': 'Generic Flat',
         'FlatRateEnvelope': 'Flat Rate Envelope',
         'FlatRateLegalEnvelope': 'Flat Rate Legal Envelope',
         'FlatRatePaddedEnvelope': 'Flate Rate Padded Envelope',
         'SmallFlatRateEnvelope': ' Small Flat Rate Envelope',
         'SmallFlatRateBox': 'Small Flat Rate Box',
         'MediumFlatRateBox': 'Medium Flat Rate Box',
-        'LargeFlatRateBox': 'Large Flat Rate Box'}
+        'LargeFlatRateBox': 'Large Flat Rate Box',
+        'Parcel': 'Generic Package'}
 
     _code_to_trackable = {
         # This is the only service that is currently known to always generate

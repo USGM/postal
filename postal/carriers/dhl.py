@@ -67,7 +67,8 @@ class DHLApi(Carrier):
 
     _package_id_to_description = {
         'EE': 'Express Envelope',
-        'OD': 'Other DHL Packaging'}
+        'OD': 'Other DHL Packaging',
+        'CP': 'Generic Packaging'}
 
     def __init__(
             self, account_number, region_code, company_name, site_id,

@@ -776,43 +776,43 @@ class UPSApi(base.Carrier):
 
         return _get_negotiated_charge(rated_shipment)
 
-    def _populate_package(self, pak, package):
+    def _populate_package(self, api_package, package):
         packaging_code = self.package_type_translate(
             package.package_type, proprietary=package.carrier_conversion).code
 
         try:
-            pak.Packaging.Code = packaging_code  # shipping
+            api_package.Packaging.Code = packaging_code  # shipping
         except AttributeError:
-            pak.PackagingType.Code = packaging_code  # rating
+            api_package.PackagingType.Code = packaging_code  # rating
 
         if packaging_code != '01':  # UPS Letter
-            pak.Dimensions.UnitOfMeasurement.Code = 'IN'
+            api_package.Dimensions.UnitOfMeasurement.Code = 'IN'
 
             ### Specify too many decimal digits here and it says that
             ### "every dimension is required and must be > zero".
             ### Seriously, UPS?
-            pak.Dimensions.Length = '%.2f' % max(1, package.length)
-            pak.Dimensions.Width = '%.2f' % max(1, package.width)
-            pak.Dimensions.Height = '%.2f' % max(1, package.height)
+            api_package.Dimensions.Length = '%.2f' % max(1, package.length)
+            api_package.Dimensions.Width = '%.2f' % max(1, package.width)
+            api_package.Dimensions.Height = '%.2f' % max(1, package.height)
 
-        pak.PackageWeight.UnitOfMeasurement.Code = 'LBS'
+        api_package.PackageWeight.UnitOfMeasurement.Code = 'LBS'
 
-        pak.PackageWeight.Weight = '%.1f' % package.weight
+        api_package.PackageWeight.Weight = '%.1f' % package.weight
 
         if is_large(package):
-            pak.LargePackageIndicator = ''
+            api_package.LargePackageIndicator = ''
 
         _populate_money(
-            pak.PackageServiceOptions.DeclaredValue,
+            api_package.PackageServiceOptions.DeclaredValue,
             package.get_total_insured_value())
 
         if package.get_total_insured_value() > 0:  # for rates
             # can't treat Money instance as boolean
             _populate_money(
-                pak.PackageServiceOptions.DeclaredValue,
+                api_package.PackageServiceOptions.DeclaredValue,
                 package.get_total_insured_value())
 
-        return pak
+        return api_package
 
     _to_proprietary_packaging = {
         'softpak': '04',
@@ -829,6 +829,7 @@ class UPSApi(base.Carrier):
         ### they are all code '02'
         base.Carrier._package_id_to_description.items() + {
             '01': 'Express Envelope',
+            '02': 'Generic Packaging',  ###### TODO: losing information in conversion
             '03': 'Tube',
             '04': 'Pak',  # proprietary softpak, not generic
             '21': 'Express Box',

@@ -62,7 +62,8 @@ class FedExApi(Carrier):
         'FEDEX_BOX': 'Box',
         'FEDEX_ENVELOPE': 'Express Envelope',
         'FEDEX_PAK': 'Pak',
-        'FEDEX_TUBE': 'Tube'}
+        'FEDEX_TUBE': 'Tube',
+        'YOUR_PACKAGING': 'Generic Packaging'}
 
     def create_client(self, wsdl_name):
         client = Client(

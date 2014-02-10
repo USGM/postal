@@ -186,7 +186,8 @@ class PackageType(object):
     def __eq__(self, other):
         if not isinstance(other, PackageType):
             return NotImplemented
-        carrier = getattr(self.carrier, None) == getattr(other.carrier, None)
+        carrier = (
+            getattr(self, 'carrier', None) == getattr(other, 'carrier', None))
         code = self.code == other.code
         return carrier and code
 
