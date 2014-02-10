@@ -72,23 +72,6 @@ class USPSApi(Carrier):
         'LargeFlatRateBox': 'Large Flat Rate Box',
         'Parcel': 'Generic Package'}
 
-    _code_to_trackable = {
-        # This is the only service that is currently known to always generate
-        # a tracking number.
-        'Priority': True,
-
-        # The rest will but only sometimes, depending on the kind of packaging
-        # and its weight.
-        'PriorityExpress': False,
-        'First': False,
-        'StandardPost': False,
-        'CriticalMail': False,
-        'PriorityMailExpressInternational': False,
-        'FirstClassMailInternational': False,
-        'FirstClassPackageInternationalService': False,
-        'PriorityMailInternational': False,
-        'ExpressMailInternational': False}
-
     # Needed when figuring out what label to print.
     _parcel_types = (
         'softpak', 'SmallFlatRateBox', 'MediumFlatRateBox', 'LargeFlatRateBox',
@@ -178,7 +161,7 @@ class USPSApi(Carrier):
                 'price': Money(rate._TotalAmount, 'USD'),
                 'delivery_datetime': self._get_arrival_date(
                     request, int(rate.DeliveryTimeDays)),
-                'trackable': self._code_to_trackable[service.service_id]}
+                'trackable': self.is_trackable(request, service)}
         return table
 
     def _set_dims(self, api_request, package):
@@ -329,8 +312,7 @@ class USPSApi(Carrier):
             return 'FORM2976A'
         return 'FORM2976A'
 
-    def tracking_filter(self, international,
-                        tracking_number, service, package):
+    def is_trackable(self, request, service):
         """
         Some services don't have real tracking numbers, but Endicia likes to
         pretend they do.
@@ -338,17 +320,21 @@ class USPSApi(Carrier):
         if service.service_id in [
             'First', 'FirstClassMailInternational',
                 'FirstClassPackageInternationalService']:
-            return ''
-        package_type = self.package_type_translate(
-            package.package_type, proprietary=package.carrier_conversion).code
-        if not international:
-            return tracking_number
-        if package_type in ['FlatRateEnvelope', 'FlatRateLegalEnvelope',
+            return False
+        if not request.international(self.get_origin(request)):
+            return True
+        package_types = [
+            self.package_type_translate(
+                package.package_type, proprietary=package.carrier_conversion
+            ).code for package in request.packages]
+
+        for package_type in package_types:
+            if package_type in ['FlatRateEnvelope', 'FlatRateLegalEnvelope',
                             'FlatRatePaddedEnvelope', 'SmallFlatRateEnvelope',
                             'SmallFlatRateBox', 'MediumFlatRateBox',
                             'LargeFlatRateBox']:
-            return ''
-        return tracking_number
+                return False
+        return True
 
     def ship_package(self, request, service, package):
         label_request = self.client.factory.create('LabelRequest')
@@ -396,9 +382,8 @@ class USPSApi(Carrier):
         if hasattr(response, 'PIC'):
             transaction_id = response.PIC
         transaction_id = transaction_id or tracking_number
-        international = request.international(origin=self.get_origin(request))
-        tracking_number = self.tracking_filter(
-            international, tracking_number, service, package)
+        if not self.is_trackable(request, service):
+            tracking_number = 'N/A'
         shipment = Shipment(
             self, tracking_number, transaction_id=transaction_id)
         price = Money(response.FinalPostage, 'USD')
@@ -482,8 +467,7 @@ class USPSApi(Carrier):
                 unicode(response.ErrorMessage).encode(encoding='utf-8'))
         self.passphrase = new_passphrase
 
-    @staticmethod
-    def compile_options(response_list):
+    def compile_options(self, request, response_list):
         service_sets = [
             {service for service in response.keys()}
             for response in response_list]
@@ -498,7 +482,7 @@ class USPSApi(Carrier):
                 [response[service]['price'] for response in response_list])
             # The latest delivery date will be our estimate.
             datetimes = []
-            trackable = False
+            trackable = self.is_trackable(request, service)
             for response in response_list:
                 delivery = response[service]['delivery_datetime']
                 if delivery is not None:
@@ -527,7 +511,7 @@ class USPSApi(Carrier):
                 self.client.service.CalculatePostageRates, postage_request)
             response_dict = self._request_response_table(request, response)
             responses.append(response_dict)
-        responses = self.compile_options(responses)
+        responses = self.compile_options(request, responses)
         self.cache_results(request, responses)
         return responses
 
