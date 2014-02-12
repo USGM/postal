@@ -55,7 +55,8 @@ class DHLApi(Carrier):
         'M': 'Express 10:30',
 
         'H': 'Economy Select',
-        'W': 'Economy Select'}
+        'W': 'Economy Select',
+        'X': 'Express Envelope'}
 
     _generic_package_translation = {
         'softpak': 'CP',
