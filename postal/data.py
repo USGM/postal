@@ -209,7 +209,7 @@ class Package(object):
     Package objects represent the parcels that will be shipped and what their
     value is.
 
-    All carriers support imperial units, but have spotty support for metric.
+    All carriers support imperial units but have spotty support for metric.
     It is with great annoyance that we have therefore made the default units
     imperial. You can convert your measurements on the fly by setting imperial
     to false.
@@ -270,7 +270,7 @@ class Package(object):
         return number / 2.54
 
     @staticmethod
-    def to_kilogram(number):
+    def to_kilograms(number):
         return number * 0.453592
 
     @staticmethod

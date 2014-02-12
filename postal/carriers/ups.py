@@ -744,6 +744,9 @@ class UPSApi(base.Carrier):
         if response.Response.ResponseStatus.Code != '1':
             _on_unknown_error()
 
+        if not hasattr(response, 'TransitResponse'):
+            return None
+
         for summary in response.TransitResponse.ServiceSummary:
             if (
                 summary.Service.Code !=
