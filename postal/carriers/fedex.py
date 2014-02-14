@@ -11,8 +11,7 @@ from money import Money
 
 from base import Carrier, ClearEmpty
 from ..exceptions import CarrierError, NotSupportedError, PostalError
-from ..data import Address, Shipment
-
+from ..data import Address, Shipment, Declaration
 
 class FedExApi(Carrier):
     """
@@ -377,7 +376,11 @@ class FedExApi(Carrier):
     def set_declarations(self, client, api_request, package):
         commodities = []
         total_value = 0
-        for declaration in package.declarations:
+        declarations = package.declarations[:]
+        if package.documents_only and not declarations:
+            declarations.append(
+                Declaration('Printed Documents', Money('1.00'), 'US', 1))
+        for declaration in declarations:
             commodity = client.factory.create('Commodity')
             commodity.Description = declaration.description
             value = declaration.value
@@ -416,8 +419,6 @@ class FedExApi(Carrier):
             api_request.PackagingType = self.package_type_translate(
                 package.package_type,
                 proprietary=package.carrier_conversion).code
-        #if request.documents_only():
-        #    api_request.InternationalDocument = 'DOCUMENTS_ONLY'
 
         self.line_items(
             self.rates_client, api_request, request.packages)
