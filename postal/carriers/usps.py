@@ -361,9 +361,10 @@ class USPSApi(Carrier):
             item.Value = declaration.value.amount
             item.CountryOfOrigin = declaration.origin_country.alpha2
             item.Description = declaration.description
-            item.Weight = int(ceil(
+            commodities = sum(dec.units for dec in package.declarations)
+            item.Weight = int(
                 float(package.weight) / len(package.declarations) /
-                declaration.units))
+                commodities) or 1
             label_request.CustomsInfo.CustomsItems.CustomsItem.append(item)
             if request.documents_only():
                 label_request.CustomsInfo.ContentsType = 'Documents'
