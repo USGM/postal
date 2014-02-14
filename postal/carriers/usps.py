@@ -147,6 +147,12 @@ class USPSApi(Carrier):
                 date += relativedelta(days=1)
         return date
 
+    @staticmethod
+    def _get_price(rate):
+        postage = rate._TotalAmount
+        fees = rate.Fees._TotalAmount
+        return Money(postage, 'USD') + Money(fees, 'USD')
+
     def _request_response_table(self, request, response):
         table = {}
         try:
@@ -158,7 +164,7 @@ class USPSApi(Carrier):
                 continue
             service = self.get_service(rate.MailClass)
             table[service] = {
-                'price': Money(rate._TotalAmount, 'USD'),
+                'price': self._get_price(rate),
                 'delivery_datetime': self._get_arrival_date(
                     request, int(rate.DeliveryTimeDays)),
                 'trackable': self.is_trackable(request, service)}
