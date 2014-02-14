@@ -228,9 +228,6 @@ class FedExApi(Carrier):
         else:
             api_request.PackagingType = 'YOUR_PACKAGING'
 
-        #if request.documents_only():
-        #    api_request.InternationalDocument = 'DOCUMENTS_ONLY'
-
         api_request.RateRequestTypes = 'ACCOUNT'
         self.set_address(api_request.Shipper, origin)
         self.set_address(api_request.Recipient, request.destination)
@@ -336,7 +333,7 @@ class FedExApi(Carrier):
                 dimensions.Length = int(ceil(package.length))
                 dimensions.Units = 'IN'
 
-            if package.declarations:
+            if package.declarations or package.documents_only:
                 self.set_declarations(client, api_request, package)
 
                 value = package.get_total_insured_value()
@@ -347,6 +344,9 @@ class FedExApi(Carrier):
             api_request.RequestedPackageLineItems.append(item)
             if package.documents_only:
                 detail.DocumentContent = 'DOCUMENTS_ONLY'
+                detail.CustomsValue.Currency = (
+                    package.get_total_declared_value().currency)
+                detail.CustomsValue.Amount = '1.00'
         if api_request.CustomsClearanceDetail.Commodities:
             detail.DutiesPayment.PaymentType = 'RECIPIENT'
 
@@ -377,9 +377,12 @@ class FedExApi(Carrier):
         commodities = []
         total_value = 0
         declarations = package.declarations[:]
-        if package.documents_only and not declarations:
+        if not declarations and package.documents_only:
             declarations.append(
-                Declaration('Printed Documents', Money('1.00'), 'US', 1))
+                Declaration(
+                    'Printed Documents', Money(
+                    '1.00', self.postal_configuration['default_currency']),
+                    'US', 1))
         for declaration in declarations:
             commodity = client.factory.create('Commodity')
             commodity.Description = declaration.description
