@@ -315,6 +315,8 @@ class FedExApi(Carrier):
 
     def line_items(
             self, client, api_request, packages, sequence_num=None):
+
+        detail = api_request.CustomsClearanceDetail
         for index, package in enumerate(packages):
             item = client.factory.create('RequestedPackageLineItem')
             item.SequenceNumber = sequence_num or index + 1
@@ -344,8 +346,9 @@ class FedExApi(Carrier):
                     item.InsuredValue.Amount = value.amount
 
             api_request.RequestedPackageLineItems.append(item)
+            if package.documents_only:
+                detail.DocumentContent = 'DOCUMENTS_ONLY'
         if api_request.CustomsClearanceDetail.Commodities:
-            detail = api_request.CustomsClearanceDetail
             detail.DutiesPayment.PaymentType = 'RECIPIENT'
 
     @staticmethod
