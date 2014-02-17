@@ -422,6 +422,8 @@ class FedExApi(Carrier):
             api_request.PackagingType = self.package_type_translate(
                 package.package_type,
                 proprietary=package.carrier_conversion).code
+        else:
+            api_request.PackagingType = 'YOUR_PACKAGING'
 
         self.line_items(
             self.rates_client, api_request, request.packages)
