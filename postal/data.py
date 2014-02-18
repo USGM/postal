@@ -4,6 +4,7 @@ shipments.
 """
 from decimal import Decimal
 from datetime import datetime
+from money import Money
 from pycountry import countries
 import money
 
@@ -321,6 +322,9 @@ class Declaration(object):
         set the number of units to how many you have.
         """
         self.description = description
+        if value != 0 and not isinstance(value, Money):
+            ### zero doesn't really have a unit
+            raise TypeError()
         self.value = value
         self.units = units
         self.origin_country = get_country(origin_country)

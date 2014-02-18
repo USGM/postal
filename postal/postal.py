@@ -100,9 +100,9 @@ class Postal:
     def get_all_package_types(self):
         """
         Returns all types of containers supported by all carriers. Specifying
-        something other than the generic customer-supplied package/softpak
-        will yield limited rates results because most package types are
-        carrier-specific.
+        something other than the generic customer-supplied
+        package/softpak/envelope will yield limited rates results because most
+        package types are carrier-specific.
         """
         for package_type in Carrier.get_generic_package_types():
             yield package_type

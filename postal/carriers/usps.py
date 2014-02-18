@@ -219,14 +219,24 @@ class USPSApi(Carrier):
 
     def _set_address_info(self, api_request, request, short=False):
         origin = self.get_origin(request)
-        api_request.FromPostalCode = origin.postal_code
-        api_request.ToPostalCode = request.destination.postal_code
-        if request.international(origin) and short:
-            api_request.MailClass = 'International'
-            api_request.ToCountryCode = request.destination.country.alpha2
-        elif short:
-            api_request.MailClass = 'Domestic'
+
+        # Endicia doesn't support US postal code extensions
+        if origin.country.alpha2 == 'US':
+            api_request.FromPostalCode = origin.postal_code[:5]
+        else:
+            api_request.FromPostalCode = origin.postal_code
+
+        if request.destination.country.alpha2 == 'US':
+            api_request.ToPostalCode = request.destination.postal_code[:5]
+        else:
+            api_request.ToPostalCode = request.destination.postal_code
+
         if short:
+            if request.international(origin):
+                api_request.MailClass = 'International'
+                api_request.ToCountryCode = request.destination.country.alpha2
+            else:
+                api_request.MailClass = 'Domestic'
             return
         if origin.subdivision:
             from_state = origin.subdivision.upper()
@@ -318,7 +328,7 @@ class USPSApi(Carrier):
         pretend they do.
         """
         if service.service_id in [
-            'First', 'FirstClassMailInternational',
+                'First', 'FirstClassMailInternational',
                 'FirstClassPackageInternationalService']:
             return False
         if not request.international(self.get_origin(request)):
@@ -357,7 +367,7 @@ class USPSApi(Carrier):
             item.Quantity = declaration.units
             if str(declaration.value.currency) != 'USD':
                 raise NotSupportedError(
-                    "All declarations must be in US Dollars for USPS.")
+                    "USPS requires all declarations to be in US dollars.")
             item.Value = declaration.value.amount
             item.CountryOfOrigin = declaration.origin_country.alpha2
             item.Description = declaration.description
