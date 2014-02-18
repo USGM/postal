@@ -147,6 +147,12 @@ class USPSApi(Carrier):
                 date += relativedelta(days=1)
         return date
 
+    @staticmethod
+    def _get_price(rate):
+        postage = rate._TotalAmount
+        fees = rate.Fees._TotalAmount
+        return Money(postage, 'USD') + Money(fees, 'USD')
+
     def _request_response_table(self, request, response):
         table = {}
         try:
@@ -158,7 +164,7 @@ class USPSApi(Carrier):
                 continue
             service = self.get_service(rate.MailClass)
             table[service] = {
-                'price': Money(rate._TotalAmount, 'USD'),
+                'price': self._get_price(rate),
                 'delivery_datetime': self._get_arrival_date(
                     request, int(rate.DeliveryTimeDays)),
                 'trackable': self.is_trackable(request, service)}
@@ -371,9 +377,10 @@ class USPSApi(Carrier):
             item.Value = declaration.value.amount
             item.CountryOfOrigin = declaration.origin_country.alpha2
             item.Description = declaration.description
-            item.Weight = int(ceil(
+            commodities = sum(dec.units for dec in package.declarations)
+            item.Weight = int(
                 float(package.weight) / len(package.declarations) /
-                declaration.units))
+                commodities) or 1
             label_request.CustomsInfo.CustomsItems.CustomsItem.append(item)
             if request.documents_only():
                 label_request.CustomsInfo.ContentsType = 'Documents'

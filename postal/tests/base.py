@@ -276,6 +276,7 @@ class TestCarrier(object):
 
     def ship_documents(self):
         self.request.packages = [self.documents]
+        self.documents.declarations = []
         services = self.carrier.get_services(self.request)
         sdict = services.keys()[0].ship(self.request)
         self.shipment_dict_check(sdict)
