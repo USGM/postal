@@ -800,7 +800,7 @@ class UPSApi(base.Carrier):
 
         api_package.PackageWeight.UnitOfMeasurement.Code = 'LBS'
 
-        api_package.PackageWeight.Weight = '%.1f' % package.weight
+        api_package.PackageWeight.Weight = '%.1f' % max(.1, package.weight)
 
         if is_large(package):
             api_package.LargePackageIndicator = ''
