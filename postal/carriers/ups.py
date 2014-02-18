@@ -1,9 +1,10 @@
 import inspect
 import os
 import base64
-import threading
-from Queue import Queue
 import sys
+
+from Queue import Queue
+from threading import Thread
 
 from datetime import datetime
 from StringIO import StringIO
@@ -24,70 +25,42 @@ from ..exceptions import CarrierError, NotSupportedError
 __author__ = 'Nathan Everitt'
 
 
-def get_directory_of(a):
-    return os.path.split((os.path.abspath(inspect.getfile(a))))[0]
+class FixBrokenNamespace(MessagePlugin):
+    def __init__(self, propname):
+        self.propname = propname
 
-
-class FixBrokenRateNamespace(MessagePlugin):
     def marshalled(self, context):
-        (context.envelope.getChild('Body').getChild('RateRequest')
+        (context.envelope.getChild('Body').getChild(self.propname)
             .getChild('Request')).prefix = 'ns0'
 
 
-class FixBrokenAddressNamespace(MessagePlugin):
-    def marshalled(self, context):
-        (context.envelope.getChild('Body').getChild('XAVRequest')
-            .getChild('Request')).prefix = 'ns0'
+class FixMissingNegotiatedRates(MessagePlugin):
+    def __init__(self, propname):
+        self.propname = propname
 
-
-class FixBrokenTimeNamespace(MessagePlugin):
-    def marshalled(self, context):
-        (context.envelope.getChild('Body').getChild('TimeInTransitRequest')
-            .getChild('Request')).prefix = 'ns0'
-
-
-class FixBrokenShipmentRequestNamespace(MessagePlugin):
-    def marshalled(self, context):
-        (context.envelope.getChild('Body').getChild('ShipmentRequest')
-            .getChild('Request')).prefix = 'ns0'
-
-
-class FixMissingShipmentNegotiatedRates(MessagePlugin):
     def marshalled(self, context):
         shipment_rating_options = Element('ShipmentRatingOptions')
         shipment_rating_options.prefix = 'ns1'
         negotiated_rates_indicator = Element('NegotiatedRatesIndicator')
         negotiated_rates_indicator.prefix = 'ns1'
 
-        context.envelope.getChild('Body').getChild('ShipmentRequest').getChild(
-            'Shipment').append(shipment_rating_options)
-        shipment_rating_options.append(negotiated_rates_indicator)
-
-
-class FixMissingRatesNegotiatedRates(MessagePlugin):
-    def marshalled(self, context):
-        shipment_rating_options = Element('ShipmentRatingOptions')
-        shipment_rating_options.prefix = 'ns1'
-        negotiated_rates_indicator = Element('NegotiatedRatesIndicator')
-        negotiated_rates_indicator.prefix = 'ns1'
-
-        context.envelope.getChild('Body').getChild('RateRequest').getChild(
+        context.envelope.getChild('Body').getChild(self.propname).getChild(
             'Shipment').append(shipment_rating_options)
         shipment_rating_options.append(negotiated_rates_indicator)
 
 
 class FixInternationalNamespaces(MessagePlugin):
     def marshalled(self, context):
-        if context.envelope.getChild('Body').getChild('ShipmentRequest') \
-                .getChild('Shipment').getChild('ShipmentServiceOptions'):
-            context.envelope.getChild('Body').getChild('ShipmentRequest') \
-                .getChild('Request').prefix = 'ns1'
-            context.envelope.getChild('Body').getChild('ShipmentRequest') \
-                .getChild('Shipment').getChild('ShipmentRatingOptions') \
-                .prefix = 'ns2'
-            context.envelope.getChild('Body').getChild('ShipmentRequest') \
-                .getChild('Shipment').getChild('ShipmentRatingOptions') \
-                .getChild('NegotiatedRatesIndicator').prefix = 'ns2'
+        request = context.envelope.getChild('Body').getChild('ShipmentRequest')
+        options = request.getChild(
+            'Shipment').getChild('ShipmentServiceOptions')
+        rating_options = request.getChild('Shipment').getChild(
+            'ShipmentRatingOptions')
+
+        if options:
+            request.getChild('Request').prefix = 'ns1'
+            rating_options.prefix = 'ns2'
+            rating_options.getChild('NegotiatedRatesIndicator').prefix = 'ns2'
 
 
 class AuthenticationPlugin(MessagePlugin):
@@ -124,68 +97,11 @@ class AuthenticationPlugin(MessagePlugin):
         service_access_token.append(access_license_number)
 
 
-Void = Client(
-    'file://' + os.path.join(
-        get_directory_of(inspect.currentframe()), 'wsdl', 'ups', 'Void.wsdl'),
-    cache=suds.cache.NoCache())
-
-
-def _convert_webfault(webfault):
-    error = webfault.fault.detail.Errors.ErrorDetail.PrimaryErrorCode
-
-    if error.Code == '111210':
-        ### 'The requested service is unavailable between the selected
-        ### locations.'
-        result = NotSupportedError(
-            'UPS does not offer that service to that destination.')
-    else:
-        result = CarrierError('Webfault#%s: %s' % (error.Code, error.Description))
-
-    result.code = error.Code
-    return result
-
-
-def _on_unknown_error():
-    raise CarrierError('UPS encountered an unknown error.')
-
-
 class UPSApi(base.Carrier):
     name = 'UPS'
     address_validation = True
     auto_residential = True
     _code_to_description = {
-
-        ### from docs:
-        # 01 = Next Day Air
-        # 02 = 2nd Day Air
-        # 03 = Ground
-        # 12 = 3 Day Select
-        # 13 = Next Day Air Saver
-        # 14 = Next Day Air Early AM
-        # 59 = 2nd Day Air AM
-        #
-        # Valid international values:
-        # 07 = Worldwide Express
-        # 08 = Worldwide Expedited
-        # 11 = Standard
-        # 54 = Worldwide Express Plus
-        # 65 = UPS Saver. Required for Rating and Ignored for Shopping
-        # ? = WorldWide Express Saver Freight
-        #
-        # Valid Poland to Poland Same
-        # Day values:
-        # 82 = UPS Today Standard
-        # 83 = UPS Today Dedicated
-        # Courier
-        # 84 = UPS Today Intercity
-        # 85 = UPS Today Express
-        # 86 = UPS Today Express Saver
-        # 96 = UPS Worldwide Express Freight
-        #
-        # Code for the UPS Service associated with
-        # the shipment Note: The valid service code for
-        # a FRS Rating Request is
-        # 03=Ground
 
         # 'UPS Express' if shipping from Canada
         # (delivers before 10:30am)
@@ -217,7 +133,80 @@ class UPSApi(base.Carrier):
         '59': 'Second Day Air A.M.',
         '65': 'Saver',
         '96': 'Worldwide Express Freight'}
-        ### leaving out a few that are Polish-only
+
+    _to_proprietary_packaging = {
+        'softpak': '04',
+        'envelope': '01'}
+
+    _generic_package_translation = {
+        'package': '02',
+        'softpak': '02',
+        'envelope': '02'}
+
+    _package_id_to_description = dict(
+        ### UPS supports generic boxes, softpaks, and flats;
+        ### they are all code '02'
+        base.Carrier._package_id_to_description.items() + {
+            '01': 'Express Envelope',
+            ###### TODO: losing information in conversion
+            '02': 'Generic Packaging',
+            '03': 'Tube',
+            '04': 'Pak',  # proprietary softpak, not generic
+            '21': 'Express Box',
+            '24': '25kg Box',
+            '25': '10kg Box',
+            '30': 'Pallet',
+            '2a': 'Small Express Box',
+            '2b': 'Medium Express Box',
+            '2c': 'Large Express Box'
+            ### For FRS rating requests the
+            ### only valid value is customer
+            ### supplied packaging 02.
+        }.items())
+
+    _service_code_to_time_in_transit_code = {
+        '14': '1DM',
+        '01': '1DA',
+        '13': '1DP',
+        '59': '2DM',
+        '02': '2DA',
+        '12': '3DS',
+        '03': 'GND',
+        '54': '21',
+        '07': '01',
+        '08': '05',
+        '11': '03',
+        '65': '20',
+        '96': '29'  # UPS Worldwide Express Freight
+
+        ### No mappings:
+        # UPS Next Day Air Early A.M. (Saturday Delivery)
+        # UPS Next Day Air (Saturday Delivery)
+        # UPS Second Day Air (Saturday Delivery)
+        #?: '28'  # UPS Worldwide Saver
+        #?: 'G'  # UPS Ground ---- Puerto Rico to United States and
+        # United States to Puerto Rico
+    }
+
+    @staticmethod
+    def _get_directory_of(frame):
+        return os.path.split((os.path.abspath(inspect.getfile(frame))))[0]
+
+    @classmethod
+    def _get_path(cls, name):
+        return 'file://' + os.path.join(
+            cls._get_directory_of(inspect.currentframe()),
+            'wsdl', 'ups', name)
+
+    def _create_client(self, name, plugins=None):
+        if not plugins:
+            plugins = []
+        client = Client(
+            self._get_path(name),
+            cache=suds.cache.NoCache(),
+            plugins=plugins,
+            timeout=self.postal_configuration['timeout'])
+        return client
 
     def __init__(
             self, username, password, access_license_number, shipper_number,
@@ -228,47 +217,159 @@ class UPSApi(base.Carrier):
         authentication = AuthenticationPlugin(
             username, password, access_license_number)
 
-        self._RateWS = Client(
-            'file://' + os.path.join(
-                get_directory_of(inspect.currentframe()),
-                'wsdl', 'ups', 'RateWS.wsdl'),
-            cache=suds.cache.NoCache(),
+        self._RateWS = self._create_client(
+            'RateWS.wsdl',
             plugins=[
-                authentication, FixBrokenRateNamespace(),
-                FixMissingRatesNegotiatedRates()
-            ],
-            timeout=postal_configuration['timeout'])
-        self._XAV = Client(
-            'file://' + os.path.join(
-                get_directory_of(inspect.currentframe()),
-                'wsdl', 'ups', 'XAV.wsdl'),
-            cache=suds.cache.NoCache(),
-            plugins=[authentication, FixBrokenAddressNamespace()],
-            timeout=postal_configuration['timeout'])
-        self._TNTWS = Client(
-            'file://' + os.path.join(
-                get_directory_of(inspect.currentframe()),
-                'wsdl', 'ups', 'TNTWS.wsdl'),
-            cache=suds.cache.NoCache(),
-            plugins=[authentication, FixBrokenTimeNamespace()],
-            timeout=postal_configuration['timeout'])
-        self._Ship = Client(
-            'file://' + os.path.join(
-                get_directory_of(inspect.currentframe()),
-                'wsdl', 'ups', 'Ship.wsdl'),
-            cache=suds.cache.NoCache(),
+                authentication, FixBrokenNamespace('RateRequest'),
+                FixMissingNegotiatedRates('RateRequest')])
+
+        self._XAV = self._create_client(
+            'XAV.wsdl',
+            plugins=[authentication, FixBrokenNamespace('XAVRequest')])
+
+        self._TNTWS = self._create_client(
+            'TNTWS.wsdl',
+            plugins=(
+                authentication, FixBrokenNamespace('TimeInTransitRequest')))
+
+        self._Ship = self._create_client(
+            'Ship.wsdl',
             plugins=[
-                authentication, FixBrokenShipmentRequestNamespace(),
-                FixMissingShipmentNegotiatedRates(),
-                FixInternationalNamespaces()
-            ],
-            timeout=postal_configuration['timeout'])
+                authentication, FixBrokenNamespace('ShipmentRequest'),
+                FixMissingNegotiatedRates('ShipmentRequest'),
+                FixInternationalNamespaces()])
+
         if not test:
             self._Ship.set_options(
                 location='https://onlinetools.ups.com/webservices/Ship')
 
+    @staticmethod
+    def _convert_webfault(webfault):
+        error = webfault.fault.detail.Errors.ErrorDetail.PrimaryErrorCode
+
+        if error.Code == '111210':
+            result = NotSupportedError(
+                'UPS does not offer that service to that destination.')
+        else:
+            result = CarrierError('Webfault#%s: %s' % (
+                error.Code, error.Description))
+
+        result.code = error.Code
+        return result
+
+    @staticmethod
+    def _on_unknown_error():
+        raise CarrierError('UPS encountered an unknown error.')
+
+    @classmethod
+    def _get_negotiated_charge(cls, rated_shipment):
+        if hasattr(rated_shipment, 'NegotiatedRateCharges'):
+            return cls._get_money(
+                rated_shipment.NegotiatedRateCharges.TotalCharge)
+        else:
+            return cls._get_money(rated_shipment.TotalCharges)
+
+    @staticmethod
+    def get_length_plus_girth(package):
+        height, width, length = sorted(
+            [package.length, package.width, package.height])
+        return length + width * 2 + height * 2
+
+    @staticmethod
+    def _populate_address(
+            node, address, use_street=True,
+            use_name=True, use_phone=False, use_attn=False,
+            international=False):
+        """
+        node = shipment.Shipper|shipment.ShipFrom|shipment.ShipTo
+        """
+
+        if address.contact_name:
+            if len(address.contact_name) > 35:
+                raise NotSupportedError(
+                    'UPS requires the contact name to be at most 35 '
+                    'characters long. The company name should be in the '
+                    'street lines.')
+            if use_name:
+                # docs say the limit is 35 characters
+                node.Name = address.contact_name[:35]
+            if use_attn:
+                node.AttentionName = address.contact_name[:35]
+
+        if address.street_lines:
+            if len(address.street_lines) > 3:
+                raise NotSupportedError(
+                    'UPS does not support more than three address lines.')
+            for line in address.street_lines:
+                if len(line) > 35:
+                    raise NotSupportedError(
+                        'UPS requires each address line to be at most 35 '
+                        'characters long.')
+                if use_street:
+                    node.Address.AddressLine = address.street_lines
+
+        node.Address.City = address.city
+        if address.subdivision:
+            node.Address.StateProvinceCode = address.subdivision.upper()
+        if address.postal_code is not None:
+            node.Address.PostalCode = address.postal_code.replace(' ', '')
+        node.Address.CountryCode = address.country.alpha2
+        if not international and address.residential:
+            node.Address.ResidentialAddressIndicator = ''
+        if use_phone:
+            node.Phone.Number = address.phone_number
+
+    @classmethod
+    def _populate_shipper(
+            cls, node, address, shipper_number, use_attn=False,
+            use_phone=False,tax_identification_number=None):
+        cls._populate_address(
+            node, address, use_phone=use_phone, use_attn=use_attn)
+        node.ShipperNumber = shipper_number
+
+        if tax_identification_number is not None:
+            node.TaxIdentificationNumber = tax_identification_number
+
+    @staticmethod
+    def _get_money(node):
+        return money.Money(node.MonetaryValue, node.CurrencyCode)
+
+    @staticmethod
+    def _populate_money(node, value):
+        node.CurrencyCode = value.currency
+        node.MonetaryValue = str(value.amount)
+
+    @classmethod
+    def is_large(cls, package):
+        """
+        A package is considered a "Large Package" when its length plus girth
+        [(2 x width) + (2 x height)] combined exceeds 130 inches, but does
+        not exceed the maximum UPS size of 165 inches.  An Additional
+        Handling Charge will not be assessed when a Large Package
+        Surcharge is applied.
+        """
+
+        if package.package_type.code in ['01', 'envelope']:
+            return False
+        return cls.get_length_plus_girth(package) > 130
+
+    @classmethod
+    def _ensure_request_supported(cls, request):
+        for package in request.packages:
+            cls._ensure_package_supported(package)
+
+    @classmethod
+    def _ensure_package_supported(cls, package):
+        if package.package_type.code not in ['01', 'envelope']:
+            if cls.get_length_plus_girth(package) > 165:
+                raise NotSupportedError(
+                    'UPS does not support packages of that size.')
+        if package.weight > 150:
+            raise NotSupportedError(
+                'UPS does not ship packages that weigh more than 150 pounds.')
+
     def ship(self, service, request, receiver_account_number=None):
-        _ensure_request_supported(request)
+        self._ensure_request_supported(request)
 
         origin = request.origin or self.postal_configuration['shipper_address']
         international = (origin.country != request.destination.country)
@@ -290,17 +391,18 @@ class UPSApi(base.Carrier):
         ### not affect shipment charges. This is also true of any associated
         ### amounts within the International Forms container.
         if request.destination.country.alpha2 in ('CA', 'PR'):
-            pass#_populate_money(api_shipment.Shipment.InvoiceLineTotal, ???) TODO
+            # TODO: _populate_money(api_shipment.Shipment.InvoiceLineTotal, ?)
+            pass
 
-        _populate_shipper(
+        self._populate_shipper(
             api_shipment.Shipper, origin, self.shipper_number,
-            True, True, self.postal_configuration['tax_id']
-        )
-        _populate_address(
+            True, True, self.postal_configuration['tax_id'])
+
+        self._populate_address(
             api_shipment.ShipTo, request.destination, use_phone=True,
             use_attn=True, use_name=True, international=international)
 
-        _populate_address(
+        self._populate_address(
             api_shipment.ShipFrom, origin, use_phone=True,
             use_attn=True, international=international)#, use_name=True)
 
@@ -356,24 +458,19 @@ class UPSApi(base.Carrier):
             ### in order to acquire billing information.
             bill_receiver.BillReceiver.AccountNumber = receiver_account_number
 
-            api_shipment.ShipmentServiceOptions.InternationalForms \
-                .FormType = '01'
-            api_shipment.ShipmentServiceOptions.InternationalForms \
-                .CurrencyCode = request.get_total_insured_value().currency
-            api_shipment.ShipmentServiceOptions.InternationalForms \
-                .InvoiceDate = datetime.now().strftime('%Y%m%d')
+            form = api_shipment.ShipmentServiceOptions.InternationalForms
+            form.FormType = '01'
+            form.CurrencyCode = request.get_total_insured_value().currency
+            form.InvoiceDate = datetime.now().strftime('%Y%m%d')
 
-            api_shipment.ShipmentServiceOptions \
-                .InternationalForms.Product = api_product
-            api_shipment.ShipmentServiceOptions.InternationalForms \
-                .ReasonForExport = 'GIFT'
+            form.Product = api_product
+            # TODO: Make this tweakable.
+            form.ReasonForExport = 'GIFT'
 
-            _populate_address(
-                api_shipment.ShipmentServiceOptions.InternationalForms
-                    .Contacts.SoldTo,
+            self._populate_address(
+                form.Contacts.SoldTo,
                 request.destination, use_phone=True, use_attn=True,
                 international=True)
-            #api_shipment.ShipmentServiceOptions.InternationalForms.Contacts.SoldTo.TaxIdentificationNumber = ?????????????
 
         ### signature requirement upon receipt
         # Valid values are: 1 -
@@ -385,23 +482,21 @@ class UPSApi(base.Carrier):
         # Only
         signature_required = self.get_param(request, 'signature', None)
         if signature_required:
+            confirm = api_shipment.ShipmentServiceOptions.DeliveryConfirmation
             if signature_required == 'Adult':
-                api_shipment.ShipmentServiceOptions \
-                    .DeliveryConfirmation.DCISType = 2
+                confirm.DCISType = 2
             elif signature_required == 'Indirect':
-                api_shipment.ShipmentServiceOptions \
-                    .DeliveryConfirmation.DCISType = 1
+                confirm.DCISType = 1
             else:
                 raise NotSupportedError(
                     'UPS does not support that signature confirmation method, '
                     'only indirect and adult-only.')
 
-        description = ', '.join([
-            a.description
+        descriptions = [
+            dec.description for dec in package.declarations
+            for package in request.packages]
 
-            ### flatten list of lists of declarations
-            for a in sum([b.declarations for b in request.packages], [])
-        ])
+        description = ', '.join(descriptions)
 
         ### UPS does not allow descriptions longer than 50 characters.
         api_shipment.Description = description[0:50]
@@ -416,16 +511,13 @@ class UPSApi(base.Carrier):
             response = self._Ship.service.ProcessShipment(
                 api_request, api_shipment, label_spec, receipt_spec)
         except WebFault as err:
-            raise _convert_webfault(err)
+            raise self._convert_webfault(err)
 
-        published_rate = _get_money(
-            response.ShipmentResults.ShipmentCharges.TotalCharges)
-        negotiated_rate = _get_money(
+        negotiated_rate = self._get_money(
             response.ShipmentResults.NegotiatedRateCharges.TotalCharge)
-        ### TODO: store/return these rates ^
 
         if response.Response.ResponseStatus.Code != '1':
-            _on_unknown_error()
+            self._on_unknown_error()
 
         master_tracking_number = \
             response.ShipmentResults.ShipmentIdentificationNumber
@@ -447,45 +539,54 @@ class UPSApi(base.Carrier):
         return {
             'shipment': Shipment(self, master_tracking_number),
             'packages': packages,
-            'price': negotiated_rate
-        }
+            'price': negotiated_rate}
+
+    def _task(self, request, rated_shipment, shipment_info):
+        """
+        Because the delivery datetime check must be done on a separate web
+        request, we break this down into tasks so the requests run in parallel.
+        """
+        try:
+            service = base.Service(
+                self,
+                rated_shipment.Service.Code,
+                self._code_to_description.get(
+                    rated_shipment.Service.Code, '???'))
+
+            info = {
+                'price': self._get_negotiated_charge(rated_shipment),
+                # This has to make a separate web request.
+                'delivery_datetime': self.delivery_datetime(service, request),
+                'alerts': [
+                    a.Description for a in rated_shipment.RatedShipmentAlert],
+                'trackable': True}
+            shipment_info.put((service, info))
+
+        except Exception as err:
+            err.traceback = sys.exc_info()[2]
+            shipment_info.put(err)
 
     def get_services(self, request):
-        _ensure_request_supported(request)
+        self._ensure_request_supported(request)
 
         rates = self._request_rates(request, 'Shop')
 
         shipment_info = Queue()
+        # Each request takes multiple web service calls.
+        # We thread for efficiency.
         for rated_shipment in rates.RatedShipment:
-            def task(rated_shipment):
-                try:
-                    service = base.Service(
-                        self,
-                        rated_shipment.Service.Code,
-                        self._code_to_description.get(
-                            rated_shipment.Service.Code, '???'))
-
-                    shipment_info.put((service, dict(
-                        price=_get_negotiated_charge(rated_shipment),
-                        delivery_datetime=
-                            self.delivery_datetime(service, request),
-                        alerts=[a.Description
-                            for a in rated_shipment.RatedShipmentAlert],
-                        trackable=True
-                    )))
-                except Exception as err:
-                    err.traceback = sys.exc_info()[2]
-                    shipment_info.put(err)
-
-            threading.Thread(target=task, args=(rated_shipment,)).start()
+            thread = Thread(
+                target=self._task,
+                args=(request, rated_shipment, shipment_info))
+            thread.start()
             
         result = {}
         for _ in rates.RatedShipment:
-            a = shipment_info.get()
-            if isinstance(a, Exception):
-                raise a
+            info = shipment_info.get()
+            if isinstance(info, Exception):
+                raise info
             else:
-                service, rates = a
+                service, rates = info
                 result[service] = rates
         return result
 
@@ -500,38 +601,21 @@ class UPSApi(base.Carrier):
             UPS products from the
             ShipFrom to the ShipTo
             addresses.
-
-        pickup_type = one of:
-            '01' - Daily Pickup
-            '03' - Customer Counter
-            '06' - One Time Pickup
-            '07' - On Call Air
-            '19' - Letter Center
-            '20' - Air Service Center
-
-        customer_type = one of
-            00 - Rates Associated with Shipper Number
-            01 - Daily Rates
-            04 - Retail Rates
-            53 - Standard List Rates
-
-        ship_from:data.Address|None = The address of the warehouse to
-            ship from or None if same as shipper's office
         """
-        _ensure_request_supported(request)
+        self._ensure_request_supported(request)
 
-        pickup_type = '01'
-        customer_type = '00'
+        DAILY_PICKUP = '01'
+        SHIPPER = '00'
 
         api_request = self._RateWS.factory.create('ns0:RequestType')
         api_request.RequestOption = [request_type]
 
         _pickup_type = self._RateWS.factory.create('ns2:CodeDescriptionType')
-        _pickup_type.Code = pickup_type
+        _pickup_type.Code = DAILY_PICKUP
 
         _customer_classification = self._RateWS.factory.create(
             'ns2:CodeDescriptionType')
-        _customer_classification.Code = customer_type
+        _customer_classification.Code = SHIPPER
 
         shipment = self._RateWS.factory.create('ns2:ShipmentType')
         shipment.ShipmentRatingOptions.NegotiatedRatesIndicator = ''
@@ -549,12 +633,11 @@ class UPSApi(base.Carrier):
             shipment.Service.Description = service.name
 
         origin = request.origin or self.postal_configuration['shipper_address']
-        international = (origin.country != request.destination.country)
 
-        _populate_shipper(
+        self._populate_shipper(
             shipment.Shipper, origin, self.shipper_number)
-        _populate_address(shipment.ShipFrom, origin)
-        _populate_address(shipment.ShipTo, request.destination)
+        self._populate_address(shipment.ShipFrom, origin)
+        self._populate_address(shipment.ShipTo, request.destination)
 
         using_ups_pak = False
 
@@ -581,14 +664,11 @@ class UPSApi(base.Carrier):
             rates = self._RateWS.service.ProcessRate(
                 api_request, _pickup_type, _customer_classification, shipment)
         except WebFault as err:
-            raise _convert_webfault(err)
+            raise self._convert_webfault(err)
 
-        if rates.Response.ResponseStatus.Code != '1':  # 1 = Success
-            _on_unknown_error()
-
-        #if hasattr(rates.Response, 'Alert'):
-        #    for alert in rates.Response.Alert:
-        #        print 'ALERT:', alert.Description
+        # 1 = Success
+        if rates.Response.ResponseStatus.Code != '1':
+            self._on_unknown_error()
 
         return rates
 
@@ -616,10 +696,10 @@ class UPSApi(base.Carrier):
                 address_key)
 
         except WebFault as err:
-            raise _convert_webfault(err)
+            raise self._convert_webfault(err)
 
         if response.Response.ResponseStatus.Code != '1':
-            _on_unknown_error()
+            self._on_unknown_error()
 
         if not hasattr(response, 'Candidate') or len(response.Candidate) == 0:
             return False, address
@@ -636,20 +716,19 @@ class UPSApi(base.Carrier):
         if address_key.PostcodeExtendedLow:
             postal_code += '-%s' % address_key.PostcodeExtendedLow
 
+        lines = candidate.AddressKeyFormat.AddressLine
+        if hasattr(candidate.AddressKeyFormat, 'Urbanization'):
+            lines.append(candidate.AddressKeyFormat.Urbanization)
+
         result = Address(
             contact_name=address.contact_name,
             phone_number=address.phone_number,
-            street_lines=candidate.AddressKeyFormat.AddressLine + (((
-                [candidate.AddressKeyFormat.Urbanization]
-                if hasattr(candidate.AddressKeyFormat, 'Urbanization') else
-                []
-            ))),
+            street_lines=lines,
             subdivision=candidate.AddressKeyFormat.PoliticalDivision1,
             city=candidate.AddressKeyFormat.PoliticalDivision2,
             postal_code=postal_code,
             country=candidate.AddressKeyFormat.CountryCode,
-            residential=residential
-        )
+            residential=residential)
 
         if result == address:
             return True, result
@@ -657,7 +736,7 @@ class UPSApi(base.Carrier):
             return False, result
 
     def delivery_datetime(self, service, request):
-        _ensure_request_supported(request)
+        self._ensure_request_supported(request)
 
         api_request = self._TNTWS.factory.create('ns0:RequestType')
 
@@ -669,11 +748,11 @@ class UPSApi(base.Carrier):
         international = (origin.country != request.destination.country)
 
         req_ship_from = self._TNTWS.factory.create('ns2:RequestShipFromType')
-        _populate_address(
+        self._populate_address(
             req_ship_from, origin, use_street=False, use_name=False)
 
         req_ship_to = self._TNTWS.factory.create('ns2:RequestShipToType')
-        _populate_address(
+        self._populate_address(
             req_ship_to, request.destination, use_street=False, use_name=False)
 
         sticks = self._TNTWS.factory.create('ns2:PickupType')
@@ -690,82 +769,61 @@ class UPSApi(base.Carrier):
         weight.UnitOfMeasurement.Code = 'LBS'
 
         ### UPS's TiT API won't take a weight that is zero
-        weight.Weight = str(
-            max(.1, sum([package.weight for package in request.packages])))
+        weight.Weight = str(request.total_weight() or .1)
 
         invoice = self._TNTWS.factory.create('ns2:InvoiceLineTotalType')
-        _populate_money(invoice, request.get_total_declared_value())
+        self._populate_money(invoice, request.get_total_declared_value())
+
+        # None means the tag will be skipped in the XML, leaving the default
+        # value.
+
+        if international and request.documents_only():
+            documents = ''
+        else:
+            documents = None
+
+        bill_type, max_list, sat_morn, drop_off, hold_pickup = (
+            None, None, None, None, None)
+
+        num_packages = len(request.packages)
 
         try:
             response = self._TNTWS.service.ProcessTimeInTransit(
-                api_request,
-                req_ship_from,
-                req_ship_to,
-                sticks,
-                weight,
-
-                # num packages in shipment
-                str(len(request.packages)),
-                invoice,
-
-                # DocumentsOnlyIndicator (missing tag = false)
-                (((''
-                   if international and request.documents_only() else
-                   None))),
-
-                # BillType
-                # This field needs to be populated when UPS WorldWide
-                # Express Freight Shipment Service is needed to be returned in
-                # response. The valid value is 04.
-                None,
-
-                # MaximumListSize - default is 35
-                None,
-
-                # SaturdayDeliveryInfoRequestIndicator
-                # missing tag = no
-                None,
-
-                # DropOffAtFacilityIndicator
-                # missing tag = pick up at warehouse
-                None,
-
-                # HoldForPickupIndicator
-                # If present, indicates pickup by consignee. If absent,
-                # indicates delivery by UPS. This accessorial is valid
-                # if Bill Type is 04.
-                None)
+                api_request, req_ship_from, req_ship_to, sticks, weight,
+                num_packages, invoice, documents, bill_type, max_list,
+                sat_morn, drop_off, hold_pickup)
 
         except WebFault as err:
-            if err.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Code == '270037':
+            if (err.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Code
+                    == '270037'):
                 return None
-            raise _convert_webfault(err)
+            raise self._convert_webfault(err)
 
         if response.Response.ResponseStatus.Code != '1':
-            _on_unknown_error()
+            self._on_unknown_error()
 
         if not hasattr(response, 'TransitResponse'):
             return None
 
         for summary in response.TransitResponse.ServiceSummary:
-            if (
-                summary.Service.Code !=
-                _service_code_to_time_in_transit_code[service.service_id]
-            ):
+            if (summary.Service.Code !=
+                    self._service_code_to_time_in_transit_code[
+                        service.service_id]):
                 continue
 
+            date = summary.EstimatedArrival.Arrival.Date
+            time = summary.EstimatedArrival.Arrival.Time
             return datetime(
-                year=int(summary.EstimatedArrival.Arrival.Date[0:4]),
-                month=int(summary.EstimatedArrival.Arrival.Date[4:6]),
-                day=int(summary.EstimatedArrival.Arrival.Date[6:8]),
-                hour=int(summary.EstimatedArrival.Arrival.Time[0:2]),
-                minute=int(summary.EstimatedArrival.Arrival.Time[2:4])
-            )
+                year=int(date[0:4]),
+                month=int(date[4:6]),
+                day=int(date[6:8]),
+                hour=int(time[0:2]),
+                minute=int(time[2:4]))
 
         return None
 
     def quote(self, service, request):
-        _ensure_request_supported(request)
+        self._ensure_request_supported(request)
 
         rates = self._request_rates(request, 'Rate', service)
 
@@ -777,7 +835,7 @@ class UPSApi(base.Carrier):
             raise CarrierError(
                 'UPS has no rates available for those parameters.')
 
-        return _get_negotiated_charge(rated_shipment)
+        return self._get_negotiated_charge(rated_shipment)
 
     def _populate_package(self, api_package, package):
         packaging_code = self.package_type_translate(
@@ -788,198 +846,33 @@ class UPSApi(base.Carrier):
         except AttributeError:
             api_package.PackagingType.Code = packaging_code  # rating
 
+        dims = api_package.Dimensions
         if packaging_code != '01':  # UPS Letter
-            api_package.Dimensions.UnitOfMeasurement.Code = 'IN'
+            dims.UnitOfMeasurement.Code = 'IN'
 
             ### Specify too many decimal digits here and it says that
             ### "every dimension is required and must be > zero".
             ### Seriously, UPS?
-            api_package.Dimensions.Length = '%.2f' % max(1, package.length)
-            api_package.Dimensions.Width = '%.2f' % max(1, package.width)
-            api_package.Dimensions.Height = '%.2f' % max(1, package.height)
+            dims.Length = '%.2f' % max(1, package.length)
+            dims.Width = '%.2f' % max(1, package.width)
+            dims.Height = '%.2f' % max(1, package.height)
 
         api_package.PackageWeight.UnitOfMeasurement.Code = 'LBS'
 
         api_package.PackageWeight.Weight = '%.1f' % max(.1, package.weight)
 
-        if is_large(package):
+        if self.is_large(package):
+            # Make sure this tag shows up.
             api_package.LargePackageIndicator = ''
 
-        _populate_money(
+        self._populate_money(
             api_package.PackageServiceOptions.DeclaredValue,
             package.get_total_insured_value())
 
         if package.get_total_insured_value() > 0:  # for rates
             # can't treat Money instance as boolean
-            _populate_money(
+            self._populate_money(
                 api_package.PackageServiceOptions.DeclaredValue,
                 package.get_total_insured_value())
 
         return api_package
-
-    _to_proprietary_packaging = {
-        'softpak': '04',
-        'envelope': '01'}
-
-    _generic_package_translation = {
-        'package': '02',
-        'softpak': '02',
-        'envelope': '02'
-    }
-
-    _package_id_to_description = dict(
-        ### UPS supports generic boxes, softpaks, and flats;
-        ### they are all code '02'
-        base.Carrier._package_id_to_description.items() + {
-            '01': 'Express Envelope',
-            '02': 'Generic Packaging',  ###### TODO: losing information in conversion
-            '03': 'Tube',
-            '04': 'Pak',  # proprietary softpak, not generic
-            '21': 'Express Box',
-            '24': '25kg Box',
-            '25': '10kg Box',
-            '30': 'Pallet',
-            '2a': 'Small Express Box',
-            '2b': 'Medium Express Box',
-            '2c': 'Large Express Box'
-            ### For FRS rating requests the
-            ### only valid value is customer
-            ### supplied packaging 02.
-        }.items()
-    )
-
-
-def _get_negotiated_charge(rated_shipment):
-    if hasattr(rated_shipment, 'NegotiatedRateCharges'):
-        return _get_money(rated_shipment.NegotiatedRateCharges.TotalCharge)
-    else:
-        return _get_money(rated_shipment.TotalCharges)
-
-
-def get_length_plus_girth(package):
-    height, width, length = sorted(
-        [package.length, package.width, package.height])
-    return length + width * 2 + height * 2
-
-
-def is_large(package):
-    ### http://www.ups.com/content/pr/en/shipping/cost/additional.html#Large+Package+Surcharge
-    # A package is considered a "Large Package" when its length plus girth
-    # [(2 x width) + (2 x height)] combined exceeds 130 inches, but does not
-    # exceed the maximum UPS size of 165 inches.  An Additional Handling Charge
-    # will not be assessed when a Large Package Surcharge is applied.
-
-    if package.package_type.code in ['01', 'envelope']:
-        return False
-    return get_length_plus_girth(package) > 130
-
-
-def _ensure_request_supported(request):
-    for package in request.packages:
-        _ensure_package_supported(package)
-
-
-def _ensure_package_supported(package):
-    if package.package_type.code not in ['01', 'envelope']:
-        if get_length_plus_girth(package) > 165:
-            raise NotSupportedError(
-                'UPS does not support packages of that size.')
-    if package.weight > 150:
-        raise NotSupportedError(
-            'UPS does not ship packages that weigh more than 150 pounds.')
-
-
-def _test_is_large():
-    from ..data import Package
-    from .base import PackageType
-
-    t = PackageType(None, 'package', 'Package')
-    assert is_large(Package(10, 10, 91, 0, t))
-    assert not is_large(Package(10, 10, 90, 0, t))
-    assert is_large(Package(91, 10, 10, 0, t))
-    assert is_large(Package(10, 91, 10, 0, t))
-_test_is_large()
-
-
-def _populate_address(
-        node, address, use_street=True,
-        use_name=True, use_phone=False, use_attn=False,
-        international=False):
-    """
-    node = shipment.Shipper|shipment.ShipFrom|shipment.ShipTo
-    """
-
-    if address.contact_name:
-        if len(address.contact_name) > 35:
-            raise NotSupportedError('UPS requires the contact name to be at '
-                                    'most 35 characters long. The company '
-                                    'name should be in the street lines.')
-        if use_name:
-            # docs say the limit is 35 characters
-            node.Name = address.contact_name[:35]
-        if use_attn:
-            node.AttentionName = address.contact_name[:35]
-
-    if address.street_lines:
-        if len(address.street_lines) > 3:
-            raise NotSupportedError(
-                'UPS does not support more than three address lines.')
-        for line in address.street_lines:
-            if len(line) > 35:
-                raise NotSupportedError('UPS requires each address line to be '
-                                        'at most 35 characters long.')
-            if use_street:
-                node.Address.AddressLine = address.street_lines
-
-    node.Address.City = address.city
-    if address.subdivision:
-        node.Address.StateProvinceCode = address.subdivision.upper()
-    if address.postal_code is not None:
-        node.Address.PostalCode = address.postal_code.replace(' ', '')
-    node.Address.CountryCode = address.country.alpha2
-    if not international and address.residential:
-        node.Address.ResidentialAddressIndicator = ''
-    if use_phone:
-        node.Phone.Number = address.phone_number
-
-
-def _populate_shipper(
-        node, address, shipper_number, use_attn=False, use_phone=False,
-        tax_identification_number=None):
-    _populate_address(node, address, use_phone=use_phone, use_attn=use_attn)
-    node.ShipperNumber = shipper_number
-    if tax_identification_number is not None:
-        node.TaxIdentificationNumber = tax_identification_number
-
-
-def _get_money(node):
-    return money.Money(node.MonetaryValue, node.CurrencyCode)
-
-
-def _populate_money(node, value):
-    node.CurrencyCode = value.currency
-    node.MonetaryValue = str(value.amount)
-
-
-_service_code_to_time_in_transit_code = {
-    '14': '1DM',
-    '01': '1DA',
-    '13': '1DP',
-    '59': '2DM',
-    '02': '2DA',
-    '12': '3DS',
-    '03': 'GND',
-    '54': '21',
-    '07': '01',
-    '08': '05',
-    '11': '03',
-    '65': '20',
-    '96': '29'  # UPS Worldwide Express Freight
-
-    ### No mappings:
-    # UPS Next Day Air Early A.M. (Saturday Delivery)
-    # UPS Next Day Air (Saturday Delivery)
-    # UPS Second Day Air (Saturday Delivery)
-    #?: '28'  # UPS Worldwide Saver
-    #?: 'G'  # UPS Ground ---- Puerto Rico to United States and United States to Puerto Rico
-}
