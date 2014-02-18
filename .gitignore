@@ -1,3 +1,6 @@
 .idea*
 *.pyc
 postal/tests/test_credentials.py
+build/*
+dist/*
+Postal*.egg-*

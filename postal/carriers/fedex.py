@@ -4,14 +4,16 @@ This is the module for interfacing with FedEx's web services APIs.
 from base64 import b64decode
 from datetime import datetime
 from math import ceil
-from PyPDF2 import PdfFileReader, PdfFileWriter
-from StringIO import StringIO
-from suds.client import Client
-from money import Money
 
-from base import Carrier, ClearEmpty
+from money import Money
+from PyPDF2 import PdfFileReader, PdfFileWriter
+from suds.client import Client
+
+from .base import Carrier, ClearEmpty
 from ..exceptions import CarrierError, NotSupportedError, PostalError
 from ..data import Address, Shipment, Declaration
+
+from io import BytesIO
 
 class FedExApi(Carrier):
     """
@@ -232,14 +234,20 @@ class FedExApi(Carrier):
 
     @staticmethod
     def format_label(label):
-        input = PdfFileReader(StringIO(b64decode(label)))
+        # Some jump-around for dual compatibility with Python 2 and 3
+        #label = re.sub('\s', '', str(label))
+        if isinstance(label, bytes):
+            label = label.decode('utf-8')
+        label = b64decode(label)
+        #label = str(label)
+        input = PdfFileReader(BytesIO(label))
         output = PdfFileWriter()
 
         page = input.getPage(0)
         page.mediaBox.lowerLeft = (30, 325)
         page.mediaBox.upperRight = (320, 760)
         output.addPage(page)
-        output_stream = StringIO()
+        output_stream = BytesIO()
         output.write(output_stream)
         return output_stream.getvalue()
 

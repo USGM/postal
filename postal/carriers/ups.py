@@ -7,12 +7,15 @@ from Queue import Queue
 from threading import Thread
 
 from datetime import datetime
-from StringIO import StringIO
+from io import BytesIO
 
 import PIL.Image
+from .base import Service, Carrier
 import suds.cache
-import money
-import base
+try:
+    import money
+except ImportError:
+    import Money as money
 
 from suds.client import Client
 from suds.plugin import MessagePlugin
@@ -112,7 +115,7 @@ class AuthenticationPlugin(MessagePlugin):
         service_access_token.append(access_license_number)
 
 
-class UPSApi(base.Carrier):
+class UPSApi(Carrier):
 
     # Used when generating some ambiguous SOAP objects.
     common = 'http://www.ups.com/XMLSchema/XOLTWS/Common/v1.0'
@@ -618,8 +621,11 @@ class UPSApi(base.Carrier):
         packages = {}
 
         for index, pak in enumerate(response.ShipmentResults.PackageResults):
-            pdf = StringIO()
-            image = StringIO(base64.b64decode(pak.ShippingLabel.GraphicImage))
+            pdf = BytesIO()
+            label = base64.b64decode(pak.ShippingLabel.GraphicImage)
+            if isinstance(label, str):
+                label = label.encode('utf-8')
+            image = BytesIO(label)
             image = PIL.Image.open(image)
             image = image.transpose(PIL.Image.ROTATE_270)
             image = image.crop((0, 0, 800, 1200))

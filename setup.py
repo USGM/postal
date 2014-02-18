@@ -1,6 +1,25 @@
 import os
-from setuptools import setup
+from sys import version_info
 
+from setuptools import setup, find_packages
+
+PY3 = version_info[0] == 3
+
+if PY3:
+    install_requires=[
+        'PyPDF2', 'Pillow>=2.2.1',
+        'requests>=2.0.1', 'pycountry>=1.2',
+        'python-dateutil>=2.1', 'python-money', 'suds==0.5.1']
+    dependency_links = [
+        'https://github.com/USGM/PyPDF2/tarball/master#egg=PyPDF2-1.19',
+        'https://github.com/USGM/python-money/tarball/master#egg=python-money-0.5.1',
+        'https://github.com/USGM/suds/tarball/master#egg=suds-0.5.1']
+else:
+    install_requires=[
+        'suds>=0.4', 'python-money>=0.5', 'PyPDF2==1.19', 'Pillow>=2.2.1',
+        'requests>=2.0.1', 'python-money>=0.5', 'pycountry>=1.2',
+        'python-dateutil>=2.1']
+    dependency_links = ['https://github.com/USGM/PyPDF2/tarball/master#egg=PyPDF2-1.19']
 
 def get_data_files():
     paths = [
@@ -24,14 +43,13 @@ setup(
     download_url='https://github.com/USGM/postal',
     description='A simple unified interface for shipping with '
                 'multiple carriers',
+    use_2to3=True,
     license='None',
-    install_requires=[
-        'suds>=0.4', 'python-money>=0.5', 'PyPDF2>=1.19', 'Pillow>=2.2.1',
-        'requests>=2.0.1'],
-    packages=[
-        'postal', 'postal.carriers', 'postal.tests',
-        'postal.carriers.templates'],
-    data_files = get_data_files(),
+    install_requires=install_requires,
+    dependency_links=dependency_links,
+    packages=find_packages(),
+    zip_safe=False,
+    data_files=get_data_files(),
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Environment :: Console',

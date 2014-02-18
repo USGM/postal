@@ -1,4 +1,4 @@
-from ..configuration_base import base_postal_configuration
+from postal.configuration_base import base_postal_configuration
 
 from test_credentials import (
     dhl_credentials, fedex_credentials, ups_credentials, usps_credentials)

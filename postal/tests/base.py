@@ -1,13 +1,13 @@
-from StringIO import StringIO
 from datetime import datetime
+from io import BytesIO
 from unittest import SkipTest
 from dateutil.relativedelta import relativedelta
-from test_configuration import config
 
 from PyPDF2 import PdfFileReader
-from money.Money import Money
+from money import Money
 
 from ..carriers.base import Service, Carrier
+from .test_configuration import config
 
 from ..data import Address, Package, Declaration, Shipment, Request, \
     PackageType
@@ -241,7 +241,7 @@ class TestCarrier(object):
         for key, value in sdict['packages'].items():
             self.assertIsInstance(key, Package)
             label = value['label']
-            PdfFileReader(StringIO(label))
+            PdfFileReader(BytesIO(label))
             self.assertIn('tracking_number', value)
 
     def ship_package(self):

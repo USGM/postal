@@ -9,7 +9,10 @@ cwd = os.path.split(os.path.abspath(
 
 def load_template(namespace, name):
     template_name = os.path.join(cwd, namespace, name)
-    return open(template_name).read()
+    f = open(template_name)
+    text = f.read()
+    f.close()
+    return text
 
 
 def populate_template(template, escape_variables, no_escape_variables=None):

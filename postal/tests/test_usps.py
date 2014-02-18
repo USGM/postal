@@ -1,9 +1,11 @@
 import unittest
 from unittest import SkipTest
+
 from money import Money
 from base import TestCarrier, domestic, international
 from ..carriers.usps import USPSApi
 from postal.carriers import Carrier
+
 
 class TestUSPS(TestCarrier, unittest.TestCase):
     carrier_class = USPSApi

@@ -13,6 +13,7 @@ DHL rarely ships domestically, and trying to handle domestic shipments with
 them results in a lot of traps. We therefore disable domestic shipments with
 DHL.
 """
+from io import BytesIO
 from math import ceil
 import random
 from base64 import b64decode
@@ -21,8 +22,8 @@ from time import timezone
 from xml.etree.ElementTree import fromstring, tostring
 
 from PyPDF2 import PdfFileReader, PdfFileWriter
-from StringIO import StringIO
 from dateutil.relativedelta import relativedelta
+
 from money import Money
 from requests import post, RequestException
 
@@ -92,7 +93,9 @@ class DHLApi(Carrier):
             self.url = 'https://xmlpi-ea.dhl.com/XMLShippingServlet'
 
     def make_call(self, call):
-        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Connection": "Close"}
         try:
             response = post(
                 self.url, data=call, headers=headers,
@@ -399,7 +402,11 @@ class DHLApi(Carrier):
 
     @staticmethod
     def format_labels(data):
-        main_pdf = PdfFileReader(StringIO(b64decode(data)))
+        if isinstance(data, str):
+            data = b64decode(data.encode('utf-8'))
+        else:
+            data = b64decode(data)
+        main_pdf = PdfFileReader(BytesIO(data))
         num_pages = main_pdf.getNumPages()
         labels = []
         for page in range(num_pages - 1):
@@ -408,7 +415,7 @@ class DHLApi(Carrier):
             page.mediaBox.UpperRight = (41, 47)
             page.mediaBox.LowerLeft = (322, 580)
             output.addPage(page)
-            output_stream = StringIO()
+            output_stream = BytesIO()
             output.write(output_stream)
             # Reload page for resizing.
             labels.append(output_stream.getvalue())
