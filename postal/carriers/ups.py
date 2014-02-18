@@ -7,12 +7,15 @@ from Queue import Queue
 from threading import Thread
 
 from datetime import datetime
-from StringIO import StringIO
+from io import BytesIO
 
 import PIL.Image
+from .base import Service, Carrier
 import suds.cache
-import money
-import base
+try:
+    import money
+except ImportError:
+    import Money as money
 
 from suds.client import Client
 from suds.plugin import MessagePlugin
@@ -97,7 +100,7 @@ class AuthenticationPlugin(MessagePlugin):
         service_access_token.append(access_license_number)
 
 
-class UPSApi(base.Carrier):
+class UPSApi(Carrier):
     name = 'UPS'
     address_validation = True
     auto_residential = True
@@ -146,7 +149,7 @@ class UPSApi(base.Carrier):
     _package_id_to_description = dict(
         ### UPS supports generic boxes, softpaks, and flats;
         ### they are all code '02'
-        base.Carrier._package_id_to_description.items() + {
+        Carrier._package_id_to_description.items() + {
             '01': 'Express Envelope',
             ###### TODO: losing information in conversion
             '02': 'Generic Packaging',
@@ -525,8 +528,11 @@ class UPSApi(base.Carrier):
         packages = {}
 
         for index, pak in enumerate(response.ShipmentResults.PackageResults):
-            pdf = StringIO()
-            image = StringIO(base64.b64decode(pak.ShippingLabel.GraphicImage))
+            pdf = BytesIO()
+            label = base64.b64decode(pak.ShippingLabel.GraphicImage)
+            if isinstance(label, str):
+                label = label.encode('utf-8')
+            image = BytesIO(label)
             image = PIL.Image.open(image)
             image = image.transpose(PIL.Image.ROTATE_270)
             image = image.crop((0, 0, 800, 1200))
@@ -547,7 +553,7 @@ class UPSApi(base.Carrier):
         request, we break this down into tasks so the requests run in parallel.
         """
         try:
-            service = base.Service(
+            service = Service(
                 self,
                 rated_shipment.Service.Code,
                 self._code_to_description.get(
@@ -673,7 +679,7 @@ class UPSApi(base.Carrier):
         return rates
 
     def get_service(self, service_id):
-        return base.Service(
+        return Service(
             self, service_id, self._code_to_description[service_id])
 
     def validate_address(self, address):

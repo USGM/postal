@@ -6,7 +6,10 @@ from decimal import Decimal
 from datetime import datetime
 from money import Money
 from pycountry import countries
-import money
+try:
+    import money
+except ImportError:
+    import Money
 
 from exceptions import AddressError
 

@@ -1,6 +1,8 @@
 import unittest
 from unittest import SkipTest
+
 from money import Money
+
 from base import TestCarrier
 from ..carriers.usps import USPSApi
 

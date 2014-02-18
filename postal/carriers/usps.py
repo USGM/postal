@@ -15,20 +15,22 @@ do so would mean that some packages would have been shipped, and others would
 not have. Automatically refunding the packages would also be problematic, as
 the cause of the original problem might also prevent the refund working.
 """
+import random
+import re
 from base64 import b64decode
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from math import ceil
-import random
-import re
-from PyPDF2 import PdfFileReader, PdfFileWriter
-from StringIO import StringIO
-from suds.client import Client
-from money import Money
 
-from base import Carrier, ClearEmpty
+from PyPDF2 import PdfFileReader, PdfFileWriter
+from money import Money
+from suds.client import Client
+
+from base import Carrier, ClearEmpty, PY3
 from ..exceptions import CarrierError, NotSupportedError
 from ..data import Shipment, sigfig
+
+from io import BytesIO
 
 
 class USPSApi(Carrier):
@@ -275,7 +277,10 @@ class USPSApi(Carrier):
 
     @staticmethod
     def _format_label(label, type):
-        input = PdfFileReader(StringIO(b64decode(label)))
+        label = b64decode(label)
+        if isinstance(label, str):
+            label = label.encode('utf-8')
+        input = PdfFileReader(BytesIO(label))
         output = PdfFileWriter()
 
         page = input.getPage(0)
@@ -287,7 +292,7 @@ class USPSApi(Carrier):
             page.mediaBox.upperRight = (521, 752)
 
         output.addPage(page)
-        output_stream = StringIO()
+        output_stream = BytesIO()
         output.write(output_stream)
 
         return output_stream.getvalue()
@@ -296,11 +301,11 @@ class USPSApi(Carrier):
         output = PdfFileWriter()
         pages = []
         for label in labels:
-            input = PdfFileReader(StringIO(label))
+            input = PdfFileReader(BytesIO(label))
             pages.append(input.getPage(0))
         for page in pages:
             output.addPage(page)
-        output_stream = StringIO()
+        output_stream = BytesIO()
         output.write(output_stream)
         return output_stream.getvalue()
 
@@ -480,8 +485,11 @@ class USPSApi(Carrier):
         response = self.service_call(
             self.client.service.ChangePassPhrase, change_request)
         if response.Status != 0:
-            raise CarrierError(
-                unicode(response.ErrorMessage).encode(encoding='utf-8'))
+            if PY3:
+                error = response.ErrorMessage
+            else:
+                error = unicode(response.ErrorMessage).encode('utf-8')
+            raise CarrierError(error)
         self.passphrase = new_passphrase
 
     def compile_options(self, request, response_list):

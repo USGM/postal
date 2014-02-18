@@ -12,10 +12,14 @@ import os
 import re
 
 from suds.plugin import MessagePlugin
+import sys
 
 from ..exceptions import CarrierError, PostalError
 from postal.data import PackageType
 from postal.exceptions import NotSupportedError
+
+
+PY3 = sys.version_info[0] == 3
 
 
 class ClearEmpty(MessagePlugin):
@@ -122,7 +126,7 @@ class Carrier(object):
     @staticmethod
     def cache_key(request):
         return hash(tuple(sorted(
-            request.packages, key=lambda x: x.cache_hash)))
+            request.packages, key=lambda x: x.cache_hash())))
 
     def cache_results(self, request, response_dict):
         """
