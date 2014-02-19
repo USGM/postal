@@ -110,7 +110,18 @@ class FedExApi(Carrier):
     def service_call(self, func, *args, **kwargs):
         response = super(FedExApi, self).service_call(func, *args, **kwargs)
         if response.HighestSeverity in ["FAILURE", "ERROR"]:
-            raise CarrierError(response.Notifications[0].Message)
+            code = response.Notifications[0].Code
+
+            if code == '521':
+                err = NotSupportedError('FedEx requires a valid postal code '
+                                        'for that region. (If one was '
+                                        'specified, it is invalid.)')
+            else:
+                err = CarrierError('Error#%s: %s' % (
+                    code, response.Notifications[0].Message))
+
+            err.code = code
+            raise err
         return response
 
     def user_client(self, client):

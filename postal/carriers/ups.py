@@ -248,8 +248,12 @@ class UPSApi(base.Carrier):
         error = webfault.fault.detail.Errors.ErrorDetail.PrimaryErrorCode
 
         if error.Code == '111210':
-            result = NotSupportedError(
-                'UPS does not offer that service to that destination.')
+            result = NotSupportedError('UPS does not offer that service to '
+                                       'that destination.')
+        elif error.Code == '270005':
+            result = NotSupportedError('UPS requires a valid postal code for '
+                                       'that region. (If one was specified, '
+                                       'it is invalid.)')
         else:
             result = CarrierError('Webfault#%s: %s' % (
                 error.Code, error.Description))
@@ -298,8 +302,8 @@ class UPSApi(base.Carrier):
 
         if address.street_lines:
             if len(address.street_lines) > 3:
-                raise NotSupportedError(
-                    'UPS does not support more than three address lines.')
+                raise NotSupportedError('UPS does not support more than three '
+                                        'address lines.')
             for line in address.street_lines:
                 if len(line) > 35:
                     raise NotSupportedError(
@@ -492,9 +496,16 @@ class UPSApi(base.Carrier):
                     'UPS does not support that signature confirmation method, '
                     'only indirect and adult-only.')
 
-        descriptions = [
-            dec.description for dec in package.declarations
-            for package in request.packages]
+        # descriptions = [
+        #     dec.description
+        #         for dec in pack.declarations
+        #         for pack in request.packages
+        # ]
+
+        descriptions = []
+        for pack in request.packages:
+            for dec in pack.declarations:
+                descriptions.append(dec.description)
 
         description = ', '.join(descriptions)
 
@@ -639,26 +650,12 @@ class UPSApi(base.Carrier):
         self._populate_address(shipment.ShipFrom, origin)
         self._populate_address(shipment.ShipTo, request.destination)
 
-        using_ups_pak = False
-
         paks = []
         for package in request.packages:
             pak = self._RateWS.factory.create('ns2:PackageType')
             self._populate_package(pak, package)
             paks.append(pak)
         shipment.Package = paks
-
-        if (shipment.ShipFrom.Address.CountryCode in ('US', 'PR') and
-                request.destination.country.alpha2 not in ('US', 'PR') and
-                using_ups_pak):
-            # Required if the shipment is from
-            # US/PR Outbound to non US/PR
-            # destination with the
-            # PackagingType of UPS PAK(04)
-
-            #shipment.InvoiceLineTotal.CurrencyCode = 'USD'
-            #shipment.InvoiceLineTotal.MonetaryValue = '0'
-            pass  # let UPS raise a webfault if this is actually required
 
         try:
             rates = self._RateWS.service.ProcessRate(
