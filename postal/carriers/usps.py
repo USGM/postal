@@ -362,7 +362,6 @@ class USPSApi(Carrier):
         self._set_address_info(label_request, request)
         label_request._ImageFormat = 'PDF'
         label_format = self._label_type(request, service, package)
-        label_request.Stealth = 'TRUE'
         if request.international(origin=self.get_origin(request)):
             label_request._LabelType = 'International'
             label_request._LabelSubtype = 'Integrated'
@@ -387,6 +386,7 @@ class USPSApi(Carrier):
             else:
                 label_request.CustomsInfo.ContentsType = self.get_param(
                     request, 'contents', 'Gift')
+        label_request.Stealth = 'TRUE'
         response = self.service_call(
             self.client.service.GetPostageLabel, label_request)
         if hasattr(response, 'TrackingNumber'):
