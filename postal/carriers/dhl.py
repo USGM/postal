@@ -207,15 +207,11 @@ class DHLApi(Carrier):
         self.cache_results(request, response_dict)
 
         return {
-            Service(self, key, value['service_name']): {
+            self.get_service(key): {
                 'price': value['price'],
                 'delivery_datetime': value['delivery_datetime'],
                 'trackable': True}
             for key, value in response_dict.items()}
-
-    def get_service(self, service_id):
-        return Service(
-            self, service_id, self._code_to_description[service_id])
 
     @staticmethod
     def build_address(address):

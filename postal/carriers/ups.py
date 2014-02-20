@@ -602,11 +602,7 @@ class UPSApi(base.Carrier):
         request, we break this down into tasks so the requests run in parallel.
         """
         try:
-            service = base.Service(
-                self,
-                rated_shipment.Service.Code,
-                self._code_to_description.get(
-                    rated_shipment.Service.Code, '???'))
+            service = self.get_service(rated_shipment.Service.Code)
 
             info = {
                 'price': self._get_negotiated_charge(rated_shipment),
@@ -712,10 +708,6 @@ class UPSApi(base.Carrier):
             self._on_unknown_error()
 
         return rates
-
-    def get_service(self, service_id):
-        return base.Service(
-            self, service_id, self._code_to_description[service_id])
 
     def validate_address(self, address):
         request = self._XAV.factory.create('ns0:RequestType')

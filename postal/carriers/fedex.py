@@ -64,7 +64,7 @@ class FedExApi(Carrier):
         'FEDEX_TUBE': 'Tube',
         'YOUR_PACKAGING': 'Generic Packaging'}
 
-    _mix_max_estimates = {
+    _min_max_estimates = {
         'FIRST_OVERNIGHT': (1, 1),
         'PRIORITY_OVERNIGHT': (1, 1),
         'STANDARD_OVERNIGHT': (1, 1),
@@ -138,6 +138,9 @@ class FedExApi(Carrier):
                 err = NotSupportedError('FedEx requires a valid postal code '
                                         'for that region. (If one was '
                                         'specified, it is invalid.)')
+            elif code == '711':
+                err = NotSupportedError('FedEx does not ship to that postal '
+                                        'code.')
             else:
                 err = CarrierError('Error#%s: %s' % (
                     code, response.Notifications[0].Message))
