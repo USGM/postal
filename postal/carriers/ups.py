@@ -188,6 +188,26 @@ class UPSApi(base.Carrier):
         # United States to Puerto Rico
     }
 
+    _min_max_estimates = {
+        '01': (1, 1),  # Next Day Air
+        '02': (2, 2),  # Second Day Air
+        '03': (1, 5),  # Ground
+        '07': (1, 3),  # Worldwide Express
+        '08': (2, 5),  # Worldwide Expedited
+
+        ### '11' (Standard) depends on day of shipment request
+
+        '12': (3, 3),  # Three-Day Select
+        '13': (1, 1),  # Next Day Air Saver
+        '14': (1, 1),  # Next Day Air Early AM
+        '54': (1, 3),  # Worldwide Express Plus
+        '59': (2, 2),  # Second Day Air AM
+
+        '65': (1, 3),  # Saver ------ it's 1-3 for international and undocumented for domestic
+
+        '96': (1, 3),  # Worldwide Express Freight
+    }
+
     @staticmethod
     def _get_directory_of(frame):
         return os.path.split((os.path.abspath(inspect.getfile(frame))))[0]
@@ -254,6 +274,12 @@ class UPSApi(base.Carrier):
             result = NotSupportedError('UPS requires a valid postal code for '
                                        'that region. (If one was specified, '
                                        'it is invalid.)')
+        elif error.Code == '270040':  # "City is ambiguous"
+            # Once had this problem with an address where the city was
+            # correct but the postal code was wrong.
+            result = NotSupportedError('UPS has no rates for that address. '
+                                       'The city and/or the postal code may '
+                                       'be incorrect.')
         else:
             result = CarrierError('Webfault#%s: %s' % (
                 error.Code, error.Description))
@@ -366,11 +392,11 @@ class UPSApi(base.Carrier):
     def _ensure_package_supported(cls, package):
         if package.package_type.code not in ['01', 'envelope']:
             if cls.get_length_plus_girth(package) > 165:
-                raise NotSupportedError(
-                    'UPS does not support packages of that size.')
+                raise NotSupportedError('UPS does not ship packages of '
+                                        'that size.')
         if package.weight > 150:
-            raise NotSupportedError(
-                'UPS does not ship packages that weigh more than 150 pounds.')
+            raise NotSupportedError('UPS does not ship packages that weigh '
+                                    'more than 150 pounds.')
 
     def ship(self, service, request, receiver_account_number=None):
         self._ensure_request_supported(request)
@@ -442,15 +468,30 @@ class UPSApi(base.Carrier):
             api_package.append(pak)
 
             if international:
-                for dec in package.declarations:
-                    product = self._Ship.factory.create('ns2:ProductType')
-                    product.Description = [dec.description]
-                    product.Unit.Number = dec.units
-                    product.Unit.UnitOfMeasurement.Code = 'PCS'  # pieces
-                    product.Unit.Value = dec.value.amount
-                    product.OriginCountryCode = dec.origin_country.alpha2
+                if not package.declarations:
+                    if package.documents_only:
+                        product = self._Ship.factory.create('ns2:ProductType')
+                        product.Description = ['documents']
+                        product.Unit.Number = 1
+                        product.Unit.UnitOfMeasurement.Code = 'PCS'  # pieces
+                        product.Unit.Value = 1
+                        product.OriginCountryCode = origin.country.alpha2
 
-                    api_product.append(product)
+                        api_product.append(product)
+                    else:
+                        raise NotSupportedError('UPS requires each package '
+                                                "that isn't documents only to "
+                                                'have declarations.')
+                else:
+                    for dec in package.declarations:
+                        product = self._Ship.factory.create('ns2:ProductType')
+                        product.Description = [dec.description]
+                        product.Unit.Number = dec.units
+                        product.Unit.UnitOfMeasurement.Code = 'PCS'  # pieces
+                        product.Unit.Value = dec.value.amount
+                        product.OriginCountryCode = dec.origin_country.alpha2
+
+                        api_product.append(product)
 
         api_shipment.Package = api_package
 
@@ -468,7 +509,8 @@ class UPSApi(base.Carrier):
             form.InvoiceDate = datetime.now().strftime('%Y%m%d')
 
             form.Product = api_product
-            # TODO: Make this tweakable.
+
+            # TODO: Should eventually be parameterized
             form.ReasonForExport = 'GIFT'
 
             self._populate_address(
@@ -492,15 +534,9 @@ class UPSApi(base.Carrier):
             elif signature_required == 'Indirect':
                 confirm.DCISType = 1
             else:
-                raise NotSupportedError(
-                    'UPS does not support that signature confirmation method, '
-                    'only indirect and adult-only.')
-
-        # descriptions = [
-        #     dec.description
-        #         for dec in pack.declarations
-        #         for pack in request.packages
-        # ]
+                raise NotSupportedError('UPS does not support that signature '
+                                        'confirmation method - only indirect '
+                                        'and adult-only.')
 
         descriptions = []
         for pack in request.packages:

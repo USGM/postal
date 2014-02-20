@@ -147,9 +147,8 @@ class Carrier(object):
         comprehensive as practical. If you want services available for a
         specific request, get_services should be used instead.
         """
-        return (
-            Service(self, code, name)
-            for code, name in self._code_to_description.items())
+        return (self.get_service(code)
+                for code in self._code_to_description.keys())
 
     def get_services(self, request):
         """
@@ -163,8 +162,7 @@ class Carrier(object):
     def get_service(self, service_id):
         if service_id not in self._code_to_description:
             raise NotSupportedError(
-                "This service is not available on this carrier, "
-                "or is unsupported.")
+                self.name + ' does not support that service.')
 
         args = []
         if service_id in self._min_max_estimates:
