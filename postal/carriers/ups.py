@@ -480,6 +480,7 @@ class UPSApi(base.Carrier):
                         api_product.append(product)
                     else:
                         raise NotSupportedError('UPS requires each package '
+                                                "in an international shipment "
                                                 "that isn't documents only to "
                                                 'have declarations.')
                 else:
@@ -518,6 +519,23 @@ class UPSApi(base.Carrier):
                 request.destination, use_phone=True, use_attn=True,
                 international=True)
 
+            descriptions = []
+            for pack in request.packages:
+                if pack.declarations:
+                    for dec in pack.declarations:
+                        descriptions.append(dec.description)
+                elif pack.documents_only:
+                    descriptions.append('documents')
+                else:
+                    raise NotSupportedError('UPS requires each package '
+                                            "in an international shipment "
+                                            "that isn't documents only to "
+                                            'have declarations.')
+            description = ', '.join(descriptions)
+
+            ### UPS does not allow descriptions longer than 50 characters.
+            api_shipment.Description = description[0:50]
+
         ### signature requirement upon receipt
         # Valid values are: 1 -
         # Delivery Confirmation
@@ -537,16 +555,6 @@ class UPSApi(base.Carrier):
                 raise NotSupportedError('UPS does not support that signature '
                                         'confirmation method - only indirect '
                                         'and adult-only.')
-
-        descriptions = []
-        for pack in request.packages:
-            for dec in pack.declarations:
-                descriptions.append(dec.description)
-
-        description = ', '.join(descriptions)
-
-        ### UPS does not allow descriptions longer than 50 characters.
-        api_shipment.Description = description[0:50]
 
         label_spec = self._Ship.factory.create('ns3:LabelSpecificationType')
         label_spec.LabelImageFormat.Code = 'GIF'
@@ -827,9 +835,11 @@ class UPSApi(base.Carrier):
                 sat_morn, drop_off, hold_pickup)
 
         except WebFault as err:
-            if (err.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Code
-                    == '270037'):
+            code = err.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Code
+            if code == '270037':  # no TiT information available
                 return None
+            elif code == '270019':  # TiT service is not available
+                return None  # It's not essential information
             raise self._convert_webfault(err)
 
         if response.Response.ResponseStatus.Code != '1':
