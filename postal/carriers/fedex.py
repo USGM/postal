@@ -64,6 +64,28 @@ class FedExApi(Carrier):
         'FEDEX_TUBE': 'Tube',
         'YOUR_PACKAGING': 'Generic Packaging'}
 
+    _mix_max_estimates = {
+        'FIRST_OVERNIGHT': (1, 1),
+        'PRIORITY_OVERNIGHT': (1, 1),
+        'STANDARD_OVERNIGHT': (1, 1),
+        'FEDEX_2_DAY': (2, 2),
+        'FEDEX_2_DAY_AM': (2, 2),
+        'FEDEX_EXPRESS_SAVER': (3, 3),
+        'FEDEX_GROUND': (1, 5),
+        'FEDEX_HOME_DELIVERY': (1, 5),
+        'SMART_POST': (2, 14),
+        'GROUND_HOME_DELIVERY': (1, 5),
+        'SAME_DAY': (0, 0),
+        'SAME_DAY_CITY': (0, 0),
+        'FEDEX_FIRST_FREIGHT': (1, 1),
+        'FEDEX_3_DAY_FREIGHT': (3, 3),
+        'INTERNATIONAL_ECONOMY': (4, 6),
+        'INTERNATIONAL_ECONOMY_FREIGHT': (4, 6),
+        'INTERNATIONAL_PRIORITY_FREIGHT': (1, 3),
+        'INTERNATIONAL_FIRST': (1, 8),
+        'INTERNATIONAL_PRIORITY': (1, 3),
+        'EUROPE_FIRST_INTERNATIONAL_PRIORITY': (1, 1)}
+
     def create_client(self, wsdl_name):
         client = Client(
             self.service_url(wsdl_name), plugins=[ClearEmpty()],

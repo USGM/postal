@@ -71,6 +71,12 @@ class DHLApi(Carrier):
         'OD': 'Other DHL Packaging',
         'CP': 'Generic Packaging'}
 
+    # Aside from Economy, DHL's transit times are mostly the same.
+    _min_max_estimates = {
+        key: (1, 3) for key in _code_to_description.keys()}
+    _min_max_estimates['H'] = (2, 5)
+    _min_max_estimates['W'] = (2, 5)
+
     def __init__(
             self, account_number, region_code, company_name, site_id,
             password, test_mode=False, postal_configuration=None):

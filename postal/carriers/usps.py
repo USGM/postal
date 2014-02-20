@@ -77,6 +77,15 @@ class USPSApi(Carrier):
         'softpak', 'SmallFlatRateBox', 'MediumFlatRateBox', 'LargeFlatRateBox',
         'Parcel')
 
+    _min_max_estimates = {
+        'PriorityExpress': (1, 1),
+        'First': (2, 3),
+        'Priority': (1, 3),
+        'CriticalMail': (1, 3),
+        'PriorityMailExpressInternational': (3, 5),
+        'ExpressMailInternational': (3, 5),
+        'PriorityMailInternational': (6, 10)}
+
     def __init__(
             self, account_id, passphrase, requester_id, test=True,
             postal_configuration=None):

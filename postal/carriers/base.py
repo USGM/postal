@@ -83,6 +83,16 @@ class Carrier(object):
     # stuffed inside a branded FedEx envelope.
     _to_proprietary_packaging = {}
 
+    # Used to determine the min and maximum estimated transit times for a
+    # service. While these can't always be guarenteed, they are useful for
+    # displaying to users to help them find out when their items will arrive.
+    # The keys should be the service codes, and the values should be a tuple of
+    # the minimum and maximum number of days a delivery is expected to take.
+    # If it's something like 'next day' which is always the same min or max,
+    # use the same integer. If it is not possible to estimate, leave the
+    # service out of the dictionary altogether.
+    _min_max_estimates = {}
+
     def __init__(self, postal_configuration):
         self.postal_configuration = postal_configuration
         if not postal_configuration:
@@ -151,11 +161,16 @@ class Carrier(object):
         raise NotImplementedError
 
     def get_service(self, service_id):
-        try:
-            return Service(
-                self, service_id, self._code_to_description[service_id])
-        except KeyError:
-            raise NotSupportedError()
+        if service_id not in self._code_to_description:
+            raise NotSupportedError(
+                "This service is not available on this carrier, "
+                "or is unsupported.")
+
+        args = []
+        if service_id in self._min_max_estimates:
+            args = self._min_max_estimates[service_id]
+        return Service(
+            self, service_id, self._code_to_description[service_id], *args)
 
     def get_origin(self, request):
         return request.origin or self.postal_configuration['shipper_address']
@@ -291,13 +306,18 @@ class Carrier(object):
 
 
 class Service(object):
-    def __init__(self, carrier, service_id, name):
+    def __init__(self, carrier, service_id, name,
+                 min_transit=None, max_transit=None):
         self.carrier = carrier
         # Unique identifier for use with a carrier's get_service() method.
         # This should always be a string.
         self.service_id = service_id
         # The display name for a service, such as 'Priority Mail International'
         self.name = name
+        # The minimum estimated days of transit.
+        self.min_transit = min_transit
+        # The max.
+        self.max_transit = max_transit
 
     def __str__(self):
         return "%s: %s" % (self.carrier.name, self.name)
