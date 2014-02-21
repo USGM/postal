@@ -230,9 +230,10 @@ class UPSApi(base.Carrier):
 
     def __init__(
             self, username, password, access_license_number, shipper_number,
-            test, postal_configuration=None):
+            test, auto_time_in_transit=True, postal_configuration=None):
         super(UPSApi, self).__init__(postal_configuration)
         self.shipper_number = shipper_number
+        self.auto_time_in_transit = auto_time_in_transit
 
         authentication = AuthenticationPlugin(
             username, password, access_license_number)
@@ -276,10 +277,14 @@ class UPSApi(base.Carrier):
                                        'it is invalid.)')
         elif error.Code == '270040':  # "City is ambiguous"
             # Once had this problem with an address where the city was
-            # correct but the postal code was wrong.
+            # correct but the postal code was wrong. Because UPS.
             result = NotSupportedError('UPS has no rates for that address. '
                                        'The city and/or the postal code may '
                                        'be incorrect.')
+        elif error.Code == '111285':
+            result = NotSupportedError('UPS has no rates for that address. '
+                                       'The postal code/city/country may be '
+                                       'incorrect.')
         else:
             result = CarrierError('Webfault#%s: %s' % (
                 error.Code, error.Description))
@@ -606,11 +611,13 @@ class UPSApi(base.Carrier):
 
             info = {
                 'price': self._get_negotiated_charge(rated_shipment),
-                # This has to make a separate web request.
-                'delivery_datetime': self.delivery_datetime(service, request),
                 'alerts': [
                     a.Description for a in rated_shipment.RatedShipmentAlert],
                 'trackable': True}
+
+            if self.auto_time_in_transit:
+                info['delivery_datetime'] = self.delivery_datetime(service, request)
+
             shipment_info.put((service, info))
 
         except Exception as err:
@@ -807,13 +814,10 @@ class UPSApi(base.Carrier):
         invoice = self._TNTWS.factory.create('ns2:InvoiceLineTotalType')
         self._populate_money(invoice, request.get_total_declared_value())
 
-        # None means the tag will be skipped in the XML, leaving the default
-        # value.
-
         if international and request.documents_only():
-            documents = ''
+            documents = ''  # empty tag = true
         else:
-            documents = None
+            documents = None  # missing tag = false
 
         bill_type, max_list, sat_morn, drop_off, hold_pickup = (
             None, None, None, None, None)

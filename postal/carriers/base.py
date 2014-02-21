@@ -164,11 +164,11 @@ class Carrier(object):
             raise NotSupportedError(
                 self.name + ' does not support that service.')
 
-        args = []
-        if service_id in self._min_max_estimates:
-            args = self._min_max_estimates[service_id]
+        min_transit, max_transit = self._min_max_estimates.get(
+            service_id, (None, None))
         return Service(
-            self, service_id, self._code_to_description[service_id], *args)
+            self, service_id, self._code_to_description[service_id],
+            min_transit, max_transit)
 
     def get_origin(self, request):
         return request.origin or self.postal_configuration['shipper_address']
@@ -223,6 +223,10 @@ class Carrier(object):
         """
         Get carrier-specific extra configuration information from request
         object.
+
+        *args: [] | [object] = one object to use as the default value or no
+                               extra arguments to raise an exception if no
+                               parameter of the specified name is found
         """
         default = None
         raise_exception = False

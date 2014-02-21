@@ -71,7 +71,14 @@ base_postal_configuration = {
             'access_license_number': '',
             # Your account number with UPS. You should be able to find this by
             # logging into their website.
-            'shipper_number': ''},
+            'shipper_number': '',
+
+            # (Optional) Whether UPS makes a separate web request for delivery
+            # datetimes when getting rates via Postal.options() or
+            # UPSApi.get_services(). Does not affect calling delivery_datetime
+            # directly or via a Service object. Defaults to True when not
+            # specified.
+            'auto_time_in_transit': False},
 
         # You can register for a USPS API key at
         # https://secure.shippingapis.com/registration/
