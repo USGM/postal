@@ -417,7 +417,7 @@ class FedExApi(Carrier):
             declarations.append(
                 Declaration(
                     'Printed Documents', Money(
-                    '1.00', self.postal_configuration['default_currency']),
+                        '1.00', self.postal_configuration['default_currency']),
                     'US', 1))
         for declaration in declarations:
             commodity = client.factory.create('Commodity')
@@ -426,7 +426,7 @@ class FedExApi(Carrier):
             commodity.NumberOfPieces = declaration.units
             commodity.UnitPrice.Currency = value.currency
             commodity.UnitPrice.Amount = value.amount
-            value = value * declaration.units
+            value *= declaration.units
             commodity.CountryOfManufacture = declaration.origin_country.alpha2
             commodity.CustomsValue.Currency = value.currency
             commodity.CustomsValue.Amount = value.amount

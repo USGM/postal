@@ -32,9 +32,6 @@ from ..data import Shipment, sigfig
 
 
 class USPSApi(Carrier):
-    """
-    Implements calls to the FedEx web API.
-    """
     name = 'USPS'
     address_validation = False
     _code_to_description = {
@@ -116,8 +113,7 @@ class USPSApi(Carrier):
     def _sanity_check(self, request):
         origin = self.get_origin(request)
         if origin.country.alpha2 != 'US':
-            raise NotSupportedError(
-                "USPS only ships from the United States.")
+            raise NotSupportedError("USPS only ships from the United States.")
 
     @staticmethod
     def _service_day(proposed_datetime):
@@ -390,7 +386,7 @@ class USPSApi(Carrier):
                 float(package.weight) / len(package.declarations) /
                 commodities) or 1
             label_request.CustomsInfo.CustomsItems.CustomsItem.append(item)
-            if request.documents_only():
+            if package.documents_only():
                 label_request.CustomsInfo.ContentsType = 'Documents'
             else:
                 label_request.CustomsInfo.ContentsType = self.get_param(
@@ -446,13 +442,14 @@ class USPSApi(Carrier):
 
     def ship(self, service, request):
         self._sanity_check(request)
+        if len(request.packages) == 1:
+            return self.ship_package(request, service, request.packages[0])
+
         # Too dangerous to allow multiship if any packages don't work. So we
         # force a rate check before doing anything else. This should raise
         # an exception if there's a problem with any of the packages.
         self.quote(service, request)
         responses = []
-        if len(request.packages) == 1:
-            return self.ship_package(request, service, request.packages[0])
         for package in request.packages:
             try:
                 responses.append(self.ship_package(request, service, package))

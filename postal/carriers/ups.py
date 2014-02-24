@@ -426,8 +426,9 @@ class UPSApi(base.Carrier):
         ### not affect shipment charges. This is also true of any associated
         ### amounts within the International Forms container.
         if request.destination.country.alpha2 in ('CA', 'PR'):
-            # TODO: _populate_money(api_shipment.Shipment.InvoiceLineTotal, ?)
-            pass
+            self._populate_money(
+                api_shipment.Shipment.InvoiceLineTotal,
+                request.get_total_declared_value())
 
         self._populate_shipper(
             api_shipment.Shipper, origin, self.shipper_number,
@@ -439,7 +440,7 @@ class UPSApi(base.Carrier):
 
         self._populate_address(
             api_shipment.ShipFrom, origin, use_phone=True,
-            use_attn=True, international=international)#, use_name=True)
+            use_attn=True, international=international)
 
         shipper_charge = self._Ship.factory.create('ns3:ShipmentChargeType')
         api_shipment.PaymentInformation.ShipmentCharge = [shipper_charge]
