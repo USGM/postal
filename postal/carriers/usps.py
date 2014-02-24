@@ -386,7 +386,7 @@ class USPSApi(Carrier):
                 float(package.weight) / len(package.declarations) /
                 commodities) or 1
             label_request.CustomsInfo.CustomsItems.CustomsItem.append(item)
-            if package.documents_only():
+            if package.documents_only:
                 label_request.CustomsInfo.ContentsType = 'Documents'
             else:
                 label_request.CustomsInfo.ContentsType = self.get_param(
