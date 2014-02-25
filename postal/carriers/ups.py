@@ -427,7 +427,7 @@ class UPSApi(base.Carrier):
         ### amounts within the International Forms container.
         if request.destination.country.alpha2 in ('CA', 'PR'):
             self._populate_money(
-                api_shipment.Shipment.InvoiceLineTotal,
+                api_shipment.InvoiceLineTotal,
                 request.get_total_declared_value())
 
         self._populate_shipper(
