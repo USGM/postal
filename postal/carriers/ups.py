@@ -270,7 +270,8 @@ class UPSApi(base.Carrier):
 
         if error.Code == '111210':
             result = NotSupportedError('UPS does not offer that service to '
-                                       'that destination.')
+                                       'that destination. (Double-check your '
+                                       'address.)')
         elif error.Code == '270005':
             result = NotSupportedError('UPS requires a valid postal code for '
                                        'that region. (If one was specified, '
