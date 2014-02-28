@@ -286,6 +286,9 @@ class UPSApi(base.Carrier):
             result = NotSupportedError('UPS has no rates for that address. '
                                        'The postal code/city/country may be '
                                        'incorrect.')
+        elif error.Code == '111286':
+            result = NotSupportedError('UPS has no rates for that address. '
+                                       'The state/province may be incorrect.')
         else:
             result = CarrierError('Webfault#%s: %s' % (
                 error.Code, error.Description))

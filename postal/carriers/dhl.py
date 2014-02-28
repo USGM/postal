@@ -196,7 +196,7 @@ class DHLApi(Carrier):
         return response_dict
 
     def get_services(self, request):
-        self._ensure_international(request)
+        self._ensure_supported(request)
 
         rate_request = self.rates_request(request)
         response = self.make_call(rate_request)[0][1]
@@ -331,7 +331,6 @@ class DHLApi(Carrier):
         else:
             origin_city = ''
 
-        destination_city
         escape_variables = {
             'origin_country': origin.country.alpha2,
             'origin_postal_code': origin.postal_code,
@@ -416,11 +415,24 @@ class DHLApi(Carrier):
             labels.append(output_stream.getvalue())
         return labels
 
-    def _ensure_international(self, request):
-        if (
-                request.origin or self.postal_configuration[
-                'shipper_address']).country == request.destination.country:
+    def _ensure_supported(self, request):
+        if request.destination.country == (request.origin
+                or self.postal_configuration['shipper_address']).country:
             raise NotSupportedError("DHL does not support domestic shipments.")
+
+        for pak in request.packages:
+            if (pak.package_type.carrier == None
+                and pak.package_type.code == 'envelope'
+                and pak.carrier_conversion
+               ) or (
+                pak.package_type.carrier == self
+                and pak.package_type.code == 'EE'
+               ):
+                # express envelope or generic conversion to one
+                if pak.weight > .5:
+                    raise NotSupportedError('DHL does not ship express '
+                                            'envelopes that weigh more than '
+                                            '.5 pounds.')
 
     @staticmethod
     def get_shipping_charge(response):
@@ -431,11 +443,8 @@ class DHLApi(Carrier):
     def ship(self, service, request):
         # DHL's shipment rating information from their shipment API is bogus.
         # The rating API is the most trustworthy.
-        try:
-            price = self.quote(service, request)
-        except Exception as err:
-            raise err
-        self._ensure_international(request)
+        price = self.quote(service, request)
+        self._ensure_supported(request)
         ship_request = self.shipment_request(service, request)
         response = self.make_call(ship_request)
         tracking_number = response.findtext('AirwayBillNumber')
@@ -453,7 +462,7 @@ class DHLApi(Carrier):
         return shipment_dict
 
     def delivery_datetime(self, service, request):
-        self._ensure_international(request)
+        self._ensure_supported(request)
         if not self.cache_key(request) in self.cache:
             self.get_services(request)
         data = self.cache[tuple(request)].get(service.service_id, None)
@@ -463,7 +472,7 @@ class DHLApi(Carrier):
         return data['delivery_datetime']
 
     def quote(self, service, request):
-        self._ensure_international(request)
+        self._ensure_supported(request)
         if not self.cache_key(request) in self.cache:
             self.get_services(request)
         data = self.cache[self.cache_key(request)].get(

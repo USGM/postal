@@ -67,8 +67,8 @@ class Address(object):
             raise AddressError(
                 "Not enough information to construct an address.")
         if isinstance(street_lines, str):
-            raise TypeError(
-                'street_lines should be a sequence of strings, not a string')
+            raise TypeError('street_lines should be a sequence of strings, '
+                            'not a string')
 
         self.contact_name = contact_name
         self.phone_number = phone_number
@@ -187,10 +187,7 @@ class PackageType(object):
     def __eq__(self, other):
         if not isinstance(other, PackageType):
             return NotImplemented
-        carrier = (
-            getattr(self, 'carrier', None) == getattr(other, 'carrier', None))
-        code = self.code == other.code
-        return carrier and code
+        return (self.carrier == other.carrier) and (self.code == other.code)
 
     def __ne__(self, other):
         return not (self == other)
