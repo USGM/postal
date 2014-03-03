@@ -188,7 +188,7 @@ class USPSApi(Carrier):
         if (package.package_type.code == 'softpak' and
                 not package.carrier_conversion and softpak_convert):
             api_request.PackageTypeIndicator = 'Softpak'
-            api_request.MailpieceShape = 'Package'
+            api_request.MailpieceShape = 'Parcel'
         else:
             api_request.MailpieceShape = self._get_internal_package_type_code(
                 package.package_type, package.carrier_conversion)
