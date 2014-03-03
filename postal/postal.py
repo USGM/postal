@@ -3,10 +3,10 @@ Front-end for the Postal Library.
 """
 import threading
 from Queue import Queue
+from multiprocessing.pool import ThreadPool
 import sys
 from .exceptions import PostalError, NotSupportedError
 from carriers import Carrier
-from data import PackageType
 
 
 class Postal:
@@ -40,6 +40,8 @@ class Postal:
         # Give carriers a back reference to the main postal object.
         configuration_dict['postal'] = self
 
+        self.thread_pool = ThreadPool(processes=len(self.carriers))
+
     def options(self, request):
         """
         Gets all service options from all carriers.
@@ -63,15 +65,11 @@ class Postal:
                 if len(request.packages) == 1:
                     raise NotSupportedError('The dimensions of that package '
                                             'are invalid.')
-                raise NotSupportedError(
-                    'The dimensions of package #' + str(i) + ' are invalid.')
+                raise NotSupportedError('The dimensions of package #%s are '
+                                        'invalid.' % i)
 
-        results = Queue()
-        for carrier in self.carriers.values():
-            threading.Thread(
-                target=_task, args=(carrier, request, results)).start()
-
-        return dict((results.get() for _ in self.carriers))
+        return dict(self.thread_pool.map(
+            _task, [(carrier, request) for carrier in self.carriers.values()]))
 
     def get_all_services(self):
         """
@@ -95,10 +93,7 @@ class Postal:
 
     def get_all_package_types(self):
         """
-        Returns all types of containers supported by all carriers. Specifying
-        something other than the generic customer-supplied
-        package/softpak/envelope will yield limited rates results because most
-        package types are carrier-specific.
+        Returns all types of containers supported by all carriers.
         """
         for package_type in Carrier.get_generic_package_types():
             yield package_type
@@ -107,7 +102,8 @@ class Postal:
                 yield package_type
 
 
-def _task(carrier, request, results):
+def _task(arg_list):
+    carrier, request = arg_list
     data_dict = {'services': None, 'error': None}
     try:
         data_dict['services'] = carrier.get_services(request)
@@ -116,5 +112,4 @@ def _task(carrier, request, results):
             err.traceback = sys.exc_info()[2]
         data_dict['error'] = err
 
-    results.put((carrier, data_dict))
-
+    return carrier, data_dict

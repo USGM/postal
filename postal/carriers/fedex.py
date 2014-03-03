@@ -46,7 +46,8 @@ class FedExApi(Carrier):
     # To get FedEx's packaging advantages, you must use their packaging.
     _generic_package_translation = {
         'package': 'YOUR_PACKAGING',
-        'envelope': 'YOUR_PACKAGING'}
+        'envelope': 'YOUR_PACKAGING',
+        'softpak': 'YOUR_PACKAGING'}
 
     # We only apply these translations to envelopes/softpaks. Not to packages,
     # since there are too many options there, and it's too easy to go out of

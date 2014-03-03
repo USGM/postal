@@ -182,7 +182,9 @@ class USPSApi(Carrier):
         api_request.WeightOz = ounces
         api_request.Machinable = True
 
-        if package.package_type == Carrier.GENERIC_SOFTPAK and not package.carrier_conversion:
+        # Trying comparison to package code instead of carrier+code with ==
+        # shouldn't make a difference but it's causing problems.
+        if package.package_type.code == 'softpak' and not package.carrier_conversion:
             api_request.PackageTypeIndicator = 'Softpak'
             api_request.MailPieceShape = 'Package'
         else:
