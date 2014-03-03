@@ -23,6 +23,7 @@ import random
 import re
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from StringIO import StringIO
+from suds import TypeNotFound
 from suds.client import Client
 from money import Money
 
@@ -171,7 +172,7 @@ class USPSApi(Carrier):
                 'trackable': self.is_trackable(request, service)}
         return table
 
-    def _set_dims(self, api_request, package):
+    def _set_dims(self, api_request, package, softpak_convert=True):
         dims = api_request.MailpieceDimensions
         dims.Length, dims.Width, dims.Height = sorted(
             [sigfig(package.length), sigfig(package.width),
@@ -184,7 +185,8 @@ class USPSApi(Carrier):
 
         # Trying comparison to package code instead of carrier+code with ==
         # shouldn't make a difference but it's causing problems.
-        if package.package_type.code == 'softpak' and not package.carrier_conversion:
+        if (package.package_type.code == 'softpak' and
+                not package.carrier_conversion and softpak_convert):
             api_request.PackageTypeIndicator = 'Softpak'
             api_request.MailPieceShape = 'Package'
         else:
@@ -513,7 +515,7 @@ class USPSApi(Carrier):
         responses = []
         for package in request.packages:
             postage_request = self.client.factory.create('PostageRatesRequest')
-            self._set_dims(postage_request, package)
+            self._set_dims(postage_request, package, softpak_convert=False)
             self._set_address_info(postage_request, request, short=True)
             self._set_creds(postage_request, inset=True)
             self._insurance_params(postage_request, package)
