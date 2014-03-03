@@ -88,14 +88,10 @@ class Postal:
         return self.carriers[carrier_name].get_service(service_id)
 
     def get_package_type(self, carrier_name, code):
-        if not carrier_name:
-            carrier = None
+        if carrier_name:
+            return self.carriers[carrier_name].get_package_type(code)
         else:
-            carrier = self.carriers[carrier_name]
-        if not carrier:
-            name = Carrier.generic_packaging_table[code]
-            return PackageType(None, code, name)
-        return carrier.get_package_type(code)
+            return Carrier.generic_packaging_table[code]
 
     def get_all_package_types(self):
         """

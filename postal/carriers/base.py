@@ -64,15 +64,18 @@ class Carrier(object):
     # things like get_all_services() to construct service objects.
     _code_to_description = {}
 
-    # Names of generic packaging types that are usually shippable on all
-    # services.
-    generic_packaging_table = {
-        # Generic box
-        'package': 'Package',
-        'softpak': 'Softpak',
-        'envelope': 'Envelope'}
+    GENERIC_PACKAGE = PackageType(None, 'package', 'Package')
+    GENERIC_SOFTPAK = PackageType(None, 'softpak', 'Softpak')
+    GENERIC_ENVELOPE = PackageType(None, 'envelope', 'Envelope')
 
-    # Table for all supported packaging types, aside from the generics.
+    generic_packaging_table = {
+        'package': GENERIC_PACKAGE,
+        'softpak': GENERIC_SOFTPAK,
+        'envelope': GENERIC_ENVELOPE}
+
+    # Table for all proprietary packaging types. Do not list codes for generic
+    # or "customer-supplied" packaging types here; they are always called by
+    # their generic names.
     _package_id_to_description = {}
 
     # Translate generic package id types into their IDs for this carrier.
@@ -251,13 +254,24 @@ class Carrier(object):
 
     @staticmethod
     def get_generic_package_types():
-        return [
-            PackageType(
-                None, code, name)
-            for code, name in Carrier.generic_packaging_table.items()]
+        return Carrier.generic_packaging_table.values()
 
     def get_package_type(self, code):
         name = self._package_id_to_description.get(code, None)
+        if not name:
+            # Checking for generic translations in order to properly handle
+            # generics that have been translated inappropriately.
+            # Translations should never be stored outside of Postal but this
+            # function shouldn't fail or raise an exception when they are.
+            for generic_code, carrier_code in self._generic_package_translation.values():
+                if code == carrier_code:
+                    # This does happen to lose some information about what the
+                    # type of the object is because some carriers treat all
+                    # generics as "customer-supplied", which is why translated
+                    # generics shouldn't be stored outside of Postal.
+                    name = Carrier.generic_packaging_table[generic_code].name
+                    break
+
         if not name:
             raise NotSupportedError(
                 "No packaging code '%s' for %s." % (code, self.name))
@@ -268,43 +282,45 @@ class Carrier(object):
         Returns all package types supported by this carrier.
         """
         package_types = [
-            PackageType(
-                self, code, name)
+            PackageType(self, code, name)
             for code, name in self._package_id_to_description.items()]
         if generics:
-            package_types += [
-                PackageType(None, code, name)
-                for code, name in self.generic_packaging_table.items()]
+            package_types += self.generic_packaging_table.values()
         return package_types
 
-    def package_type_translate(self, package_type, proprietary=False):
-        """
-        Takes a package type, verifies it can be used on this carrier, and
-        converts it to a version that can be used with this carrier if it's
-        generic. If proprietary is true, will attempt to bump up to proprietary
-        packaging.
-        """
-        code = package_type.code
-        if package_type.carrier and package_type.carrier != self:
-            raise NotSupportedError(
-                "Packaging type %s is not available on %s." % (
-                    package_type, self.name))
-        elif package_type.carrier == self:
+    def to_proprietary_package_type(self, package_type):
+        if package_type.carrier == self:
             return package_type
-
-        if proprietary:
-            prop_code = self._to_proprietary_packaging.get(code, None)
-            if prop_code:
+        if package_type.carrier is None:
+            code = self._to_proprietary_packaging.get(package_type.code, None)
+            if code:
                 return PackageType(
-                    self, prop_code,
-                    self._package_id_to_description[prop_code])
+                    self, code, self._package_id_to_description[code])
+        raise NotSupportedError("Package type %s is not available on %s."
+                                % (package_type, self.name))
 
-        converted_generic_code = self._generic_package_translation.get(code, None)
-        if not converted_generic_code:
-            raise NotSupportedError(
-                "Package type %s is not available on %s." % (
-                    package_type, self.name))
-        return PackageType(self, converted_generic_code, package_type.name)
+    def _get_internal_package_type_code(
+            self, package_type, to_proprietary=False):
+        """
+        Converts a package type into the code used when sending a network
+        request. Generic package types must always be translated before being
+        transmitted but their translations should, for best maintainability,
+        never be stored outside of Postal.
+        """
+        if package_type.carrier == self:
+            return package_type.code
+
+        if package_type.carrier is None:
+            if to_proprietary:
+                if package_type.code in self._to_proprietary_packaging:
+                    return self._to_proprietary_packaging[package_type.code]
+            # Can't convert so proceed to try a generic instead.
+            if package_type.code in self._generic_package_translation:
+                return self._generic_package_translation[package_type.code]
+            # Not supported at all so fall through to below exception
+
+        raise NotSupportedError("Packaging type %s is not available for %s."
+                                % (package_type, self.name))
 
 
 class Service(object):

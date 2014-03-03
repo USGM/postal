@@ -61,8 +61,7 @@ class FedExApi(Carrier):
         'FEDEX_BOX': 'Box',
         'FEDEX_ENVELOPE': 'Express Envelope',
         'FEDEX_PAK': 'Pak',
-        'FEDEX_TUBE': 'Tube',
-        'YOUR_PACKAGING': 'Generic Packaging'}
+        'FEDEX_TUBE': 'Tube'}
 
     _min_max_estimates = {
         'FIRST_OVERNIGHT': (1, 1),
@@ -258,9 +257,9 @@ class FedExApi(Carrier):
         api_request.ServiceType = service.service_id
         api_request.DropoffType = 'REGULAR_PICKUP'
         if len(request.packages) == 1:
-            api_request.PackagingType = self.package_type_translate(
-                package.package_type,
-                proprietary=package.carrier_conversion).code
+            api_request.PackagingType = self._get_internal_package_type_code(
+                package.package_type, to_proprietary=package.carrier_conversion
+            )
         else:
             api_request.PackagingType = 'YOUR_PACKAGING'
 
@@ -455,9 +454,9 @@ class FedExApi(Carrier):
         api_request.PackageCount = len(request.packages)
         if len(request.packages) == 1:
             package = request.packages[0]
-            api_request.PackagingType = self.package_type_translate(
-                package.package_type,
-                proprietary=package.carrier_conversion).code
+            api_request.PackagingType = self._get_internal_package_type_code(
+                package.package_type, to_proprietary=package.carrier_conversion
+            )
         else:
             api_request.PackagingType = 'YOUR_PACKAGING'
 

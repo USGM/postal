@@ -55,24 +55,20 @@ class USPSApi(Carrier):
 
     _to_proprietary_packaging = {
         'envelope': 'FlatRateEnvelope',
+
+        # USPS doesn't care what size a padded flat rate envelope is as long
+        # as its weight is at or below 4 lbs so it's usable as a softpak
         'softpak': 'FlatRatePaddedEnvelope'}
 
     _package_id_to_description = {
-        'Letter': 'Generic Letter',
-        'Flat': 'Generic Flat',
+        'Letter': 'Letter',
         'FlatRateEnvelope': 'Flat Rate Envelope',
         'FlatRateLegalEnvelope': 'Flat Rate Legal Envelope',
         'FlatRatePaddedEnvelope': 'Flate Rate Padded Envelope',
         'SmallFlatRateEnvelope': ' Small Flat Rate Envelope',
         'SmallFlatRateBox': 'Small Flat Rate Box',
         'MediumFlatRateBox': 'Medium Flat Rate Box',
-        'LargeFlatRateBox': 'Large Flat Rate Box',
-        'Parcel': 'Generic Package'}
-
-    # Needed when figuring out what label to print.
-    _parcel_types = (
-        'softpak', 'SmallFlatRateBox', 'MediumFlatRateBox', 'LargeFlatRateBox',
-        'Parcel')
+        'LargeFlatRateBox': 'Large Flat Rate Box'}
 
     _min_max_estimates = {
         'PriorityExpress': (1, 1),
@@ -185,13 +181,13 @@ class USPSApi(Carrier):
             ounces = 1
         api_request.WeightOz = ounces
         api_request.Machinable = True
-        package_type = self.package_type_translate(
-            package.package_type, proprietary=package.carrier_conversion).code
-        if package_type == 'softpak':
+
+        if package.package_type == Carrier.GENERIC_SOFTPAK and not package.carrier_conversion:
             api_request.PackageTypeIndicator = 'Softpak'
             api_request.MailPieceShape = 'Package'
         else:
-            api_request.MailpieceShape = package_type
+            api_request.MailpieceShape = self._get_internal_package_type_code(
+                package.package_type, package.carrier_conversion)
 
     def _set_creds(self, api_request, inset=False):
         api_request.RequesterID = self.requester_id
@@ -310,32 +306,23 @@ class USPSApi(Carrier):
         return output_stream.getvalue()
 
     def _label_type(self, request, service, package):
-        origin = self.get_origin(request)
-        package_type = self.package_type_translate(
-            package.package_type, proprietary=package.carrier_conversion).code
-        if package_type not in self._parcel_types:
-            package_type = 'Flat'
-        else:
-            package_type = 'Parcel'
-        if not request.international(origin):
+        if not request.international(self.get_origin(request)):
             return 'Domestic'
-        if service.service_id in [
+        elif service.service_id in (
                 'FirstClassMailInternational',
-                'FirstClassPackageInternationalService']:
+                'FirstClassPackageInternationalService'):
             return 'FORM2976'
-        if (service.service_id == 'PriorityMailInternational') and (
-                package_type == 'Parcel'):
-            return 'FORM2976A'
-        elif (service.service_id == 'PriorityMailInternational') and (
-                package_type == 'Flat'):
+        elif service.service_id == 'PriorityMailInternational' \
+                and package.package_type.code not in (
+                    'softpak', 'package', 'SmallFlatRateBox',
+                    'MediumFlatRateBox', 'LargeFlatRateBox', 'Parcel'):
             return 'FORM2976'
-        elif service.service_id == 'PriorityMailExpressInternational':
+        else:
             return 'FORM2976A'
-        return 'FORM2976A'
 
     def is_trackable(self, request, service):
         """
-        Some services don't have real tracking numbers, but Endicia likes to
+        Some services don't have real tracking numbers but Endicia likes to
         pretend they do.
         """
         if service.service_id in [
@@ -344,16 +331,15 @@ class USPSApi(Carrier):
             return False
         if not request.international(self.get_origin(request)):
             return True
-        package_types = [
-            self.package_type_translate(
-                package.package_type, proprietary=package.carrier_conversion
-            ).code for package in request.packages]
 
-        for package_type in package_types:
-            if package_type in ['FlatRateEnvelope', 'FlatRateLegalEnvelope',
-                            'FlatRatePaddedEnvelope', 'SmallFlatRateEnvelope',
-                            'SmallFlatRateBox', 'MediumFlatRateBox',
-                            'LargeFlatRateBox']:
+        for pak in request.packages:
+            code = self._get_internal_package_type_code(
+                pak.package_type, to_proprietary=pak.carrier_conversion)
+
+            if code in ['FlatRateEnvelope', 'FlatRateLegalEnvelope',
+                        'FlatRatePaddedEnvelope', 'SmallFlatRateEnvelope',
+                        'SmallFlatRateBox', 'MediumFlatRateBox',
+                        'LargeFlatRateBox']:
                 return False
         return True
 

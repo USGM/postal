@@ -143,26 +143,21 @@ class UPSApi(base.Carrier):
         'softpak': '02',
         'envelope': '02'}
 
-    _package_id_to_description = dict(
-        ### UPS supports generic boxes, softpaks, and flats;
-        ### they are all code '02'
-        base.Carrier._package_id_to_description.items() + {
-            '01': 'Express Envelope',
-            ###### TODO: losing information in conversion
-            '02': 'Generic Packaging',
-            '03': 'Tube',
-            '04': 'Pak',  # proprietary softpak, not generic
-            '21': 'Express Box',
-            '24': '25kg Box',
-            '25': '10kg Box',
-            '30': 'Pallet',
-            '2a': 'Small Express Box',
-            '2b': 'Medium Express Box',
-            '2c': 'Large Express Box'
-            ### For FRS rating requests the
-            ### only valid value is customer
-            ### supplied packaging 02.
-        }.items())
+    _package_id_to_description = {
+        '01': 'Express Envelope',
+        '03': 'Tube',
+        '04': 'Pak',  # proprietary softpak, not generic
+        '21': 'Express Box',
+        '24': '25kg Box',
+        '25': '10kg Box',
+        '30': 'Pallet',
+        '2a': 'Small Express Box',
+        '2b': 'Medium Express Box',
+        '2c': 'Large Express Box'
+        ### For FRS rating requests the
+        ### only valid value is customer
+        ### supplied packaging 02.
+    }
 
     _service_code_to_time_in_transit_code = {
         '14': '1DM',
@@ -882,8 +877,8 @@ class UPSApi(base.Carrier):
         return self._get_negotiated_charge(rated_shipment)
 
     def _populate_package(self, api_package, package):
-        packaging_code = self.package_type_translate(
-            package.package_type, proprietary=package.carrier_conversion).code
+        packaging_code = self._get_internal_package_type_code(
+            package.package_type, to_proprietary=package.carrier_conversion)
 
         try:
             api_package.Packaging.Code = packaging_code  # shipping

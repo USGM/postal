@@ -172,6 +172,12 @@ class Request(object):
     def documents_only(self):
         return all([package.documents_only for package in self.packages])
 
+    def __str__(self):
+        return 'Request(origin=%s destination=%s packages=%s ship_datetime=%s extra_params=%s' \
+            % (repr(self.origin), repr(self.destination), repr(self.packages), repr(self.ship_datetime), repr(self.extra_params))
+    def __repr__(self):
+        return str(self)
+
 
 class PackageType(object):
     """

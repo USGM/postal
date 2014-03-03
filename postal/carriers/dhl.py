@@ -68,8 +68,7 @@ class DHLApi(Carrier):
 
     _package_id_to_description = {
         'EE': 'Express Envelope',
-        'OD': 'Other DHL Packaging',
-        'CP': 'Generic Packaging'}
+        'OD': 'Other Packaging'}
 
     # Aside from Economy, DHL's transit times are mostly the same.
     _min_max_estimates = {
