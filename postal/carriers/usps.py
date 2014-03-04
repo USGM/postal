@@ -23,13 +23,12 @@ import random
 import re
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from StringIO import StringIO
-from suds import TypeNotFound
 from suds.client import Client
 from money import Money
 
 from base import Carrier, ClearEmpty
 from ..exceptions import CarrierError, NotSupportedError
-from ..data import Shipment, sigfig
+from ..data import Shipment, sigfig, TWOPLACES
 
 
 class USPSApi(Carrier):
@@ -368,7 +367,7 @@ class USPSApi(Carrier):
             if str(declaration.value.currency) != 'USD':
                 raise NotSupportedError(
                     "USPS requires all declarations to be in US dollars.")
-            item.Value = declaration.value.amount
+            item.Value = declaration.value.amount.quantize(TWOPLACES)
             item.CountryOfOrigin = declaration.origin_country.alpha2
             item.Description = declaration.description
             commodities = sum(dec.units for dec in package.declarations)
