@@ -171,7 +171,7 @@ class USPSApi(Carrier):
                 'trackable': self.is_trackable(request, service)}
         return table
 
-    def _set_dims(self, api_request, package, softpak_convert=True):
+    def _set_dims(self, api_request, package, softpack_convert=True):
         dims = api_request.MailpieceDimensions
         dims.Length, dims.Width, dims.Height = sorted(
             [sigfig(package.length), sigfig(package.width),
@@ -185,7 +185,7 @@ class USPSApi(Carrier):
         # Trying comparison to package code instead of carrier+code with ==
         # shouldn't make a difference but it's causing problems.
         if (package.package_type.code == 'softpak' and
-                not package.carrier_conversion and softpak_convert):
+                not package.carrier_conversion and softpack_convert):
             api_request.PackageTypeIndicator = 'Softpack'
             api_request.MailpieceShape = 'Parcel'
         else:
@@ -350,7 +350,6 @@ class USPSApi(Carrier):
         label_request = self.client.factory.create('LabelRequest')
         label_request.MailClass = service.service_id
         label_request.PartnerTransactionID = self.ref_number()
-        self._set_dims(label_request, package)
         self._insurance_params(label_request, package)
         self._set_creds(label_request)
         self._set_address_info(label_request, request)
@@ -360,6 +359,12 @@ class USPSApi(Carrier):
             label_request._LabelType = 'International'
             label_request._LabelSubtype = 'Integrated'
             label_request.IntegratedFormType = label_format
+            softpack_convert = False
+        else:
+            softpack_convert = True
+
+        self._set_dims(label_request, package,
+                       softpack_convert=softpack_convert)
 
         for declaration in package.declarations:
             item = self.client.factory.create('CustomsItem')
@@ -514,7 +519,7 @@ class USPSApi(Carrier):
         responses = []
         for package in request.packages:
             postage_request = self.client.factory.create('PostageRatesRequest')
-            self._set_dims(postage_request, package, softpak_convert=False)
+            self._set_dims(postage_request, package, softpack_convert=False)
             self._set_address_info(postage_request, request, short=True)
             self._set_creds(postage_request, inset=True)
             self._insurance_params(postage_request, package)
