@@ -1,8 +1,7 @@
 """
 Front-end for the Postal Library.
 """
-import threading
-from Queue import Queue
+from copy import copy
 from multiprocessing.pool import ThreadPool
 import sys
 from .exceptions import PostalError, NotSupportedError
@@ -100,6 +99,19 @@ class Postal:
         for carrier in self.carriers.values():
             for package_type in carrier.get_all_package_types(generics=False):
                 yield package_type
+
+    def without(self, *args):
+        """
+        Creates and returns a shallow copy of this Postal instance except with
+        its carriers table missing the carriers named by the specified
+        argument list. For example, calling postal_instance.without('UPS')
+        creates a new postal object with all previous carriers except UPS.
+        """
+        result = copy(self)
+        result.carriers = copy(self.carriers)
+        for arg in args:
+            result.carriers.pop(arg, None)
+        return result
 
 
 def _task(arg_list):
