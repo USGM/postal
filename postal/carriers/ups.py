@@ -26,27 +26,43 @@ __author__ = 'Nathan Everitt'
 
 
 class FixBrokenNamespace(MessagePlugin):
-    def __init__(self, propname):
+    def __init__(self, propname, schema):
+        self.schema = schema
         self.propname = propname
+
+    def swap_namespaces(self, namespace, tags):
+        for tag in tags:
+            children = tag.getChildren()
+            if children:
+                self.swap_namespaces(namespace, children)
+            tag.prefix = namespace
+
+    def get_namespace(self, context):
+        declarations = context.envelope.nsdeclarations().split()
+        for dec in declarations:
+            if self.schema in dec:
+                return dec.split(':')[1].split('=')[0]
+        raise CarrierError("Could not find namespace schema.")
 
     def marshalled(self, context):
-        (context.envelope.getChild('Body').getChild(self.propname)
-            .getChild('Request')).prefix = 'ns0'
+        namespace = self.get_namespace(context)
+        self.swap_namespaces(
+            namespace,
+            [context.envelope.getChild('Body').getChild(
+                self.propname).getChild('Request')])
 
 
-class FixMissingNegotiatedRates(MessagePlugin):
-    def __init__(self, propname):
-        self.propname = propname
+class FixMissingNegotiatedRates(FixBrokenNamespace):
 
     def marshalled(self, context):
         shipment_rating_options = Element('ShipmentRatingOptions')
-        shipment_rating_options.prefix = 'ns1'
         negotiated_rates_indicator = Element('NegotiatedRatesIndicator')
-        negotiated_rates_indicator.prefix = 'ns1'
+        shipment_rating_options.append(negotiated_rates_indicator)
 
+        namespace = self.get_namespace(context)
         context.envelope.getChild('Body').getChild(self.propname).getChild(
             'Shipment').append(shipment_rating_options)
-        shipment_rating_options.append(negotiated_rates_indicator)
+        self.swap_namespaces(namespace, [shipment_rating_options])
 
 
 class FixInternationalNamespaces(MessagePlugin):
@@ -58,7 +74,6 @@ class FixInternationalNamespaces(MessagePlugin):
             'ShipmentRatingOptions')
 
         if options:
-            request.getChild('Request').prefix = 'ns1'
             rating_options.prefix = 'ns2'
             rating_options.getChild('NegotiatedRatesIndicator').prefix = 'ns2'
 
@@ -98,6 +113,13 @@ class AuthenticationPlugin(MessagePlugin):
 
 
 class UPSApi(base.Carrier):
+
+    # Used when generating some ambiguous SOAP objects.
+    common = 'http://www.ups.com/XMLSchema/XOLTWS/Common/v1.0'
+    common_pfx = '{%s}' % common
+    shipment = "http://www.ups.com/XMLSchema/XOLTWS/Ship/v1.0"
+    rates = "http://www.ups.com/XMLSchema/XOLTWS/Rate/v1.1"
+
     name = 'UPS'
     address_validation = True
     auto_residential = True
@@ -236,23 +258,26 @@ class UPSApi(base.Carrier):
         self._RateWS = self._create_client(
             'RateWS.wsdl',
             plugins=[
-                authentication, FixBrokenNamespace('RateRequest'),
-                FixMissingNegotiatedRates('RateRequest')])
+                authentication, FixBrokenNamespace('RateRequest', self.common),
+                FixMissingNegotiatedRates('RateRequest', self.rates)])
 
         self._XAV = self._create_client(
             'XAV.wsdl',
-            plugins=[authentication, FixBrokenNamespace('XAVRequest')])
+            plugins=[authentication, FixBrokenNamespace(
+                'XAVRequest', self.common)])
 
         self._TNTWS = self._create_client(
             'TNTWS.wsdl',
-            plugins=(
-                authentication, FixBrokenNamespace('TimeInTransitRequest')))
+            plugins=[
+                authentication, FixBrokenNamespace(
+                    'TimeInTransitRequest', self.common)])
 
         self._Ship = self._create_client(
             'Ship.wsdl',
             plugins=[
-                authentication, FixBrokenNamespace('ShipmentRequest'),
-                FixMissingNegotiatedRates('ShipmentRequest'),
+                authentication, FixBrokenNamespace(
+                    'ShipmentRequest', self.common),
+                FixMissingNegotiatedRates('ShipmentRequest', self.shipment),
                 FixInternationalNamespaces()])
 
         if not test:
@@ -284,9 +309,14 @@ class UPSApi(base.Carrier):
         elif error.Code == '111286':
             result = NotSupportedError('UPS has no rates for that address. '
                                        'The state/province may be incorrect.')
+        elif error.Code == '121211':
+            # Got this error for the Adult Signature Only option, though it
+            # probably applies to the other ShipmentServiceOptions
+            result = NotSupportedError('UPS does not support that accessory '
+                                       'option to that address.')
         else:
-            result = CarrierError('Webfault#%s: %s' % (
-                error.Code, error.Description))
+            result = CarrierError('Webfault#%s: %s'
+                                  % (error.Code, error.Description))
 
         result.code = error.Code
         return result

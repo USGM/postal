@@ -122,12 +122,6 @@ class TestCarrier(object):
         self.international_package2.declarations = self.declarations2
         self.documents.declarations = self.document_declaration
 
-    def test_get_all_services(self):
-        services = list(self.carrier.get_all_services())
-        self.assertGreater(len(services), 0)
-        for service in services:
-            self.assertIsInstance(service, Service)
-
     def services(self):
         services = self.carrier.get_services(self.request)
         self.assertTrue(services)
@@ -280,6 +274,12 @@ class TestCarrier(object):
         services = self.carrier.get_services(self.request)
         sdict = services.keys()[0].ship(self.request)
         self.shipment_dict_check(sdict)
+
+    def test_get_all_services(self):
+        services = list(self.carrier.get_all_services())
+        self.assertGreater(len(services), 0)
+        for service in services:
+            self.assertIsInstance(service, Service)
 
     test_domestic_services = domestic(services)
     test_domestic_services_multiship = domestic(services_multiship)
