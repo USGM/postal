@@ -199,11 +199,9 @@ class FedExApi(Carrier):
     @staticmethod
     def format_label(label):
         # Some jump-around for dual compatibility with Python 2 and 3
-        #label = re.sub('\s', '', str(label))
         if isinstance(label, bytes):
             label = label.decode('utf-8')
         label = b64decode(label)
-        #label = str(label)
         input = PdfFileReader(BytesIO(label))
         output = PdfFileWriter()
 
