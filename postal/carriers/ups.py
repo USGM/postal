@@ -280,6 +280,9 @@ class UPSApi(base.Carrier):
                 FixMissingNegotiatedRates('ShipmentRequest', self.shipment),
                 FixInternationalNamespaces()])
 
+        for a in [self._RateWS, self._XAV, self._TNTWS, self._Ship]:
+            a.set_options(timeout=postal_configuration.get('timeout', None))
+
         if not test:
             self._Ship.set_options(
                 location='https://onlinetools.ups.com/webservices/Ship')

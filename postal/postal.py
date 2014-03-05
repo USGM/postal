@@ -23,6 +23,9 @@ class Postal:
             'shipper_address' -> data.Address
         }
         """
+        # Give carriers a back reference to the main postal object.
+        configuration_dict['postal'] = self
+
         self.carriers = {carrier.name: carrier
                          for carrier in configuration_dict['enabled_carriers']}
         carrier_configs = configuration_dict['carrier_inits']
@@ -35,9 +38,6 @@ class Postal:
                 print 'Error while constructing carrier ' + str(name)
                 print 'with these args: ' + str(carrier_configs[name])
                 raise
-
-        # Give carriers a back reference to the main postal object.
-        configuration_dict['postal'] = self
 
         self.thread_pool = ThreadPool(processes=len(self.carriers))
 

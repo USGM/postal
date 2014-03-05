@@ -89,7 +89,7 @@ class FedExApi(Carrier):
     def create_client(self, wsdl_name):
         client = Client(
             self.service_url(wsdl_name), plugins=[ClearEmpty()],
-            timeout=self.postal_configuration['timeout'])
+            timeout=self.postal_configuration.get('timeout', None))
         location = ''
         for service in client.wsdl.services:
             for port in service.ports:
