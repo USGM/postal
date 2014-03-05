@@ -281,9 +281,9 @@ class USPSApi(Carrier):
 
     @staticmethod
     def _format_label(label, type):
+        if isinstance(label, bytes):
+            label = label.decode('utf-8')
         label = b64decode(label)
-        if isinstance(label, str):
-            label = label.encode('utf-8')
         input = PdfFileReader(BytesIO(label))
         output = PdfFileWriter()
 
