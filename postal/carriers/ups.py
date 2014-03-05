@@ -1,6 +1,8 @@
 import inspect
+import logging
 import os
 import base64
+import re
 import sys
 
 from Queue import Queue
@@ -10,7 +12,7 @@ from datetime import datetime
 from io import BytesIO
 
 import PIL.Image
-from .base import Service, Carrier
+from .base import Service, Carrier, PY3
 import suds.cache
 try:
     import money
@@ -27,29 +29,48 @@ from ..exceptions import CarrierError, NotSupportedError
 
 __author__ = 'Nathan Everitt'
 
+#logging.getLogger('suds.transport').setLevel(logging.DEBUG)
+#logging.getLogger('suds.transport').addHandler(
+#    logging.StreamHandler(sys.stdout))
+
 
 class FixBrokenNamespace(MessagePlugin):
-    def __init__(self, propname):
+    def __init__(self, propname, schema):
+        self.schema = schema
         self.propname = propname
+
+    def swap_namespaces(self, namespace, tags):
+        for tag in tags:
+            children = tag.getChildren()
+            if children:
+                self.swap_namespaces(namespace, children)
+            tag.prefix = namespace
+
+    def get_namespace(self, context):
+        declarations = context.envelope.nsdeclarations().split()
+        for dec in declarations:
+            if self.schema in dec:
+                return dec.split(':')[1].split('=')[0]
+        raise CarrierError("Could not find namespace schema.")
 
     def marshalled(self, context):
-        (context.envelope.getChild('Body').getChild(self.propname)
-            .getChild('Request')).prefix = 'ns0'
+        namespace = self.get_namespace(context)
+        self.swap_namespaces(
+            namespace,
+            [context.envelope.getChild('Body').getChild(
+                self.propname).getChild('Request')])
 
 
-class FixMissingNegotiatedRates(MessagePlugin):
-    def __init__(self, propname):
-        self.propname = propname
+class FixMissingNegotiatedRates(FixBrokenNamespace):
 
     def marshalled(self, context):
         shipment_rating_options = Element('ShipmentRatingOptions')
-        shipment_rating_options.prefix = 'ns1'
         negotiated_rates_indicator = Element('NegotiatedRatesIndicator')
-        negotiated_rates_indicator.prefix = 'ns1'
-
+        namespace = self.get_namespace(context)
         context.envelope.getChild('Body').getChild(self.propname).getChild(
             'Shipment').append(shipment_rating_options)
         shipment_rating_options.append(negotiated_rates_indicator)
+        self.swap_namespaces(namespace, [shipment_rating_options])
 
 
 class FixInternationalNamespaces(MessagePlugin):
@@ -101,6 +122,13 @@ class AuthenticationPlugin(MessagePlugin):
 
 
 class UPSApi(Carrier):
+
+    # Used when generating some ambiguous SOAP objects.
+    common = 'http://www.ups.com/XMLSchema/XOLTWS/Common/v1.0'
+    common_pfx = '{%s}' % common
+    shipment = "http://www.ups.com/XMLSchema/XOLTWS/Ship/v1.0"
+    rates = "http://www.ups.com/XMLSchema/XOLTWS/Rate/v1.1"
+
     name = 'UPS'
     address_validation = True
     auto_residential = True
@@ -223,23 +251,26 @@ class UPSApi(Carrier):
         self._RateWS = self._create_client(
             'RateWS.wsdl',
             plugins=[
-                authentication, FixBrokenNamespace('RateRequest'),
-                FixMissingNegotiatedRates('RateRequest')])
+                authentication, FixBrokenNamespace('RateRequest', self.common),
+                FixMissingNegotiatedRates('RateRequest', self.rates)])
 
         self._XAV = self._create_client(
             'XAV.wsdl',
-            plugins=[authentication, FixBrokenNamespace('XAVRequest')])
+            plugins=[authentication, FixBrokenNamespace(
+                'XAVRequest', self.common)])
 
         self._TNTWS = self._create_client(
             'TNTWS.wsdl',
-            plugins=(
-                authentication, FixBrokenNamespace('TimeInTransitRequest')))
+            plugins=[
+                authentication, FixBrokenNamespace(
+                    'TimeInTransitRequest', self.common)])
 
         self._Ship = self._create_client(
             'Ship.wsdl',
             plugins=[
-                authentication, FixBrokenNamespace('ShipmentRequest'),
-                FixMissingNegotiatedRates('ShipmentRequest'),
+                authentication, FixBrokenNamespace(
+                    'ShipmentRequest', self.common),
+                FixMissingNegotiatedRates('ShipmentRequest', self.shipment),
                 FixInternationalNamespaces()])
 
         if not test:
@@ -377,7 +408,8 @@ class UPSApi(Carrier):
         origin = request.origin or self.postal_configuration['shipper_address']
         international = (origin.country != request.destination.country)
 
-        api_request = self._Ship.factory.create('ns0:RequestType')
+        api_request = self._Ship.factory.create(
+            '%sRequestType' % self.common_pfx)
         api_request.RequestOption = 'validate'
 
         api_shipment = self._Ship.factory.create('ns3:ShipmentType')
@@ -529,9 +561,10 @@ class UPSApi(Carrier):
 
         for index, pak in enumerate(response.ShipmentResults.PackageResults):
             pdf = BytesIO()
-            label = base64.b64decode(pak.ShippingLabel.GraphicImage)
-            if isinstance(label, str):
-                label = label.encode('utf-8')
+            label = pak.ShippingLabel.GraphicImage
+            if isinstance(label, bytes):
+                label = label.decode('utf-8')
+            label = base64.b64decode(label)
             image = BytesIO(label)
             image = PIL.Image.open(image)
             image = image.transpose(PIL.Image.ROTATE_270)
@@ -613,7 +646,8 @@ class UPSApi(Carrier):
         DAILY_PICKUP = '01'
         SHIPPER = '00'
 
-        api_request = self._RateWS.factory.create('ns0:RequestType')
+        api_request = self._RateWS.factory.create(
+            '%sRequestType' % self.common_pfx)
         api_request.RequestOption = [request_type]
 
         _pickup_type = self._RateWS.factory.create('ns2:CodeDescriptionType')
@@ -683,7 +717,7 @@ class UPSApi(Carrier):
             self, service_id, self._code_to_description[service_id])
 
     def validate_address(self, address):
-        request = self._XAV.factory.create('ns0:RequestType')
+        request = self._XAV.factory.create('%sRequestType' % self.common_pfx)
         request.RequestOption = '3'  # validation and classification
 
         address_key = self._XAV.factory.create('ns2:AddressKeyFormatType')
@@ -744,7 +778,8 @@ class UPSApi(Carrier):
     def delivery_datetime(self, service, request):
         self._ensure_request_supported(request)
 
-        api_request = self._TNTWS.factory.create('ns0:RequestType')
+        api_request = self._TNTWS.factory.create(
+            '%sRequestType' % self.common_pfx)
 
         # Does not seem to matter what its
         # contents are as long as this tag is not missing.
