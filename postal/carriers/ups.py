@@ -10,7 +10,7 @@ from datetime import datetime
 from io import BytesIO
 
 import PIL.Image
-from .base import Service, Carrier
+from .base import Carrier
 import suds.cache
 try:
     import money
@@ -444,7 +444,8 @@ class UPSApi(Carrier):
         origin = request.origin or self.postal_configuration['shipper_address']
         international = (origin.country != request.destination.country)
 
-        api_request = self._Ship.factory.create('ns0:RequestType')
+        api_request = self._Ship.factory.create(
+            '%sRequestType' % self.common_pfx)
         api_request.RequestOption = 'validate'
 
         api_shipment = self._Ship.factory.create('ns3:ShipmentType')
@@ -622,9 +623,10 @@ class UPSApi(Carrier):
 
         for index, pak in enumerate(response.ShipmentResults.PackageResults):
             pdf = BytesIO()
-            label = base64.b64decode(pak.ShippingLabel.GraphicImage)
-            if isinstance(label, str):
-                label = label.encode('utf-8')
+            label = pak.ShippingLabel.GraphicImage
+            if isinstance(label, bytes):
+                label = label.decode('utf-8')
+            label = base64.b64decode(label)
             image = BytesIO(label)
             image = PIL.Image.open(image)
             image = image.transpose(PIL.Image.ROTATE_270)
@@ -704,7 +706,8 @@ class UPSApi(Carrier):
         DAILY_PICKUP = '01'
         SHIPPER = '00'
 
-        api_request = self._RateWS.factory.create('ns0:RequestType')
+        api_request = self._RateWS.factory.create(
+            '%sRequestType' % self.common_pfx)
         api_request.RequestOption = [request_type]
 
         _pickup_type = self._RateWS.factory.create('ns2:CodeDescriptionType')
@@ -756,7 +759,7 @@ class UPSApi(Carrier):
         return rates
 
     def validate_address(self, address):
-        request = self._XAV.factory.create('ns0:RequestType')
+        request = self._XAV.factory.create('%sRequestType' % self.common_pfx)
         request.RequestOption = '3'  # validation and classification
 
         address_key = self._XAV.factory.create('ns2:AddressKeyFormatType')
@@ -817,7 +820,8 @@ class UPSApi(Carrier):
     def delivery_datetime(self, service, request):
         self._ensure_request_supported(request)
 
-        api_request = self._TNTWS.factory.create('ns0:RequestType')
+        api_request = self._TNTWS.factory.create(
+            '%sRequestType' % self.common_pfx)
 
         # Does not seem to matter what its
         # contents are as long as this tag is not missing.
