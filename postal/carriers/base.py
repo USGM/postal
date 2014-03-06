@@ -10,9 +10,11 @@ be sent.
 import inspect
 import os
 import re
+import sys
+import logging
+from threading import RLock
 
 from suds.plugin import MessagePlugin
-import sys
 
 from ..exceptions import CarrierError, PostalError
 from postal.data import PackageType
@@ -22,15 +24,22 @@ from postal.exceptions import NotSupportedError
 PY3 = sys.version_info[0] == 3
 
 
+def get_logger(logger_name, carrier_name):
+    result = logging.getLogger(logger_name)
+    result.lock = RLock()
+    result.debug_header = lambda title: result.debug(
+        ('='*20) + ' ' + str(carrier_name) + ': ' + str(title) + ' ' + ('='*20))
+    return result
+
+
 class ClearEmpty(MessagePlugin):
     def clear_empty_tags(self, tags):
         for tag in tags:
             children = tag.getChildren()[:]
             if children:
                 self.clear_empty_tags(children)
-            if re.match(r'^<[^>]+?/>$', tag.plain()):
-                if not tag.attributes:
-                    tag.parent.remove(tag)
+            if re.match(r'^<[^>]+?/>$', tag.plain()) and not tag.attributes:
+                tag.parent.remove(tag)
 
     def marshalled(self, context):
         self.clear_empty_tags(context.envelope.getChildren()[:])

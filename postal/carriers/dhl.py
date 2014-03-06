@@ -13,8 +13,10 @@ DHL rarely ships domestically, and trying to handle domestic shipments with
 them results in a lot of traps. We therefore disable domestic shipments with
 DHL.
 """
+from copy import copy, deepcopy
 from io import BytesIO
 from math import ceil
+from pprint import pformat
 import random
 from base64 import b64decode
 from datetime import datetime
@@ -27,10 +29,13 @@ from dateutil.relativedelta import relativedelta
 from money import Money
 from requests import post, RequestException
 
-from .base import Carrier, Service
+from .base import Carrier, get_logger
 from .templates.constructor import load_template, populate_template
 from ..exceptions import CarrierError, NotSupportedError
 from ..data import Shipment, TWOPLACES, sigfig
+
+
+logger = get_logger(__name__, 'DHL')
 
 
 class DHLApi(Carrier):
@@ -201,6 +206,11 @@ class DHLApi(Carrier):
         self._ensure_supported(request)
 
         rate_request = self.rates_request(request)
+
+        with logger.lock:
+            logger.debug_header('Get Services')
+            logger.debug(request)
+
         response = self.make_call(rate_request)[0][1]
         try:
             response_dict = self.response_to_dict(response.findall('QtdShp'))
@@ -208,12 +218,18 @@ class DHLApi(Carrier):
             raise
         self.cache_results(request, response_dict)
 
-        return {
+        result = {
             self.get_service(key): {
                 'price': value['price'],
                 'delivery_datetime': value['delivery_datetime'],
                 'trackable': True}
             for key, value in response_dict.items()}
+
+        with logger.lock:
+            logger.debug_header('Response')
+            logger.debug(pformat(result, width=1))
+
+        return result
 
     @staticmethod
     def build_address(address):
@@ -452,6 +468,12 @@ class DHLApi(Carrier):
         price = self.quote(service, request)
         self._ensure_supported(request)
         ship_request = self.shipment_request(service, request)
+
+        with logger.lock:
+            logger.debug_header('Shipment')
+            logger.debug(service)
+            logger.debug(request)
+
         response = self.make_call(ship_request)
         tracking_number = response.findtext('AirwayBillNumber')
         labels = response.findtext('LabelImage/OutputImage')
@@ -465,6 +487,15 @@ class DHLApi(Carrier):
             'shipment': Shipment(self, tracking_number),
             'packages': package_details,
             'price': price}
+
+        display_result = copy(shipment_dict)
+        display_result['packages'] = deepcopy(display_result['packages'])
+        for info in display_result['packages'].values():
+            info['label'] = '(omitted)'
+        with logger.lock:
+            logger.debug_header('Response')
+            logger.debug(pformat(display_result))
+
         return shipment_dict
 
     def delivery_datetime(self, service, request):

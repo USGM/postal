@@ -1,6 +1,8 @@
+from copy import deepcopy, copy
 import inspect
 import os
 import base64
+from pprint import pformat
 import sys
 
 from Queue import Queue
@@ -10,8 +12,9 @@ from datetime import datetime
 from io import BytesIO
 
 import PIL.Image
-from .base import Carrier
+from .base import Carrier, get_logger
 import suds.cache
+
 try:
     import money
 except ImportError:
@@ -26,6 +29,9 @@ from ..data import Address, Shipment
 from ..exceptions import CarrierError, NotSupportedError
 
 __author__ = 'Nathan Everitt'
+
+
+logger = get_logger(__name__, 'UPS')
 
 
 class FixBrokenNamespace(MessagePlugin):
@@ -245,7 +251,7 @@ class UPSApi(Carrier):
             self._get_path(name),
             cache=suds.cache.NoCache(),
             plugins=plugins,
-            timeout=self.postal_configuration['timeout'])
+            timeout=self.postal_configuration.get('timeout', None))
         return client
 
     def __init__(
@@ -283,9 +289,6 @@ class UPSApi(Carrier):
                 FixMissingNegotiatedRates('ShipmentRequest', self.shipment),
                 FixInternationalNamespaces()])
 
-        for a in [self._RateWS, self._XAV, self._TNTWS, self._Ship]:
-            a.set_options(timeout=postal_configuration.get('timeout', None))
-
         if not test:
             self._Ship.set_options(
                 location='https://onlinetools.ups.com/webservices/Ship')
@@ -321,6 +324,8 @@ class UPSApi(Carrier):
             result = NotSupportedError('UPS does not support that accessory '
                                        'option to that address.')
         else:
+            logger.error('UPS: Webfault#%s: %s'
+                          % (error.code, error.Description))
             result = CarrierError('Webfault#%s: %s'
                                   % (error.Code, error.Description))
 
@@ -329,6 +334,7 @@ class UPSApi(Carrier):
 
     @staticmethod
     def _on_unknown_error():
+        logger.error('UPS: Unknown error.')
         raise CarrierError('UPS encountered an unknown error.')
 
     @classmethod
@@ -337,6 +343,7 @@ class UPSApi(Carrier):
             return cls._get_money(
                 rated_shipment.NegotiatedRateCharges.TotalCharge)
         else:
+            logger.debug('UPS: No negotiated rates given.')
             return cls._get_money(rated_shipment.TotalCharges)
 
     @staticmethod
@@ -361,10 +368,9 @@ class UPSApi(Carrier):
                     'characters long. The company name should be in the '
                     'street lines.')
             if use_name:
-                # docs say the limit is 35 characters
-                node.Name = address.contact_name[:35]
+                node.Name = address.contact_name
             if use_attn:
-                node.AttentionName = address.contact_name[:35]
+                node.AttentionName = address.contact_name
 
         if address.street_lines:
             if len(address.street_lines) > 3:
@@ -604,6 +610,10 @@ class UPSApi(Carrier):
         receipt_spec = self._Ship.factory.create(
             'ns3:ReceiptSpecificationType')
 
+        with logger.lock:
+            logger.debug_header('Shipment')
+            logger.debug(service)
+            logger.debug(request)
         try:
             response = self._Ship.service.ProcessShipment(
                 api_request, api_shipment, label_spec, receipt_spec)
@@ -637,10 +647,18 @@ class UPSApi(Carrier):
                 'tracking_number': pak.TrackingNumber,
                 'label': pdf.getvalue()}
 
-        return {
+        result = {
             'shipment': Shipment(self, master_tracking_number),
             'packages': packages,
             'price': negotiated_rate}
+        display_result = copy(result)
+        display_result['packages'] = deepcopy(display_result['packages'])
+        for info in display_result['packages'].values():
+            info['label'] = '(omitted)'
+        with logger.lock:
+            logger.debug_header('Response')
+            logger.debug(pformat(display_result, width=1))
+        return result
 
     def _task(self, request, rated_shipment, shipment_info):
         """
@@ -668,6 +686,9 @@ class UPSApi(Carrier):
     def get_services(self, request):
         self._ensure_request_supported(request)
 
+        with logger.lock:
+            logger.debug_header('Get Services')
+            logger.debug(request)
         rates = self._request_rates(request, 'Shop')
 
         shipment_info = Queue()
@@ -687,6 +708,10 @@ class UPSApi(Carrier):
             else:
                 service, rates = info
                 result[service] = rates
+
+        with logger.lock:
+            logger.debug_header('Response')
+            logger.debug(pformat(result, width=1))
         return result
 
     def _request_rates(self, request, request_type, service=None):
@@ -770,6 +795,9 @@ class UPSApi(Carrier):
         address_key.CountryCode = address.country.alpha2
         address_key.PostcodePrimaryLow = address.postal_code
 
+        with logger.lock:
+            logger.debug_header('Validate Address')
+            logger.debug(address)
         try:
             response = self._XAV.service.ProcessXAV(
                 request,
@@ -784,6 +812,9 @@ class UPSApi(Carrier):
             self._on_unknown_error()
 
         if not hasattr(response, 'Candidate') or len(response.Candidate) == 0:
+            with logger.lock:
+                logger.debug_header('Response')
+                logger.debug('Invalid')
             return False, address
 
         candidate = response.Candidate[0]
@@ -813,8 +844,15 @@ class UPSApi(Carrier):
             residential=residential)
 
         if result == address:
+            with logger.lock:
+                logger.debug_header('Response')
+                logger.debug('Valid')
             return True, result
         else:
+            with logger.lock:
+                logger.debug_header('Response')
+                logger.debug('Corrected to:')
+                logger.debug(result)
             return False, result
 
     def delivery_datetime(self, service, request):
@@ -867,6 +905,10 @@ class UPSApi(Carrier):
 
         num_packages = len(request.packages)
 
+        with logger.lock:
+            logger.debug_header('Time in Transit')
+            logger.debug(service)
+            logger.debug(request)
         try:
             response = self._TNTWS.service.ProcessTimeInTransit(
                 api_request, req_ship_from, req_ship_to, sticks, weight,
@@ -876,8 +918,14 @@ class UPSApi(Carrier):
         except WebFault as err:
             code = err.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Code
             if code == '270037':  # no TiT information available
+                with logger.lock:
+                    logger.debug_header('Response')
+                    logger.debug('No TiT information available.')
                 return None
             elif code == '270019':  # TiT service is not available
+                with logger.lock:
+                    logger.debug_header('Response')
+                    logger.warning('TiT service is not available.')
                 return None  # It's not essential information
             raise self._convert_webfault(err)
 
@@ -885,6 +933,11 @@ class UPSApi(Carrier):
             self._on_unknown_error()
 
         if not hasattr(response, 'TransitResponse'):
+            # a warning because UPS is being inconsistent for unknown reasons
+            with logger.lock:
+                logger.debug_header('Response')
+                logger.warning('No TiT information given.')
+                logger.warning(response)
             return None
 
         for summary in response.TransitResponse.ServiceSummary:
@@ -895,29 +948,55 @@ class UPSApi(Carrier):
 
             date = summary.EstimatedArrival.Arrival.Date
             time = summary.EstimatedArrival.Arrival.Time
-            return datetime(
+            result = datetime(
                 year=int(date[0:4]),
                 month=int(date[4:6]),
                 day=int(date[6:8]),
                 hour=int(time[0:2]),
                 minute=int(time[2:4]))
+            with logger.lock:
+                logger.debug_header('Response')
+                logger.debug(result)
+            return result
 
+        with logger.lock:
+            logger.debug_header('Response')
+            logger.warning('No matching TiT info found.')
+            logger.warning(response)
         return None
 
     def quote(self, service, request):
         self._ensure_request_supported(request)
 
+        with logger.lock:
+            logger.debug_header('Get Price')
+            logger.debug(service)
+            logger.debug(request)
         rates = self._request_rates(request, 'Rate', service)
 
         if len(rates.RatedShipment) != 1:
-            raise CarrierError(
-                'UPS has no rates available for those parameters.')
+            with logger.lock:
+                logger.debug_header('Response')
+                logger.debug('No rates available.')
+                logger.debug(rates)
+            raise CarrierError('UPS has no rates available for those '
+                               'parameters.')
         rated_shipment = rates.RatedShipment[0]
         if rated_shipment.Service.Code != service.service_id:
-            raise CarrierError(
-                'UPS has no rates available for those parameters.')
+            with logger.lock:
+                logger.debug_header('Response')
+                logger.debug('No rates available.')
+                logger.debug(rates)
+            raise CarrierError('UPS has no rates available for those '
+                               'parameters.')
 
-        return self._get_negotiated_charge(rated_shipment)
+        result = self._get_negotiated_charge(rated_shipment)
+
+        with logger.lock:
+            logger.debug_header('Response')
+            logger.debug(result)
+
+        return result
 
     def _populate_package(self, api_package, package):
         packaging_code = self._get_internal_package_type_code(

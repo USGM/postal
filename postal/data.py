@@ -87,14 +87,15 @@ class Address(object):
 
     def __str__(self):
         return (
-            str(self.contact_name) + ' ' + str(self.phone_number) + '\n' +
-            str(self.street_lines) + '\n' +
+            str(self.contact_name) + ' ' + str(self.phone_number) + '\n    ' +
+            str(self.street_lines) + '\n    ' +
             str(self.city) + ', ' + str(self.subdivision) + ' ' +
-            str(self.postal_code) + ' ' + self.country.alpha2 + '\n' +
-            'Residential: ' + str(self.residential))
+            str(self.postal_code) + ' ' + self.country.alpha2 +
+            ((('\n    Residential' if self.residential else '')))
+        )
 
     def __repr__(self):
-        return '<\n' + str(self) + '\n>'
+        return '\n    ' + str(self)
 
     def copy(self):
         return Address(
@@ -176,8 +177,11 @@ class Request(object):
         return all([package.documents_only for package in self.packages])
 
     def __str__(self):
-        return 'Request(origin=%s destination=%s packages=%s ship_datetime=%s extra_params=%s' \
-            % (repr(self.origin), repr(self.destination), repr(self.packages), repr(self.ship_datetime), repr(self.extra_params))
+        return 'Request(\n  origin=%s\n  destination=%s\n  packages=%s' \
+               '\n  ship_datetime=%s\n  extra_params=%s\n)' \
+                % (repr(self.origin), repr(self.destination),
+                   repr(self.packages), repr(self.ship_datetime),
+                   repr(self.extra_params))
     def __repr__(self):
         return str(self)
 

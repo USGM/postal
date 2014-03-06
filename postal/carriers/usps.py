@@ -15,22 +15,26 @@ do so would mean that some packages would have been shipped, and others would
 not have. Automatically refunding the packages would also be problematic, as
 the cause of the original problem might also prevent the refund working.
 """
+from copy import copy, deepcopy
+from pprint import pformat
 import random
 import re
 from base64 import b64decode
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from math import ceil
+from io import BytesIO
 
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from money import Money
 from suds.client import Client
 
-from base import Carrier, ClearEmpty, PY3
+from base import Carrier, ClearEmpty, PY3, get_logger
 from ..exceptions import CarrierError, NotSupportedError
 from ..data import Shipment, sigfig, TWOPLACES
 
-from io import BytesIO
+
+logger = get_logger(__name__, 'USPS')
 
 
 class USPSApi(Carrier):
@@ -441,6 +445,12 @@ class USPSApi(Carrier):
 
     def ship(self, service, request):
         self._sanity_check(request)
+
+        with logger.lock:
+            logger.debug_header('Shipment')
+            logger.debug(service)
+            logger.debug(request)
+
         if len(request.packages) == 1:
             return self.ship_package(request, service, request.packages[0])
 
@@ -455,9 +465,19 @@ class USPSApi(Carrier):
             except CarrierError as err:
                 # One of the packages didn't ship correctly.
                 responses.append({
-                    'packages': {package: {
-                        'label': None, 'tracking_number': None}}})
-        return self.compile_shipments(responses)
+                    'packages': {
+                        package: {'label': None, 'tracking_number': None}}})
+        result = self.compile_shipments(responses)
+
+        display_result = copy(result)
+        display_result['packages'] = deepcopy(display_result['packages'])
+        for info in display_result['packages'].values():
+            info['label'] = '(omitted)'
+        with logger.lock:
+            logger.debug_header('Response')
+            logger.debug(pformat(display_result))
+
+        return result
 
     def refill(self, dollar_amount):
         """
@@ -524,6 +544,11 @@ class USPSApi(Carrier):
 
     def get_services(self, request):
         self._sanity_check(request)
+
+        with logger.lock:
+            logger.debug_header('Get Services')
+            logger.debug(request)
+
         responses = []
         for package in request.packages:
             postage_request = self.client.factory.create('PostageRatesRequest')
@@ -538,6 +563,11 @@ class USPSApi(Carrier):
             responses.append(response_dict)
         responses = self.compile_options(request, responses)
         self.cache_results(request, responses)
+
+        with logger.lock:
+            logger.debug_header('Response')
+            logger.debug(pformat(responses, width=1))
+
         return responses
 
     def delivery_datetime(self, service, request):

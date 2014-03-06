@@ -2,18 +2,24 @@
 This is the module for interfacing with FedEx's web services APIs.
 """
 from base64 import b64decode
+from copy import copy, deepcopy
 from datetime import datetime
 from math import ceil
+from pprint import pformat
 
 from money import Money
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from suds.client import Client
 
-from .base import Carrier, ClearEmpty
+from .base import Carrier, ClearEmpty, get_logger
 from ..exceptions import CarrierError, NotSupportedError, PostalError
 from ..data import Address, Shipment, Declaration
 
 from io import BytesIO
+
+
+logger = get_logger(__name__, 'FedEx')
+
 
 class FedExApi(Carrier):
     """
@@ -202,6 +208,11 @@ class FedExApi(Carrier):
         address_validation_options = self.address_validation_options()
         address_item = self.address_client.factory.create('AddressToValidate')
         self.set_address(address_item, address)
+
+        with logger.lock:
+            logger.debug_header('Validate Address')
+            logger.debug(address)
+
         result = self.service_call(
             self.address_client.service.addressValidation,
             auth, client_detail, transaction_detail, version_id,
@@ -209,6 +220,9 @@ class FedExApi(Carrier):
         result = result.AddressResults[0][0][0]
         success = result.Score
         address = self.address_from_validator(result, address)
+        with logger.lock:
+            logger.debug_header('Response')
+            logger.debug(address)
         return success, address
 
     def ship_version_id(self):
@@ -304,6 +318,12 @@ class FedExApi(Carrier):
         version_id = self.ship_version_id()
         package = request.packages[0]
         requested_shipment = self.requested_shipment(service, request, package)
+
+        with logger.lock:
+            logger.debug_header('Shipment')
+            logger.debug(service)
+            logger.debug(request)
+
         result = self.service_call(
             self.ship_client.service.processShipment, auth, client_detail,
             transaction_detail, version_id, requested_shipment)
@@ -345,6 +365,14 @@ class FedExApi(Carrier):
             'shipment': Shipment(self, tracking_number),
             'packages': package_details,
             'price': price}
+
+        display_result = copy(shipment_dict)
+        display_result['packages'] = deepcopy(display_result['packages'])
+        for info in display_result['packages'].values():
+            info['label'] = '(omitted)'
+        with logger.lock:
+            logger.debug_header('Response')
+            logger.debug(pformat(display_result))
         return shipment_dict
 
     def carrier_codes(self):
@@ -462,8 +490,7 @@ class FedExApi(Carrier):
         if len(request.packages) == 1:
             package = request.packages[0]
             api_request.PackagingType = self._get_internal_package_type_code(
-                package.package_type, to_proprietary=package.carrier_conversion
-            )
+                package.package_type, to_proprietary=package.carrier_conversion)
         else:
             api_request.PackagingType = 'YOUR_PACKAGING'
 
@@ -532,6 +559,11 @@ class FedExApi(Carrier):
         codes = []
         variable_options = []
         requested_shipment = self.requested_shipment_rate(request)
+
+        with logger.lock:
+            logger.debug_header('Get Services')
+            logger.debug(request)
+
         response = self.service_call(
             self.rates_client.service.getRates,
             auth, client, transaction_detail, version, return_transit, codes,
@@ -545,6 +577,10 @@ class FedExApi(Carrier):
                 'delivery_datetime': value['delivery_datetime'],
                 'trackable': True}
             for key, value in result.items()}
+
+        with logger.lock:
+            logger.debug_header('Response')
+            logger.debug(pformat(final, width=1))
 
         return final
 

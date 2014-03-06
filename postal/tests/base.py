@@ -12,6 +12,14 @@ from .test_configuration import config
 from ..data import Address, Package, Declaration, Shipment, Request, \
     PackageType
 
+
+import logging
+import sys
+logger = logging.getLogger('postal.carriers')
+logger.setLevel(logging.DEBUG)
+logger.addHandler(logging.StreamHandler(sys.stderr))
+
+
 test_from = {
     'street_lines': ['1321 Upland Drive'],
     'contact_name': 'Jonathan Piacenti',
