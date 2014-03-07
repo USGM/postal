@@ -85,13 +85,16 @@ class Address(object):
         self.country = get_country(country)
 
     def __str__(self):
+        return str(repr(self))
+
+    def __unicode__(self):
+        return unicode(repr(self))
+
+    def __repr__(self):
         return '    %s %s\n    %s\n    %s, %s %s %s' % (
             self.contact_name, self.phone_number, self.street_lines,
             self.city, self.subdivision, self.postal_code, self.country.alpha2
         ) + ((('\n    Residential' if self.residential else '')))
-
-    def __repr__(self):
-        return str(self)
 
     def copy(self):
         return Address(
