@@ -7,8 +7,10 @@ This module also contains the base Service class. Service objects are
 instantiated by Carrier classes to describe a method by which a package may
 be sent.
 """
+from copy import copy, deepcopy
 import inspect
 import os
+from pprint import pformat
 import re
 import sys
 import logging
@@ -28,7 +30,40 @@ def get_logger(logger_name, carrier_name):
     result = logging.getLogger(logger_name)
     result.lock = RLock()
     result.debug_header = lambda title: result.debug(
-        ('='*20) + ' ' + str(carrier_name) + ': ' + str(title) + ' ' + ('='*20))
+        ('='*10) + ' ' + str(carrier_name) + ': ' + str(title) + ' ' + ('='*10))
+
+    # temporarily displaying low-detail debug messages as info level until
+    # finding a way to use custom log levels with Django
+    result.debug = result.info
+
+    def sent(message):
+        result.log(logging.DEBUG, ('='*5) + ' SENT ' + ('='*5))
+        result.log(logging.DEBUG, message)
+    result.sent = sent
+
+    def received(message):
+        result.log(logging.DEBUG, ('='*5) + ' RECEIVED ' + ('='*5))
+        result.log(logging.DEBUG, message)
+    result.received = received
+
+    def shipment_response(shipment_dict):
+        display_result = copy(shipment_dict)
+        try:
+            display_result['packages'] = deepcopy(display_result['packages'])
+            for info in display_result['packages'].values():
+                info['label'] = '(omitted)'
+        except TypeError:
+            result.error('Unable to deep copy:')  # Not sure why this is happening
+            result.error(display_result['packages'])
+            display_result['packages'] = copy(display_result['packages'])
+            for key, info in display_result['packages']:
+                display_result['packages'][key] = {
+                    'label': '(omitted)',
+                    'tracking_number': info['tracking_number']
+                }
+        result.debug(pformat(display_result))
+    result.shipment_response = shipment_response
+
     return result
 
 

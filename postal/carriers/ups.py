@@ -651,13 +651,11 @@ class UPSApi(Carrier):
             'shipment': Shipment(self, master_tracking_number),
             'packages': packages,
             'price': negotiated_rate}
-        display_result = copy(result)
-        display_result['packages'] = deepcopy(display_result['packages'])
-        for info in display_result['packages'].values():
-            info['label'] = '(omitted)'
+
         with logger.lock:
             logger.debug_header('Response')
-            logger.debug(pformat(display_result, width=1))
+            logger.shipment_response(result)
+
         return result
 
     def _task(self, request, rated_shipment, shipment_info):

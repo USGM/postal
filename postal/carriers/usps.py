@@ -105,6 +105,10 @@ class USPSApi(Carrier):
 
     def service_call(self, func, *args, **kwargs):
         response = super(USPSApi, self).service_call(func, *args, **kwargs)
+
+        logger.sent(self.client.last_sent())
+        logger.received(self.client.last_received())
+
         try:
             if response.Status != 0:
                 raise CarrierError(response.ErrorMessage)
@@ -220,8 +224,8 @@ class USPSApi(Carrier):
             phone_number = phone_number[1:]
         phone_number = phone_number[:10]
         if len(phone_number) != 10:
-            raise NotSupportedError(
-                'USPS requires a standard US 10 digit phone number.')
+            raise NotSupportedError('USPS requires a standard US 10 digit '
+                                    'phone number.')
         return phone_number
 
     @staticmethod
@@ -229,8 +233,8 @@ class USPSApi(Carrier):
         for index, line in enumerate(lines):
             line_num = index + 1
             if line_num > 3:
-                raise NotSupportedError(
-                    "USPS cannot take more than 4 address lines.")
+                raise NotSupportedError("USPS cannot take more than 4 address "
+                                        "lines.")
             setattr(api_request, '%sAddress%s' % (prefix, line_num), line)
 
     def _set_address_info(self, api_request, request, short=False):
@@ -469,13 +473,9 @@ class USPSApi(Carrier):
                         package: {'label': None, 'tracking_number': None}}})
         result = self.compile_shipments(responses)
 
-        display_result = copy(result)
-        display_result['packages'] = deepcopy(display_result['packages'])
-        for info in display_result['packages'].values():
-            info['label'] = '(omitted)'
         with logger.lock:
             logger.debug_header('Response')
-            logger.debug(pformat(display_result))
+            logger.shipment_response(result)
 
         return result
 
@@ -559,6 +559,7 @@ class USPSApi(Carrier):
             postage_request.DeliveryTimeDays = "TRUE"
             response = self.service_call(
                 self.client.service.CalculatePostageRates, postage_request)
+
             response_dict = self._request_response_table(request, response)
             responses.append(response_dict)
         responses = self.compile_options(request, responses)

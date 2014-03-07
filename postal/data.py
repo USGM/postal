@@ -20,8 +20,7 @@ def get_country(country_code):
     try:
         return countries.get(alpha2=country_code)
     except KeyError:
-        raise AddressError(
-            '"' + str(country_code) + '" is not a valid country code.')
+        raise AddressError('"%s" is not a valid country code.' % country_code)
 
 
 def stack_values(iter, func_name):
@@ -86,16 +85,13 @@ class Address(object):
         self.country = get_country(country)
 
     def __str__(self):
-        return (
-            str(self.contact_name) + ' ' + str(self.phone_number) + '\n    ' +
-            str(self.street_lines) + '\n    ' +
-            str(self.city) + ', ' + str(self.subdivision) + ' ' +
-            str(self.postal_code) + ' ' + self.country.alpha2 +
-            ((('\n    Residential' if self.residential else '')))
-        )
+        return '    %s %s\n    %s\n    %s, %s %s %s' % (
+            self.contact_name, self.phone_number, self.street_lines,
+            self.city, self.subdivision, self.postal_code, self.country.alpha2
+        ) + ((('\n    Residential' if self.residential else '')))
 
     def __repr__(self):
-        return '\n    ' + str(self)
+        return str(self)
 
     def copy(self):
         return Address(
@@ -177,11 +173,12 @@ class Request(object):
         return all([package.documents_only for package in self.packages])
 
     def __str__(self):
-        return 'Request(\n  origin=%s\n  destination=%s\n  packages=%s' \
+        return 'Request(\n  origin=\n%s\n  destination=\n%s\n  packages=%s' \
                '\n  ship_datetime=%s\n  extra_params=%s\n)' \
                 % (repr(self.origin), repr(self.destination),
                    repr(self.packages), repr(self.ship_datetime),
                    repr(self.extra_params))
+
     def __repr__(self):
         return str(self)
 

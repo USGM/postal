@@ -109,6 +109,9 @@ class DHLApi(Carrier):
         except RequestException as err:
             raise CarrierError("%s" % err)
 
+        logger.sent(call)
+        logger.received(response.text)
+
         root = fromstring(response.text)
         # DHL has about three or four ways to send an error message.
         response = root
@@ -124,9 +127,8 @@ class DHLApi(Carrier):
         if status is not None:
             error_tag = status
         if error_tag is not None:
-            if not (
-                    (error_tag.findtext('ActionStatus') == 'Success')
-                    or ((error_tag.findtext('ActionNote') == 'Success'))):
+            if not ((error_tag.findtext('ActionStatus') == 'Success')
+                    or (error_tag.findtext('ActionNote') == 'Success')):
                 condition = error_tag.find('Condition')
         if condition is not None:
             raise CarrierError("Error %s. %s" % (
@@ -488,13 +490,9 @@ class DHLApi(Carrier):
             'packages': package_details,
             'price': price}
 
-        display_result = copy(shipment_dict)
-        display_result['packages'] = deepcopy(display_result['packages'])
-        for info in display_result['packages'].values():
-            info['label'] = '(omitted)'
         with logger.lock:
             logger.debug_header('Response')
-            logger.debug(pformat(display_result))
+            logger.shipment_response(shipment_dict)
 
         return shipment_dict
 

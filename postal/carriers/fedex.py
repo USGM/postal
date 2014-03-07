@@ -217,6 +217,10 @@ class FedExApi(Carrier):
             self.address_client.service.addressValidation,
             auth, client_detail, transaction_detail, version_id,
             request_timestamp, address_validation_options, address_item)
+
+        logger.sent(self.address_client.last_sent())
+        logger.received(self.address_client.last_received())
+
         result = result.AddressResults[0][0][0]
         success = result.Score
         address = self.address_from_validator(result, address)
@@ -327,6 +331,10 @@ class FedExApi(Carrier):
         result = self.service_call(
             self.ship_client.service.processShipment, auth, client_detail,
             transaction_detail, version_id, requested_shipment)
+
+        logger.sent(self.ship_client.last_sent())
+        logger.received(self.ship_client.last_received())
+
         package_details = {}
         if len(request.packages) > 1:
             master_tracking_id = (
@@ -347,6 +355,10 @@ class FedExApi(Carrier):
             result = self.service_call(
                 self.ship_client.service.processShipment, auth, client_detail,
                 transaction_detail, version_id, requested_shipment)
+
+            logger.sent(self.ship_client.last_sent())
+            logger.received(self.ship_client.last_received())
+
             detail = result.CompletedShipmentDetail.CompletedPackageDetails[0]
             package_details[package] = {
                 'tracking_number': (
@@ -366,13 +378,9 @@ class FedExApi(Carrier):
             'packages': package_details,
             'price': price}
 
-        display_result = copy(shipment_dict)
-        display_result['packages'] = deepcopy(display_result['packages'])
-        for info in display_result['packages'].values():
-            info['label'] = '(omitted)'
         with logger.lock:
             logger.debug_header('Response')
-            logger.debug(pformat(display_result))
+            logger.shipment_response(shipment_dict)
         return shipment_dict
 
     def carrier_codes(self):
@@ -568,6 +576,10 @@ class FedExApi(Carrier):
             self.rates_client.service.getRates,
             auth, client, transaction_detail, version, return_transit, codes,
             variable_options, requested_shipment)
+
+        logger.sent(self.rates_client.last_sent())
+        logger.received(self.rates_client.last_received())
+
         result = self.rate_response_dict(response)
         self.cache_results(request, result)
 
