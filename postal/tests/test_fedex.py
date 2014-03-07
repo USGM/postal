@@ -58,5 +58,31 @@ class TestFedEx(TestCarrier, unittest.TestCase):
         self.assertIsInstance(package_data['tracking_number'], str)
         self.assertIsInstance(package_data['label'], str)
 
+    def test_unicode_characters(self):
+        package = Package(11, 15, 3, 4, Carrier.GENERIC_PACKAGE, carrier_conversion=False, declarations=[
+            Declaration('book', Money(45, 'USD'), 'US', 1, insure=False)
+        ], documents_only=False)
+
+        response = self.carrier.get_services(Request(
+            Address(
+                street_lines=['1321 Upland Dr'], city='Houston',
+                subdivision='TX', country='US',
+                residential=False, contact_name='US Global Mail',
+                phone_number='2815968965',
+                postal_code='77043'
+            ),
+            Address(
+                contact_name=u'Commission construction Qu\xe9bec',
+                phone_number='0000000000',
+                street_lines=['DO NOT SHIP'],
+                city='Montreal',
+                subdivision='PQ',  # the other abbreviation is QC
+                postal_code='H2M0A7',
+                country='CA'  # Canada
+            ),
+            [package],
+            extra_params={'UPS': {'signature': 'Adult'}}
+        ))
+
 if __name__ == '__main__':
     unittest.main()

@@ -52,6 +52,9 @@ class PostalLogger(object):
             ('='*10) + ' ' + str(self.carrier_name) + ': ' + str(title) + ' '
             + ('='*10))
 
+    def error(self, message):
+        self.logger.error(message)
+
 
 def get_logger(logger_name, carrier_name):
     return PostalLogger(logger_name, carrier_name)

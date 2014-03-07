@@ -84,17 +84,20 @@ class Address(object):
         self.residential = residential
         self.country = get_country(country)
 
-    def __str__(self):
-        return str(repr(self))
-
-    def __unicode__(self):
-        return unicode(repr(self))
-
-    def __repr__(self):
+    def _str(self):
         return '    %s %s\n    %s\n    %s, %s %s %s' % (
             self.contact_name, self.phone_number, self.street_lines,
             self.city, self.subdivision, self.postal_code, self.country.alpha2
         ) + ((('\n    Residential' if self.residential else '')))
+
+    def __str__(self):
+        return self._str().encode('utf8')
+
+    def __unicode__(self):
+        return unicode(self._str())
+
+    def __repr__(self):
+        return str(self)
 
     def copy(self):
         return Address(
@@ -175,12 +178,18 @@ class Request(object):
     def documents_only(self):
         return all([package.documents_only for package in self.packages])
 
-    def __str__(self):
+    def _str(self):
         return 'Request(\n  origin=\n%s\n  destination=\n%s\n  packages=%s' \
                '\n  ship_datetime=%s\n  extra_params=%s\n)' \
                 % (repr(self.origin), repr(self.destination),
                    repr(self.packages), repr(self.ship_datetime),
                    repr(self.extra_params))
+
+    def __str__(self):
+        return self._str().encode('utf8')
+
+    def __unicode__(self):
+        return unicode(self._str())
 
     def __repr__(self):
         return str(self)
@@ -374,8 +383,10 @@ class Declaration(object):
             return self.get_total_value()
 
     def __str__(self):
-        return str(self.description) + ' x' + str(self.units) + ', ' \
-            + str(self.value) + ' each'
+        return unicode(self).encode('utf8')
+
+    def __unicode__(self):
+        return '%s x%s, %s each' % (self.description, self.units, self.value)
 
     def __repr__(self):
         return '<Declaration: ' + str(self) + '>'
