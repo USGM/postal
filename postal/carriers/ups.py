@@ -325,7 +325,7 @@ class UPSApi(Carrier):
                                        'option to that address.')
         else:
             logger.error('UPS: Webfault#%s: %s'
-                          % (error.code, error.Description))
+                          % (error.Code, error.Description))
             result = CarrierError('Webfault#%s: %s'
                                   % (error.Code, error.Description))
 
