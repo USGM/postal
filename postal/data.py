@@ -301,6 +301,30 @@ class Package(object):
     def __repr__(self):
         return str(self)
 
+    def __deepcopy__(self, memo):
+        return Package(
+            length=self.length,
+            width=self.width,
+            height=self.height,
+            weight=self.weight,
+            carrier_conversion=self.carrier_conversion,
+            documents_only=self.documents_only,
+            declarations=self.declarations  # copied in constructor
+        )
+
+    def __eq__(self, other):
+        try:
+            return all([
+                sorted([self.length, self.width, self.height]) ==
+                    sorted([other.length, other.width, other.height]),
+                self.weight == other.weight,
+                self.carrier_conversion == other.carrier_conversion,
+                self.documents_only == other.documents_only,
+                self.declarations == other.declarations
+            ])
+        except AttributeError:
+            return False
+
 
 class Declaration(object):
     """
@@ -352,6 +376,18 @@ class Declaration(object):
 
     def __repr__(self):
         return '<Declaration: ' + str(self) + '>'
+
+    def __eq__(self, other):
+        try:
+            return all([
+                self.description == other.description,
+                self.value == other.value,
+                self.units == other.units,
+                self.origin_country == other.origin_country,
+                self.insure == other.insure
+            ])
+        except AttributeError:
+            return False
 
 
 class Shipment(object):

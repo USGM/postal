@@ -345,7 +345,7 @@ class FedExApi(Carrier):
                     0].TrackingIds[0])
         detail = result.CompletedShipmentDetail.CompletedPackageDetails[0]
         package_details[package] = {
-            'tracking_number': master_tracking_id.TrackingNumber,
+            'tracking_number': str(master_tracking_id.TrackingNumber),
             'label': self.format_label(detail.Label.Parts[0].Image)}
         for sequence_num, package in enumerate(request.packages[1:]):
             sequence_num += 2
@@ -361,10 +361,10 @@ class FedExApi(Carrier):
 
             detail = result.CompletedShipmentDetail.CompletedPackageDetails[0]
             package_details[package] = {
-                'tracking_number': (
+                'tracking_number': str(
                     detail.TrackingIds[0].TrackingNumber),
                 'label': self.format_label(detail.Label.Parts[0].Image)}
-        tracking_number = master_tracking_id.TrackingNumber
+        tracking_number = str(master_tracking_id.TrackingNumber)
 
         try:
             rating = result.CompletedShipmentDetail.ShipmentRating
