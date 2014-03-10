@@ -186,7 +186,7 @@ class Request(object):
                    self.extra_params)
 
     def __str__(self):
-        return self._str().encode('ascii', errors='backslashreplace')
+        return self._str().encode('utf8')
 
     def __unicode__(self):
         return unicode(self._str())
@@ -389,8 +389,7 @@ class Declaration(object):
         return self._str().encode('utf8')
 
     def __repr__(self):
-        return ('<Declaration: ' + self._str() + '>').encode(
-            'ascii', errors='backslashreplace')
+        return ('<Declaration: ' + self._str() + '>').encode('utf8')
 
     def __eq__(self, other):
         try:

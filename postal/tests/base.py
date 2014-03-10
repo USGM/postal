@@ -16,7 +16,7 @@ from ..data import Address, Package, Declaration, Shipment, Request, \
 import logging
 import sys
 logger = logging.getLogger('postal.carriers')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler(sys.stderr))
 
 

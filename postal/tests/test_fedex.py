@@ -1,4 +1,3 @@
-from copy import deepcopy
 import unittest
 from base import TestCarrier
 from ..carriers.fedex import FedExApi
@@ -79,8 +78,7 @@ class TestFedEx(TestCarrier, unittest.TestCase):
                 postal_code='H2M0A7',
                 country='CA'  # Canada
             ),
-            [package],
-            extra_params={'UPS': {'signature': 'Adult'}}
+            [package]
         ))
 
 if __name__ == '__main__':
