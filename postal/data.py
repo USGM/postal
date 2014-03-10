@@ -382,7 +382,13 @@ class Declaration(object):
         return self.units * self.value
 
     def get_insured_value(self):
-        if not self.insure:
+        if self.insure:
+            return self.get_total_value()
+        else:
+            return 0
+
+    def get_uninsured_value(self):
+        if self.insure:
             return 0
         else:
             return self.get_total_value()
@@ -394,7 +400,8 @@ class Declaration(object):
         return self._str().encode('utf8')
 
     def __repr__(self):
-        return ('<Declaration: ' + self._str() + '>').encode('utf8')
+        return ('<Declaration: ' + self._str() + ', insure=%s>' % self.insure)\
+            .encode('utf8')
 
     def __eq__(self, other):
         try:
