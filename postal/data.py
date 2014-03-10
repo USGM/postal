@@ -179,11 +179,16 @@ class Request(object):
         return all([package.documents_only for package in self.packages])
 
     def _str(self):
+        origin = None
+        if self.origin:
+            origin = self.origin._str()
+        destination = None
+        if self.destination:
+            destination = self.destination._str()
         return 'Request(\n  origin=\n%s\n  destination=\n%s\n  packages=%s' \
                '\n  ship_datetime=%s\n  extra_params=%s\n)' \
-                % (self.origin._str(), self.destination._str(),
-                   self.packages, self.ship_datetime,
-                   self.extra_params)
+               % (origin, destination, self.packages, self.ship_datetime,
+                  self.extra_params)
 
     def __str__(self):
         return self._str().encode('utf8')
