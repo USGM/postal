@@ -309,11 +309,11 @@ class Package(object):
         self.weight = self.to_pounds(self.weight)
 
     def __str__(self):
-        return (
-            'Package(length=' + repr(self.length) + ', width=' +
-            repr(self.width) + ', height=' + repr(self.height) + ', weight=' +
-            repr(self.weight) + ', declarations=' + repr(self.declarations) +
-            ')')
+        return 'Package(%sx%sx%s weight=%s type=%s carrier_conversion=%s ' \
+               'declarations=%s)' \
+               % (self.length, self.width, self.height, self.weight,
+                  repr(self.package_type), self.carrier_conversion,
+                  self.declarations)
 
     def __repr__(self):
         return str(self)
