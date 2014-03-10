@@ -97,7 +97,7 @@ class Address(object):
         return unicode(self._str())
 
     def __repr__(self):
-        return str(self)
+        return repr(self._str())
 
     def copy(self):
         return Address(
@@ -181,18 +181,18 @@ class Request(object):
     def _str(self):
         return 'Request(\n  origin=\n%s\n  destination=\n%s\n  packages=%s' \
                '\n  ship_datetime=%s\n  extra_params=%s\n)' \
-                % (repr(self.origin), repr(self.destination),
-                   repr(self.packages), repr(self.ship_datetime),
-                   repr(self.extra_params))
+                % (self.origin._str(), self.destination._str(),
+                   self.packages, self.ship_datetime,
+                   self.extra_params)
 
     def __str__(self):
-        return self._str().encode('utf8')
+        return self._str().encode('ascii', errors='backslashreplace')
 
     def __unicode__(self):
         return unicode(self._str())
 
     def __repr__(self):
-        return str(self)
+        return repr(self._str())
 
 
 class PackageType(object):
@@ -382,14 +382,15 @@ class Declaration(object):
         else:
             return self.get_total_value()
 
-    def __str__(self):
-        return unicode(self).encode('utf8')
-
-    def __unicode__(self):
+    def _str(self):
         return '%s x%s, %s each' % (self.description, self.units, self.value)
 
+    def __str__(self):
+        return self._str().encode('utf8')
+
     def __repr__(self):
-        return '<Declaration: ' + str(self) + '>'
+        return ('<Declaration: ' + self._str() + '>').encode(
+            'ascii', errors='backslashreplace')
 
     def __eq__(self, other):
         try:

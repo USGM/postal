@@ -48,12 +48,15 @@ class PostalLogger(object):
         self.logger.info(message)
 
     def debug_header(self, title):
-        self.logger.info(
+        self.debug(
             ('='*10) + ' ' + str(self.carrier_name) + ': ' + str(title) + ' '
             + ('='*10))
 
     def error(self, message):
         self.logger.error(message)
+
+    def warning(self, message):
+        self.logger.warning(message)
 
 
 def get_logger(logger_name, carrier_name):

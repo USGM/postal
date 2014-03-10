@@ -16,7 +16,7 @@ from ..data import Address, Package, Declaration, Shipment, Request, \
 import logging
 import sys
 logger = logging.getLogger('postal.carriers')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 logger.addHandler(logging.StreamHandler(sys.stderr))
 
 
@@ -283,32 +283,32 @@ class TestCarrier(object):
         sdict = services.keys()[0].ship(self.request)
         self.shipment_dict_check(sdict)
 
-    # def test_get_all_services(self):
-    #     services = list(self.carrier.get_all_services())
-    #     self.assertGreater(len(services), 0)
-    #     for service in services:
-    #         self.assertIsInstance(service, Service)
-    #
-    # test_domestic_services = domestic(services)
-    # test_domestic_services_multiship = domestic(services_multiship)
-    # test_domestic_delayed_shipment = domestic(delayed_shipment)
-    # test_domestic_residential_shipment = domestic(residential_shipment)
-    # test_domestic_insurance = domestic(insurance)
-    # test_domestic_address_validation = domestic(address_validation)
-    # test_domestic_ship_package = domestic(ship_package)
-    # test_domestic_multiship = domestic(multiship)
-    # test_domestic_rate_ship_match = domestic(rate_ship_match)
-    # test_domestic_rate_ship_match_multiship = domestic(
-    #     rate_ship_match_multiship)
-    # test_domestic_ship_documents = domestic(ship_documents)
-    # test_international_services = international(services)
-    # test_international_services_multiship = international(services_multiship)
-    # test_international_delayed_shipment = international(delayed_shipment)
-    # test_international_insurance = international(insurance)
-    # test_international_address_validation = international(address_validation)
-    # test_international_ship_package = international(ship_package)
-    # test_international_multiship = international(multiship)
-    # test_international_rate_ship_match = international(rate_ship_match)
-    # test_international_rate_ship_match_multiship = international(
-    #     rate_ship_match_multiship)
-    # test_international_ship_documents = international(ship_documents)
+    def test_get_all_services(self):
+        services = list(self.carrier.get_all_services())
+        self.assertGreater(len(services), 0)
+        for service in services:
+            self.assertIsInstance(service, Service)
+
+    test_domestic_services = domestic(services)
+    test_domestic_services_multiship = domestic(services_multiship)
+    test_domestic_delayed_shipment = domestic(delayed_shipment)
+    test_domestic_residential_shipment = domestic(residential_shipment)
+    test_domestic_insurance = domestic(insurance)
+    test_domestic_address_validation = domestic(address_validation)
+    test_domestic_ship_package = domestic(ship_package)
+    test_domestic_multiship = domestic(multiship)
+    test_domestic_rate_ship_match = domestic(rate_ship_match)
+    test_domestic_rate_ship_match_multiship = domestic(
+        rate_ship_match_multiship)
+    test_domestic_ship_documents = domestic(ship_documents)
+    test_international_services = international(services)
+    test_international_services_multiship = international(services_multiship)
+    test_international_delayed_shipment = international(delayed_shipment)
+    test_international_insurance = international(insurance)
+    test_international_address_validation = international(address_validation)
+    test_international_ship_package = international(ship_package)
+    test_international_multiship = international(multiship)
+    test_international_rate_ship_match = international(rate_ship_match)
+    test_international_rate_ship_match_multiship = international(
+        rate_ship_match_multiship)
+    test_international_ship_documents = international(ship_documents)

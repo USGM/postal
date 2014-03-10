@@ -37,8 +37,7 @@ class TestFedEx(TestCarrier, unittest.TestCase):
                 country='MX',  # Mexico
                 residential=True
             ),
-            [package],
-            extra_params={'UPS': {'signature': 'Adult'}}
+            [package]
         ))
 
         self.assertIsInstance(response, dict)
