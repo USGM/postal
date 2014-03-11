@@ -246,11 +246,16 @@ class USPSApi(Carrier):
         # Endicia doesn't support US postal code extensions
         if origin.country.alpha2 == 'US':
             api_request.FromPostalCode = origin.postal_code[:5]
+            if not short:
+                api_request.FromZIP4 = origin.postal_code[5:].replace('-', '')
         else:
             api_request.FromPostalCode = origin.postal_code
 
         if request.destination.country.alpha2 == 'US':
             api_request.ToPostalCode = request.destination.postal_code[:5]
+            if not short:
+                api_request.ToZIP4 = request.destination.postal_code[
+                    5:].replace('-', '')
         else:
             api_request.ToPostalCode = request.destination.postal_code
 
