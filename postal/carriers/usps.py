@@ -231,9 +231,10 @@ class USPSApi(Carrier):
     @staticmethod
     def _set_lines(api_request, lines, prefix):
         lines = lines[:]
-        if len(lines) == 4:
+        if len(lines) == 3:
             setattr(api_request, "%sCompany" % prefix, lines.pop(0))
         for index, line in enumerate(lines):
+            # If we get above three lines total, labels become inconsistent.
             line_num = index + 1
             if line_num > 2:
                 raise NotSupportedError("USPS cannot take more than 3 address "
