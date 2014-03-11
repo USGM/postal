@@ -230,10 +230,13 @@ class USPSApi(Carrier):
 
     @staticmethod
     def _set_lines(api_request, lines, prefix):
+        lines = lines[:]
+        if len(lines) == 4:
+            setattr(api_request, "%sCompany" % prefix, lines.pop(0))
         for index, line in enumerate(lines):
             line_num = index + 1
-            if line_num > 3:
-                raise NotSupportedError("USPS cannot take more than 4 address "
+            if line_num > 2:
+                raise NotSupportedError("USPS cannot take more than 3 address "
                                         "lines.")
             setattr(api_request, '%sAddress%s' % (prefix, line_num), line)
 
