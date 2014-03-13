@@ -232,7 +232,11 @@ class USPSApi(Carrier):
     def _set_lines(api_request, lines, prefix):
         lines = lines[:]
         if len(lines) == 3:
-            setattr(api_request, "%sCompany" % prefix, lines.pop(0))
+            if prefix == 'Return':
+                swap = 'From'
+            else:
+                swap = prefix
+            setattr(api_request, "%sName" % swap, lines.pop(0))
         for index, line in enumerate(lines):
             # If we get above three lines total, labels become inconsistent.
             line_num = index + 1
@@ -277,11 +281,20 @@ class USPSApi(Carrier):
         else:
             to_state = None
 
-        api_request.FromName = origin.contact_name
+        if len(origin.street_lines) == 3:
+            # Swap things around to fit everything in.
+            api_request.FromCompany = origin.contact_name
+        else:
+            api_request.FromName = origin.contact_name
+
         api_request.FromState = from_state
         api_request.FromCity = origin.city
         api_request.FromPhone = self._format_phone(origin.phone_number)
-        api_request.ToName = request.destination.contact_name
+
+        if len(request.destination.street_lines) == 3:
+            api_request.ToCompany = request.destination.contact_name
+        else:
+            api_request.ToName = request.destination.contact_name
         api_request.ToState = to_state
         api_request.ToCity = request.destination.city
         api_request.ToCountryCode = request.destination.country.alpha2
