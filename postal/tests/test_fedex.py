@@ -85,6 +85,7 @@ class TestFedEx(TestCarrier, unittest.TestCase):
         request = Request(Address(**test_from), Address(**test_to), [package])
         response = self.carrier.get_services(request)
         self.assertTrue(response)
+        response.keys()[0].ship(request)
 
 if __name__ == '__main__':
     unittest.main()

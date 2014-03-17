@@ -419,9 +419,9 @@ class FedExApi(Carrier):
             # make sure that the weight, if it's under 4 pounds or so, always
             # gets set to .5lbs, to keep us safe.
             if (api_request.PackagingType == 'FEDEX_ENVELOPE') and (
-                    package.weight < 4):
-                item.Weight.Value = 1
-                api_request.TotalWeight.Value = 1
+                    package.weight <= 4):
+                item.Weight.Value = '0.5'
+                api_request.TotalWeight.Value = '0.5'
 
             if package.declarations or package.documents_only:
                 self.set_declarations(client, api_request, package)
