@@ -31,8 +31,7 @@ from suds.client import Client
 
 from base import Carrier, ClearEmpty, PY3, get_logger
 from ..exceptions import CarrierError, NotSupportedError
-from ..data import Shipment, sigfig, TWOPLACES
-
+from ..data import Shipment, sigfig, TWOPLACES, Declaration
 
 logger = get_logger(__name__, 'USPS')
 
@@ -381,6 +380,41 @@ class USPSApi(Carrier):
                 return False
         return True
 
+    def _set_declarations(self, label_request, request, package):
+
+        if not label_request._LabelType == 'International':
+            # Domestic. No declarations needed.
+            return
+
+        if package.documents_only and (not package.declarations):
+            declarations = [
+                Declaration(
+                    description='Noncommercial Documents',
+                    value=Money('1.00', 'USD'), units=1, origin_country='US')]
+        else:
+            declarations = package.declarations[:]
+
+        for declaration in declarations:
+            item = self.client.factory.create('CustomsItem')
+            item.Quantity = declaration.units
+            if str(declaration.value.currency) != 'USD':
+                raise NotSupportedError(
+                    "USPS requires all declarations to be in US dollars.")
+            item.Value = declaration.value.amount.quantize(TWOPLACES)
+            item.CountryOfOrigin = declaration.origin_country.alpha2
+            item.Description = declaration.description
+            commodities = sum(dec.units for dec in package.declarations)
+            item.Weight = int(
+                float(package.weight) / (len(declarations) or 1) /
+                (commodities or 1)) or 1
+            label_request.CustomsInfo.CustomsItems.CustomsItem.append(item)
+
+        if package.documents_only:
+            label_request.CustomsInfo.ContentsType = 'Documents'
+        else:
+            label_request.CustomsInfo.ContentsType = self.get_param(
+                request, 'contents', 'Gift')
+
     def ship_package(self, request, service, package):
         label_request = self.client.factory.create('LabelRequest')
         label_request.MailClass = service.service_id
@@ -401,25 +435,8 @@ class USPSApi(Carrier):
         self._set_dims(label_request, package,
                        softpack_convert=softpack_convert)
 
-        for declaration in package.declarations:
-            item = self.client.factory.create('CustomsItem')
-            item.Quantity = declaration.units
-            if str(declaration.value.currency) != 'USD':
-                raise NotSupportedError(
-                    "USPS requires all declarations to be in US dollars.")
-            item.Value = declaration.value.amount.quantize(TWOPLACES)
-            item.CountryOfOrigin = declaration.origin_country.alpha2
-            item.Description = declaration.description
-            commodities = sum(dec.units for dec in package.declarations)
-            item.Weight = int(
-                float(package.weight) / len(package.declarations) /
-                commodities) or 1
-            label_request.CustomsInfo.CustomsItems.CustomsItem.append(item)
-            if package.documents_only:
-                label_request.CustomsInfo.ContentsType = 'Documents'
-            else:
-                label_request.CustomsInfo.ContentsType = self.get_param(
-                    request, 'contents', 'Gift')
+        self._set_declarations(label_request, request, package)
+
         label_request.Stealth = 'TRUE'
         response = self.service_call(
             self.client.service.GetPostageLabel, label_request)
