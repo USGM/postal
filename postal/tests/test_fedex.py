@@ -1,5 +1,5 @@
 import unittest
-from base import TestCarrier
+from base import TestCarrier, test_from, test_to
 from ..carriers.fedex import FedExApi
 from ..carriers.base import Carrier
 from ..data import Request, Address, Package, Declaration, Shipment
@@ -10,34 +10,36 @@ class TestFedEx(TestCarrier, unittest.TestCase):
     carrier_class = FedExApi
 
     def test_arbitrary_shipment_000(self):
-        package = Package(1, 1, 1, 5, self.carrier.get_package_type('FEDEX_BOX'), carrier_conversion=False, declarations=[
+        # A more complex shipment for this service to test.
+        package_type = self.carrier.get_package_type('FEDEX_BOX')
+        declarations = [
             Declaration('SIM Card', Money(45, 'USD'), 'US', 1, insure=True),
-            Declaration('ECM Control Module', Money(319, 'USD'), 'US', 1, insure=True),
+            Declaration('ECM Control Module', Money(319, 'USD'), 'US', 1,
+                        insure=True),
             Declaration('Book', Money('12.78', 'USD'), 'US', 1, insure=False),
             Declaration('Book', Money('5.39', 'USD'), 'US', 1, insure=False),
-            Declaration('Snaps', Money('3.95', 'USD'), 'US', 1, insure=False)
-        ], documents_only=False)
+            Declaration('Snaps', Money('3.95', 'USD'), 'US', 1, insure=False)]
 
-        response = self.carrier.get_service('INTERNATIONAL_ECONOMY').ship(Request(
-            Address(
-                street_lines=['1321 Upland Dr'], city='Houston',
-                subdivision='TX', country='US',
-                residential=False, contact_name='US Global Mail',
-                phone_number='2815968965',
-                postal_code='77043'
-            ),
-            Address(
-                contact_name='TEST',
-                phone_number='0000000000',
-                street_lines=['DO NOT SHIP'],
-                city='Merida',
-                subdivision='Yuc',
-                postal_code='97117',
-                country='MX',  # Mexico
-                residential=True
-            ),
-            [package]
-        ))
+        package = Package(
+            1, 1, 1, 5,
+            package_type, declarations=declarations,
+            carrier_conversion=False, documents_only=False)
+
+        service = self.carrier.get_service('INTERNATIONAL_ECONOMY')
+
+        test_to_special = Address(
+            contact_name='TEST',
+            phone_number='0000000000',
+            street_lines=['DO NOT SHIP'],
+            city='Merida',
+            subdivision='Yuc',
+            postal_code='97117',
+            country='MX',  # Mexico
+            residential=True)
+
+        request = Request(Address(**test_from), test_to_special, [package])
+
+        response = service.ship(request)
 
         self.assertIsInstance(response, dict)
         self.assertIn('shipment', response)
@@ -57,29 +59,32 @@ class TestFedEx(TestCarrier, unittest.TestCase):
         self.assertIsInstance(package_data['label'], str)
 
     def test_unicode_characters(self):
-        package = Package(11, 15, 3, 4, Carrier.GENERIC_PACKAGE, carrier_conversion=False, declarations=[
-            Declaration('book', Money(45, 'USD'), 'US', 1, insure=False)
-        ], documents_only=False)
+        package = Package(
+            11, 15, 3, 4, Carrier.GENERIC_PACKAGE, carrier_conversion=False,
+            declarations=[
+                Declaration('book', Money(45, 'USD'), 'US', 1, insure=False)],
+            documents_only=False)
 
-        response = self.carrier.get_services(Request(
-            Address(
-                street_lines=['1321 Upland Dr'], city='Houston',
-                subdivision='TX', country='US',
-                residential=False, contact_name='US Global Mail',
-                phone_number='2815968965',
-                postal_code='77043'
-            ),
-            Address(
-                contact_name=u'Commission construction Qu\xe9bec',
-                phone_number='0000000000',
-                street_lines=['DO NOT SHIP'],
-                city='Montreal',
-                subdivision='PQ',  # the other abbreviation is QC
-                postal_code='H2M0A7',
-                country='CA'  # Canada
-            ),
-            [package]
-        ))
+        test_to_special = Address(
+            contact_name=u'Commission construction Qu\xe9bec',
+            phone_number='0000000000',
+            street_lines=['DO NOT SHIP'],
+            city='Montreal',
+            subdivision='PQ',  # the other abbreviation is QC
+            postal_code='H2M0A7',
+            country='CA'  # Canada
+        )
+
+        request = Request(Address(**test_from), test_to_special, [package])
+
+        self.carrier.get_services(request)
+
+    def test_heavy_domestic_envelope(self):
+        package_type = self.carrier.get_package_type('FEDEX_ENVELOPE')
+        package = Package(1, 1, 1, 3, package_type=package_type)
+        request = Request(Address(**test_from), Address(**test_to), [package])
+        response = self.carrier.get_services(request)
+        self.assertTrue(response)
 
 if __name__ == '__main__':
     unittest.main()
