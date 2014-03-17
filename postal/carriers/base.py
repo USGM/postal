@@ -36,7 +36,7 @@ class PostalLogger(object):
         self.logger.debug(message)
 
     def received(self, message):
-        self.logger.debug(('='*5) + ' SENT ' + ('='*5))
+        self.logger.debug(('='*5) + ' RECEIVED ' + ('='*5))
         self.logger.debug(message)
 
     def shipment_response(self, shipment_dict):

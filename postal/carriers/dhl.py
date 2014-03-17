@@ -281,6 +281,8 @@ class DHLApi(Carrier):
         Get the contents of the packages and make a summarizing string.
         """
         summary = ''
+        if request.documents_only():
+            return 'Noncommercial Documents'
         for package in request.packages:
             for declaration in package.declarations:
                 summary += "%s %sx," % (
@@ -301,6 +303,9 @@ class DHLApi(Carrier):
         else:
             money = request.get_total_declared_value()
         if not money and not insurance:
+            return ''
+
+        if request.documents_only():
             return ''
 
         return populate_template(
