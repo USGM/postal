@@ -7,6 +7,8 @@ This module also contains the base Service class. Service objects are
 instantiated by Carrier classes to describe a method by which a package may
 be sent.
 """
+from io import BytesIO
+from datetime import datetime
 import inspect
 import os
 from pprint import pformat
@@ -16,6 +18,7 @@ import logging
 from threading import RLock
 
 from suds.plugin import MessagePlugin
+from PIL import Image, ImageFont, ImageDraw
 
 from ..exceptions import CarrierError, PostalError
 from postal.data import PackageType
@@ -365,6 +368,158 @@ class Carrier(object):
 
         raise NotSupportedError("Packaging type %s is not available for %s."
                                 % (package_type, self.name))
+
+    def commercial_invoice(
+            self, request, logo, signature, signed_by, extra_info={}):
+        im = Image.new("RGB", (200 * 8 + 100, 200 * 11), "white")
+
+        font_head = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Arial.ttf", 40)
+        font_table_head = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf", 20)
+        font_label = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman_Bold.ttf", 30)
+        font_body = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf", 30)
+        font_table_cell = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf", 25)
+
+        draw = ImageDraw.Draw(im)
+
+        left_margin = 200
+        right_margin = 200 * 8 + 100 - 200
+        margin_width = right_margin - left_margin
+
+        draw.text(
+            (left_margin, 200), "Commercial Invoice", font=font_head, fill=0)
+
+        line_y = 275
+
+        logo_bounds = (left_margin, line_y, left_margin + 375, line_y + 375)
+        barcode_bounds = (
+            left_margin + 400, line_y, left_margin + 1000, line_y + 125)
+
+        line_y += 400
+
+        if logo:
+            #print logo.size
+            #im.paste(logo, (0, 0) + logo.size)#, box=(left_margin, 275))
+            #logo.paste(im)
+            #draw.bitmap((left_margin, 275), logo)
+            #draw.bitmap((0, 0), logo, logo)
+            draw.bitmap((0, 0), logo.convert('RGB'))
+        else:
+            draw.rectangle(logo_bounds, fill='#888')
+
+        draw.text((left_margin, 700), "Exporter:", font=font_label, fill=0)
+
+        origin = self.get_origin(request)
+        lines = [origin.contact_name] \
+              + origin.street_lines \
+              + ['%s, %s %s' % (
+                 origin.city, origin.subdivision, origin.postal_code)] \
+              + [origin.country.alpha2] \
+              + [origin.phone_number]
+
+        for i, line in enumerate(lines):
+            draw.text((left_margin, 750 + i * 40), line, font=font_body, fill=0)
+
+        draw.text(
+            (900, 700), "Consignee and Importer:", font=font_label, fill=0)
+
+        dest = request.destination
+        lines = [dest.contact_name] \
+              + dest.street_lines \
+              + [dest.city + ', ' + dest.subdivision + ' ' + dest.postal_code]\
+              + [dest.country.alpha2] \
+              + [dest.phone_number]
+
+        for i, line in enumerate(lines):
+            draw.text((900, 750 + i * 40), line, font=font_body, fill=0)
+
+        pairs = [
+            ('Total Weight', '%s lbs' % request.total_weight()),
+            ('Country of Destination', dest.country.alpha2)
+        ] + extra_info.items()
+        for i, tup in enumerate(pairs):
+            label, info = tup
+            draw.text(
+                (left_margin, 1050 + i * 40), label + ': ', font=font_label,
+                fill=0)
+
+            w, h = font_label.getsize(label + ': ')
+            draw.text(
+                (left_margin + w, 1050 + i * 40), info, font=font_body, fill=0)
+
+        rows = [
+            ('Line', 'Description', 'Harmonized Code', 'Country of Origin',
+             'Quantity', 'Value', 'Line Total')
+        ]
+        for i, dec in enumerate(request.all_declarations(), 1):
+            rows.append((
+                '%s' % i, dec.description, '', dec.origin_country.alpha2,
+                '%s' % dec.units, '%s' % dec.value, '%s' % dec.get_total_value()))
+        rows.append((
+            '', '', '', '', '',
+            'Total:', '%s' % request.get_total_declared_value()))
+
+        i = 0
+        for i, row in enumerate(rows):
+            if i == 0:
+                font = font_table_head
+            else:
+                font = font_table_cell
+
+            for j, cell in enumerate(row):
+                draw.text((left_margin + j * 190, 1250 + i * 40), cell,
+                          font=font, fill=0)
+        line_y = 1250 + i * 40
+        line_y += 100
+
+        draw.text(
+            (left_margin, line_y),
+            'These commodities, technology, or software were exported from '
+            'the United States in accordance with the',
+            font=font_body, fill=0)
+
+        line_y += 40
+
+        draw.text(
+            (left_margin, line_y),
+            'Export Administration Regulations. Diversion contrary to U.S. '
+            'law is prohibited.',
+            font=font_body, fill=0)
+
+        line_y += 60
+
+        draw.text(
+            (left_margin, line_y),
+            'I declare all information in this invoice to be true and correct.',
+            font=font_body, fill=0)
+
+        line_y += 50
+
+        signature_bounds = (
+            left_margin, line_y, left_margin + 800, line_y + 250)
+        if logo:
+            im.paste(signature, signature_bounds)
+        else:
+            draw.rectangle(signature_bounds, fill='#888')
+
+        line_y += 270
+
+        draw.line((left_margin, line_y, 1000, line_y), fill=0, width=2)
+
+        line_y += 20
+
+        draw.text(
+            (left_margin, line_y), 'Signature of authorized person',
+            font=font_body, fill=0)
+
+        line_y += 30
+
+        draw.text(
+            (left_margin, line_y),
+            'Signed by %s on %s' % (
+                signed_by, datetime.now().strftime('%b %d, %Y, %I:%M %p')),
+            font=font_body, fill=0)
+
+        return im
 
 
 class Service(object):

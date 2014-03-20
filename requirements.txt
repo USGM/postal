@@ -1,3 +1,5 @@
+#apt-get install libfreetype6-dev
+
 python-money==0.5
 PyPDF2==1.19
 Pillow==2.2.1

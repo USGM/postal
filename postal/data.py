@@ -178,6 +178,11 @@ class Request(object):
     def documents_only(self):
         return all([package.documents_only for package in self.packages])
 
+    def all_declarations(self):
+        for pack in self.packages:
+            for dec in pack.declarations:
+                yield dec
+
     def _str(self):
         origin = None
         if self.origin:
