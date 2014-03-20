@@ -77,8 +77,8 @@ class DHLApi(Carrier):
         'OD': 'Other Packaging'}
 
     # Aside from Economy, DHL's transit times are mostly the same.
-    _min_max_estimates = {
-        key: (1, 3) for key in _code_to_description.keys()}
+    _min_max_estimates = {key: (1, 3)
+                          for key in _code_to_description.keys()}
     _min_max_estimates['H'] = (2, 5)
     _min_max_estimates['W'] = (2, 5)
 
@@ -242,14 +242,14 @@ class DHLApi(Carrier):
         lines = ''.join(lines)
         template = load_template('dhl', 'address.xml')
         return populate_template(
-            template, {
-                'city': address.city,
-                'subdivision': address.subdivision,
-                'postal_code': address.postal_code,
-                'phone_number': address.phone_number,
-                'contact_name': address.contact_name,
-                'country_code': address.country.alpha2,
-                'country_name': address.country.name},
+            template,
+            {'city': address.city,
+             'subdivision': address.subdivision,
+             'postal_code': address.postal_code,
+             'phone_number': address.phone_number,
+             'contact_name': address.contact_name,
+             'country_code': address.country.alpha2,
+             'country_name': address.country.name},
             {'lines': lines})
 
     def create_header(self):
@@ -405,7 +405,7 @@ class DHLApi(Carrier):
             'number_of_packages': len(request.packages),
             'total_weight': total_weight,
             'region_code': self.region_code,
-            'company_name': self.company_name,
+            'company_name': origin.contact_name,
             'default_currency': self.postal_configuration['default_currency'],
             'contents': self.contents(request),
             'is_dutiable': is_dutiable,
