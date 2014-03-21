@@ -234,7 +234,8 @@ class DHLApi(Carrier):
         return result
 
     @staticmethod
-    def build_address(address):
+    def build_address(address, company_name=None):
+        company_name = company_name or address.contact_name
         template = load_template('dhl', 'address_line.xml')
         lines = []
         for line in address.street_lines:
@@ -249,7 +250,8 @@ class DHLApi(Carrier):
              'phone_number': address.phone_number,
              'contact_name': address.contact_name,
              'country_code': address.country.alpha2,
-             'country_name': address.country.name},
+             'country_name': address.country.name,
+             'company_name': company_name},
             {'lines': lines})
 
     def create_header(self):
@@ -384,7 +386,7 @@ class DHLApi(Carrier):
         ship_date = ship_datetime.strftime('%Y-%m-%d')
 
         origin = request.origin or self.postal_configuration['shipper_address']
-        origin_address = self.build_address(origin)
+        origin_address = self.build_address(origin, self.company_name)
         destination_address = self.build_address(request.destination)
 
         total_weight = sum([package.weight for package in request.packages])
@@ -405,7 +407,6 @@ class DHLApi(Carrier):
             'number_of_packages': len(request.packages),
             'total_weight': total_weight,
             'region_code': self.region_code,
-            'company_name': origin.contact_name,
             'default_currency': self.postal_configuration['default_currency'],
             'contents': self.contents(request),
             'is_dutiable': is_dutiable,

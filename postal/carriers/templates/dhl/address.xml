@@ -1,3 +1,4 @@
+        <CompanyName>{company_name}</CompanyName>
         {lines}
         <City>{city}</City>
         <Division>{subdivision}</Division>

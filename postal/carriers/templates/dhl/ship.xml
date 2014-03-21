@@ -14,7 +14,6 @@
         <DutyPaymentType>R</DutyPaymentType>
     </Billing>
     <Consignee>
-        <CompanyName>{company_name}</CompanyName>
         {destination_address}
     </Consignee>
     {duties}
@@ -35,7 +34,6 @@
     </ShipmentDetails>
     <Shipper>
         <ShipperID>{account_number}</ShipperID>
-        <CompanyName>{company_name}</CompanyName>
         {origin_address}
     </Shipper>
     <EProcShip>N</EProcShip>

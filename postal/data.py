@@ -226,7 +226,8 @@ class PackageType(object):
         return "%s %s" % (getattr(self.carrier, 'name', 'Generic'), self.name)
 
     def __repr__(self):
-        return '<%s|%s:%s>' % (self.carrier, self.code, str(self))
+        return '<%s|%s:%s>' % (
+            getattr(self.carrier, 'name', '???'), self.code, str(self))
 
 
 class Package(object):
