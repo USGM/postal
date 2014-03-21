@@ -396,13 +396,11 @@ class Carrier(object):
 
         line_y += 400
 
+        logo_height = 300
+
         if logo:
-            #print logo.size
-            #im.paste(logo, (0, 0) + logo.size)#, box=(left_margin, 275))
-            #logo.paste(im)
-            #draw.bitmap((left_margin, 275), logo)
-            #draw.bitmap((0, 0), logo, logo)
-            draw.bitmap((0, 0), logo.convert('RGB'))
+            logo = logo.resize((int(logo_height * logo.size[0] / logo.size[1]), logo_height), Image.ANTIALIAS)
+            im.paste(logo, (left_margin, 275, left_margin + logo.size[0], 275 + logo.size[1]))
         else:
             draw.rectangle(logo_bounds, fill='#888')
 
@@ -494,14 +492,19 @@ class Carrier(object):
 
         line_y += 50
 
-        signature_bounds = (
-            left_margin, line_y, left_margin + 800, line_y + 250)
-        if logo:
-            im.paste(signature, signature_bounds)
+        signature_height = 100
+
+        if signature:
+            signature = signature.resize(
+                (int(signature_height * signature.size[0] / signature.size[1]), signature_height),
+                Image.ANTIALIAS)
+            im.paste(signature, (left_margin, line_y, left_margin + signature.size[0], line_y + signature.size[1]))
         else:
+            signature_bounds = (
+                left_margin, line_y, left_margin + 800, line_y + signature_height)
             draw.rectangle(signature_bounds, fill='#888')
 
-        line_y += 270
+        line_y += signature_height + 20
 
         draw.line((left_margin, line_y, 1000, line_y), fill=0, width=2)
 
