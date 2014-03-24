@@ -390,19 +390,12 @@ class Carrier(object):
 
         line_y = 275
 
-        logo_bounds = (left_margin, line_y, left_margin + 375, line_y + 375)
-        barcode_bounds = (
-            left_margin + 400, line_y, left_margin + 1000, line_y + 125)
-
-        line_y += 400
-
         logo_height = 300
-
         if logo:
             logo = logo.resize((int(logo_height * logo.size[0] / logo.size[1]), logo_height), Image.ANTIALIAS)
-            im.paste(logo, (left_margin, 275, left_margin + logo.size[0], 275 + logo.size[1]))
+            im.paste(logo, (left_margin, line_y, left_margin + logo.size[0], line_y + logo.size[1]))
         else:
-            draw.rectangle(logo_bounds, fill='#888')
+            draw.rectangle((left_margin, line_y, left_margin + 375, line_y + logo_height), fill='#888')
 
         draw.text((left_margin, 700), "Exporter:", font=font_label, fill=0)
 
@@ -430,19 +423,20 @@ class Carrier(object):
         for i, line in enumerate(lines):
             draw.text((900, 750 + i * 40), line, font=font_body, fill=0)
 
+        line_y = 1050
+
         pairs = [
             ('Total Weight', '%s lbs' % request.total_weight()),
             ('Country of Destination', dest.country.alpha2)
         ] + extra_info.items()
-        for i, tup in enumerate(pairs):
-            label, info = tup
+        for label, info in pairs:
             draw.text(
-                (left_margin, 1050 + i * 40), label + ': ', font=font_label,
-                fill=0)
+                (left_margin, line_y), label + ': ', font=font_label, fill=0)
 
             w, h = font_label.getsize(label + ': ')
-            draw.text(
-                (left_margin + w, 1050 + i * 40), info, font=font_body, fill=0)
+            draw.text((left_margin + w, line_y), info, font=font_body, fill=0)
+
+            line_y += 40
 
         rows = [
             ('Line', 'Description', 'Harmonized Code', 'Country of Origin',
@@ -456,7 +450,8 @@ class Carrier(object):
             '', '', '', '', '',
             'Total:', '%s' % request.get_total_declared_value()))
 
-        i = 0
+        line_y += 20
+
         for i, row in enumerate(rows):
             if i == 0:
                 font = font_table_head
@@ -464,10 +459,10 @@ class Carrier(object):
                 font = font_table_cell
 
             for j, cell in enumerate(row):
-                draw.text((left_margin + j * 190, 1250 + i * 40), cell,
+                draw.text((left_margin + j * 190, line_y), cell,
                           font=font, fill=0)
-        line_y = 1250 + i * 40
-        line_y += 100
+            line_y += 40
+        line_y += 20
 
         draw.text(
             (left_margin, line_y),
@@ -522,7 +517,7 @@ class Carrier(object):
                 signed_by, datetime.now().strftime('%b %d, %Y, %I:%M %p')),
             font=font_body, fill=0)
 
-        return im
+        return [im]
 
 
 class Service(object):
