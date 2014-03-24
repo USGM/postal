@@ -13,9 +13,11 @@ import inspect
 import os
 from pprint import pformat
 import re
+from reportlab.lib.pagesizes import letter
 import sys
 import logging
 from threading import RLock
+from reportlab.lib.utils import ImageReader
 
 from suds.plugin import MessagePlugin
 from PIL import Image, ImageFont, ImageDraw
@@ -23,6 +25,10 @@ from PIL import Image, ImageFont, ImageDraw
 from ..exceptions import CarrierError, PostalError
 from postal.data import PackageType
 from postal.exceptions import NotSupportedError
+
+from reportlab.pdfgen.canvas import Canvas
+from reportlab.lib.units import mm, inch
+from reportlab.pdfbase import pdfmetrics
 
 
 PY3 = sys.version_info[0] == 3
@@ -369,8 +375,100 @@ class Carrier(object):
         raise NotSupportedError("Packaging type %s is not available for %s."
                                 % (package_type, self.name))
 
+    def _draw_text_line(self, canvas, font_tuple, text, space_after=0, space_before=0):
+        font_name, font_size = font_tuple
+
+        face = pdfmetrics.getFont('Helvetica').face
+        ascent = (face.ascent * font_size) / 1000.0
+        descent = (face.descent * font_size) / 1000.0
+        line_height = ascent - descent
+
+        canvas.translate(0, -line_height - space_before)
+        canvas.setFont(font_name, size=font_size)
+        canvas.drawString(0, 0, text)
+        canvas.translate(0, -space_after)
+
+    def _draw_image_line(self, canvas, image_reader, height=None):
+        if not height:
+            width, height = image_reader.getSize()
+        else:
+            width = height * image_reader.getSize()[0] / image_reader.getSize()[1]
+        canvas.translate(0, -height)
+        canvas.drawImage(image_reader, 0, 0, width, height)
+
     def commercial_invoice(
             self, request, logo, signature, signed_by, extra_info={}):
+        logo = ImageReader(logo)
+
+        result = BytesIO()
+        c = Canvas(result, pagesize=letter)
+        print c.getAvailableFonts()
+
+        c.translate(1*inch, 10*inch)
+
+        font_heading = ('Helvetica', 20)
+        font_label = ('Times-Bold', 11)
+        font_body = ('Times-Roman', 10)
+
+        self._draw_text_line(c, font_heading, 'Commercial Invoice')
+        self._draw_image_line(c, logo, height=120)
+        self._draw_text_line(c, font_label, 'Exporter:', space_before=10, space_after=5)
+
+        origin = self.get_origin(request)
+        lines = [origin.contact_name] \
+              + origin.street_lines \
+              + ['%s, %s %s' % (
+                 origin.city, origin.subdivision, origin.postal_code)] \
+              + [origin.country.alpha2] \
+              + [origin.phone_number]
+        for line in lines:
+            self._draw_text_line(c, font_body, line, space_before=2)
+
+        dest = request.destination
+        lines = [dest.contact_name] \
+              + dest.street_lines \
+              + [dest.city + ', ' + dest.subdivision + ' ' + dest.postal_code]\
+              + [dest.country.alpha2] \
+              + [dest.phone_number]
+        # for i, line in enumerate(lines):
+        #     draw.text((900, 750 + i * 40), line, font=font_body, fill=0)
+
+        c.translate(0, -10)
+        pairs = [
+            ('Total Weight', '%s lbs' % request.total_weight()),
+            ('Country of Destination', dest.country.alpha2)
+        ] + extra_info.items()
+        for label, info in pairs:
+            self._draw_text_line(c, font_label, label + ': ', space_before=2)
+            # draw.text(
+            #     (left_margin, line_y), label + ': ', font=font_label, fill=0)
+            #
+            # w, h = font_label.getsize(label + ': ')
+            # draw.text((left_margin + w, line_y), info, font=font_body, fill=0)
+
+
+        # tx = c.beginText(1*inch, 1*inch)
+        # tx.setFont('Helvetica', size=20)
+        # tx.textLines('Commercial Invoice\n68rui76ri6u8n ig7fo7f8o7o87o 87fo87fo87fo78 87fo78fgi7gfo87fo7 87fogfki7ufkl7')
+        # c.drawText(tx)
+
+        c.showPage()
+
+
+
+        tx = c.beginText(1*inch, 2*inch)
+        tx.setFont('Helvetica', size=20)
+        tx.textLines('Commercial Invoice\n68rui76ri6u8n ig7fo7f8o7o87o 87fo87fo87fo78 87fo78fgi7gfo87fo7 87fogfki7ufkl7')
+        c.drawText(tx)
+
+        c.save()
+        return result.getvalue()
+
+
+
+
+
+
         im = Image.new("RGB", (200 * 8 + 100, 200 * 11), "white")
 
         font_head = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Arial.ttf", 40)
