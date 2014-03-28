@@ -7,17 +7,22 @@ This module also contains the base Service class. Service objects are
 instantiated by Carrier classes to describe a method by which a package may
 be sent.
 """
-from io import BytesIO
+from io import BytesIO, StringIO
 from datetime import datetime
 import inspect
 import os
 from pprint import pformat
 import re
+from reportlab.platypus.doctemplate import BaseDocTemplate, PageTemplate
+from reportlab.lib.enums import TA_LEFT
+from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import letter
 import sys
 import logging
 from threading import RLock
 from reportlab.lib.utils import ImageReader
+from reportlab.platypus.frames import Frame
+from reportlab.platypus.para import Paragraph
 
 from suds.plugin import MessagePlugin
 from PIL import Image, ImageFont, ImageDraw
@@ -375,15 +380,22 @@ class Carrier(object):
         raise NotSupportedError("Packaging type %s is not available for %s."
                                 % (package_type, self.name))
 
-    def _draw_text_line(self, canvas, font_tuple, text, space_after=0, space_before=0):
+    def _newline(self, canvas, font_tuple):
         font_name, font_size = font_tuple
 
-        face = pdfmetrics.getFont('Helvetica').face
+        face = pdfmetrics.getFont(font_name).face
         ascent = (face.ascent * font_size) / 1000.0
         descent = (face.descent * font_size) / 1000.0
         line_height = ascent - descent
 
-        canvas.translate(0, -line_height - space_before)
+        self.cursor_x = 0
+        canvas.translate(0, -line_height)
+
+    def _draw_text_line(self, canvas, font_tuple, text, space_after=0, space_before=0):
+        font_name, font_size = font_tuple
+
+        self._newline(canvas, font_tuple)
+        canvas.translate(0, -space_before)
         canvas.setFont(font_name, size=font_size)
         canvas.drawString(0, 0, text)
         canvas.translate(0, -space_after)
@@ -396,8 +408,96 @@ class Carrier(object):
         canvas.translate(0, -height)
         canvas.drawImage(image_reader, 0, 0, width, height)
 
+    def _draw_text_cell(self, canvas, font_tuple, text, cell_width):
+        font_name, font_size = font_tuple
+
+        canvas.setFont(font_name, size=font_size)
+        canvas.drawString(getattr(self, 'cursor_x', 0), 0, text)
+        self.cursor_x = getattr(self, 'cursor_x', 0) + cell_width
+
+    def _page(self, canvas, doc):
+        canvas.saveState()
+        canvas.setFont('Times-Roman', 9)
+        canvas.drawCentredString(4.125*inch, .75*inch, '%s' % doc.page)
+        canvas.restoreState()
+
     def commercial_invoice(
             self, request, logo, signature, signed_by, extra_info={}):
+        #logo_reader = ImageReader(logo)
+        logo_reader = ImageReader(BytesIO(logo))
+
+
+
+
+        result = BytesIO()
+        #result = StringIO()
+
+        # from StringIO import StringIO
+        # result = StringIO()
+
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+        from reportlab.platypus import SimpleDocTemplate, Image
+
+        c = Canvas('asdf', pagesize=letter)
+        print c.getAvailableFonts()
+
+        doc = SimpleDocTemplate(result, pagesize=letter)
+        #doc = BaseDocTemplate(result, pagesize=letter)
+
+        styles = getSampleStyleSheet()
+        bodyText = styles["BodyText"]
+        bodyText.alignment = TA_LEFT
+
+
+        elements = []
+
+        elements.append(Paragraph('Commercial Invoice', bodyText))
+
+        height = 100
+        width = height * logo_reader.getSize()[0] / logo_reader.getSize()[1]
+        im = Image(BytesIO(logo), width=width, height=height)
+        im.hAlign = 'LEFT'
+        elements.append(im)
+
+        elements.append(Paragraph('ashogiaheoihf asoidfh', bodyText))
+
+
+
+        rows = [
+            [Paragraph(a, bodyText) for a in ['Line', 'Description', 'Harmonized Code', 'Country of Origin',
+             'Quantity', 'Value', 'Line Total']]
+        ]
+        for i, dec in enumerate(request.all_declarations(), 1):
+            rows.append([
+                '%s' % i,
+                Paragraph(dec.description, bodyText),
+                '', dec.origin_country.alpha2,
+                '%s' % dec.units, '%s' % dec.value, '%s' % dec.get_total_value()])
+        rows.append([
+            '', '', '', '', '',
+            'Total:', '%s' % request.get_total_declared_value()])
+
+        t = Table(rows,
+                  #colWidths=6.5*inch
+            colWidths=[
+            .3*inch, 1.9*inch, 1*inch, 1*inch, .5*inch, .9*inch, .9*inch]
+            )
+        t.setStyle(TableStyle([('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                               ('FONTSIZE', (0, 0), (-1, 0), 8)]))
+        elements.append(t)
+
+
+        doc.build(elements)
+        return result.getvalue()
+
+
+
+
+
+
+
         logo = ImageReader(logo)
 
         result = BytesIO()
@@ -409,6 +509,8 @@ class Carrier(object):
         font_heading = ('Helvetica', 20)
         font_label = ('Times-Bold', 11)
         font_body = ('Times-Roman', 10)
+        font_table_head = ('Times-Bold', 7)
+        font_table_cell = ('Times-Roman', 10)
 
         self._draw_text_line(c, font_heading, 'Commercial Invoice')
         self._draw_image_line(c, logo, height=120)
@@ -451,6 +553,33 @@ class Carrier(object):
         # tx.setFont('Helvetica', size=20)
         # tx.textLines('Commercial Invoice\n68rui76ri6u8n ig7fo7f8o7o87o 87fo87fo87fo78 87fo78fgi7gfo87fo7 87fogfki7ufkl7')
         # c.drawText(tx)
+
+
+        rows = [
+            (font_table_head, 'Line', 'Description', 'Harmonized Code', 'Country of Origin',
+             'Quantity', 'Value', 'Line Total')
+        ]
+        for i, dec in enumerate(request.all_declarations(), 1):
+            rows.append((
+                font_table_cell,
+                '%s' % i, dec.description, '', dec.origin_country.alpha2,
+                '%s' % dec.units, '%s' % dec.value, '%s' % dec.get_total_value()))
+        rows.append((
+            font_table_cell,
+            '', '', '', '', '',
+            'Total:', '%s' % request.get_total_declared_value()))
+
+        c.translate(0, -10)
+        for row in rows:
+            #for j, cell in enumerate(row):
+            #
+            self._newline(c, row[0])
+            for cell in row[1:]:
+                self._draw_text_cell(c, row[0], cell, 6.5*inch/7)
+
+
+
+
 
         c.showPage()
 
