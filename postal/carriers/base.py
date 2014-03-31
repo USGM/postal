@@ -13,9 +13,11 @@ import inspect
 import os
 from pprint import pformat
 import re
+from itertools import izip_longest
+from reportlab.platypus.paraparser import ParaFrag
 from reportlab.platypus.doctemplate import BaseDocTemplate, PageTemplate
-from reportlab.lib.enums import TA_LEFT
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.enums import TA_LEFT, TA_CENTER
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import letter
 import sys
 import logging
@@ -423,12 +425,6 @@ class Carrier(object):
 
     def commercial_invoice(
             self, request, logo, signature, signed_by, extra_info={}):
-        #logo_reader = ImageReader(logo)
-        logo_reader = ImageReader(BytesIO(logo))
-
-
-
-
         result = BytesIO()
         #result = StringIO()
 
@@ -446,33 +442,79 @@ class Carrier(object):
         doc = SimpleDocTemplate(result, pagesize=letter)
         #doc = BaseDocTemplate(result, pagesize=letter)
 
-        styles = getSampleStyleSheet()
-        bodyText = styles["BodyText"]
-        bodyText.alignment = TA_LEFT
-
+        styleTableHead = ParagraphStyle(
+            'table head', fontName='Helvetica-Bold', fontSize=7, wordWrap=True, leading=7*1.2,
+            alignment=TA_CENTER)
+        styleTableCell = ParagraphStyle('table cell', fontName='Times-Roman', fontSize=10, wordWrap=True, leading=10*1.2)
+        styleHeading = ParagraphStyle('heading', fontName='Helvetica-Bold', fontSize=18, leading=18*1.2)
+        styleBody = ParagraphStyle('body', fontName='Times-Roman', fontSize=10, wordWrap=True, spaceAfter=15)
 
         elements = []
 
-        elements.append(Paragraph('Commercial Invoice', bodyText))
+        elements.append(Paragraph('Commercial Invoice', styleHeading))
 
-        height = 100
+        logo_reader = ImageReader(BytesIO(logo))
+        height = 1.5*inch
         width = height * logo_reader.getSize()[0] / logo_reader.getSize()[1]
         im = Image(BytesIO(logo), width=width, height=height)
         im.hAlign = 'LEFT'
         elements.append(im)
 
-        elements.append(Paragraph('ashogiaheoihf asoidfh', bodyText))
+        origin = self.get_origin(request)
+        origin_lines = ['Exporter:'] \
+                     + [origin.contact_name] \
+                     + origin.street_lines \
+                     + ['%s, %s %s' % (
+                        origin.city, origin.subdivision, origin.postal_code)] \
+                     + [origin.country.alpha2] \
+                     + [origin.phone_number]
 
+        dest = request.destination
+        dest_lines = ['Consignee and Importer:'] \
+                   + [dest.contact_name] \
+                   + dest.street_lines \
+                   + [dest.city + ', ' + dest.subdivision + ' ' + dest.postal_code]\
+                   + [dest.country.alpha2] \
+                   + [dest.phone_number]
+
+        t = Table(
+            list(izip_longest(origin_lines, dest_lines, fillvalue='')),
+            colWidths=[3.125*inch, 3.125*inch],
+            rowHeights=[.15*inch] * max(len(origin_lines), len(dest_lines))
+        )
+        t.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, 0), 'Times-Bold'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Times-Roman'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10)
+        ]))
+        elements.append(t)
+
+
+        pairs = [
+            ('Total Weight', '%s lbs' % request.total_weight()),
+            ('Country of Destination', dest.country.alpha2)
+        ] + extra_info.items()
+        for i, (label, info) in enumerate(pairs):
+            pairs[i] = (label + ': ', info)
+
+        t = Table(pairs, rowHeights=[.15*inch] * len(pairs))
+        t.hAlign = TA_LEFT
+        t.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (0, -1), 'Times-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Times-Roman'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10)
+        ]))
+        elements.append(t)
 
 
         rows = [
-            [Paragraph(a, bodyText) for a in ['Line', 'Description', 'Harmonized Code', 'Country of Origin',
+            [Paragraph(a, styleTableHead) for a in ['Line', 'Description', 'Harmonized Code', 'Country of Origin',
              'Quantity', 'Value', 'Line Total']]
         ]
         for i, dec in enumerate(request.all_declarations(), 1):
             rows.append([
                 '%s' % i,
-                Paragraph(dec.description, bodyText),
+                Paragraph(dec.description, styleTableCell),
                 '', dec.origin_country.alpha2,
                 '%s' % dec.units, '%s' % dec.value, '%s' % dec.get_total_value()])
         rows.append([
@@ -482,12 +524,58 @@ class Carrier(object):
         t = Table(rows,
                   #colWidths=6.5*inch
             colWidths=[
-            .3*inch, 1.9*inch, 1*inch, 1*inch, .5*inch, .9*inch, .9*inch]
+            .3*inch, 2.5*inch, .6*inch, .6*inch, .5*inch, .9*inch, .9*inch]
+            #rowHeights=[.175*inch] * len(rows)
             )
-        t.setStyle(TableStyle([('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                               ('FONTSIZE', (0, 0), (-1, 0), 8)]))
+        t.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 7),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ALIGNMENT', (0, 0), (-1, 0), 'CENTER'),
+            ('ALIGNMENT', (0, 1), (0, -1), 'CENTER'),
+            ('ALIGNMENT', (2, 1), (6, -1), 'CENTER'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Times-Roman'),
+            ('FONTSIZE', (0, 1), (-1, -1), 10)
+        ]))
         elements.append(t)
 
+        elements.append(Paragraph(
+            'These commodities, technology, or software were exported from '
+            'the United States in accordance with the '
+            'Export Administration regulations. Diversion contrary to U.S. '
+            'law is prohibited.',
+            style=styleBody
+        ))
+
+        elements.append(Paragraph(
+            'I declare all information in this invoice to be true and correct.',
+            style=styleBody
+        ))
+
+
+        signature_reader = ImageReader(BytesIO(signature))
+        height = .75*inch
+        width = height * signature_reader.getSize()[0] / signature_reader.getSize()[1]
+        im = Image(BytesIO(signature), width=width, height=height)
+        im.hAlign = 'LEFT'
+        elements.append(im)
+
+
+        t = Table([['']], colWidths=[6.5*inch])
+        t.setStyle(TableStyle([
+            ("LINEBELOW", (0, 0), (-1, -1), 1, colors.black)]))
+            #("LINEBELOW", (0, 'splitlast'), (-1, 'splitlast'), 5, colors.black)]))
+        elements.append(t)
+
+
+
+        elements.append(Paragraph(
+            'Signature of authorized person', style=styleBody))
+        elements.append(Paragraph(
+            'Signed by %s on %s' % (
+                signed_by, datetime.now().strftime('%b %d, %Y, %I:%M %p')),
+            style=styleBody
+        ))
 
         doc.build(elements)
         return result.getvalue()
