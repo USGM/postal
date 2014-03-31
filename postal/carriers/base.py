@@ -7,6 +7,9 @@ This module also contains the base Service class. Service objects are
 instantiated by Carrier classes to describe a method by which a package may
 be sent.
 """
+import sys
+import logging
+from threading import RLock
 from io import BytesIO, StringIO
 from datetime import datetime
 import inspect
@@ -14,28 +17,22 @@ import os
 from pprint import pformat
 import re
 from itertools import izip_longest
-from reportlab.platypus.paraparser import ParaFrag
-from reportlab.platypus.doctemplate import BaseDocTemplate, PageTemplate
+
+from reportlab.lib import colors
 from reportlab.lib.enums import TA_LEFT, TA_CENTER
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.pagesizes import letter
-import sys
-import logging
-from threading import RLock
 from reportlab.lib.utils import ImageReader
-from reportlab.platypus.frames import Frame
+from reportlab.lib.units import inch
+from reportlab.platypus import Table, TableStyle, SimpleDocTemplate, Image
 from reportlab.platypus.para import Paragraph
+from reportlab.pdfgen.canvas import Canvas
 
 from suds.plugin import MessagePlugin
-from PIL import Image, ImageFont, ImageDraw
 
 from ..exceptions import CarrierError, PostalError
 from postal.data import PackageType
 from postal.exceptions import NotSupportedError
-
-from reportlab.pdfgen.canvas import Canvas
-from reportlab.lib.units import mm, inch
-from reportlab.pdfbase import pdfmetrics
 
 
 PY3 = sys.version_info[0] == 3
@@ -382,41 +379,6 @@ class Carrier(object):
         raise NotSupportedError("Packaging type %s is not available for %s."
                                 % (package_type, self.name))
 
-    def _newline(self, canvas, font_tuple):
-        font_name, font_size = font_tuple
-
-        face = pdfmetrics.getFont(font_name).face
-        ascent = (face.ascent * font_size) / 1000.0
-        descent = (face.descent * font_size) / 1000.0
-        line_height = ascent - descent
-
-        self.cursor_x = 0
-        canvas.translate(0, -line_height)
-
-    def _draw_text_line(self, canvas, font_tuple, text, space_after=0, space_before=0):
-        font_name, font_size = font_tuple
-
-        self._newline(canvas, font_tuple)
-        canvas.translate(0, -space_before)
-        canvas.setFont(font_name, size=font_size)
-        canvas.drawString(0, 0, text)
-        canvas.translate(0, -space_after)
-
-    def _draw_image_line(self, canvas, image_reader, height=None):
-        if not height:
-            width, height = image_reader.getSize()
-        else:
-            width = height * image_reader.getSize()[0] / image_reader.getSize()[1]
-        canvas.translate(0, -height)
-        canvas.drawImage(image_reader, 0, 0, width, height)
-
-    def _draw_text_cell(self, canvas, font_tuple, text, cell_width):
-        font_name, font_size = font_tuple
-
-        canvas.setFont(font_name, size=font_size)
-        canvas.drawString(getattr(self, 'cursor_x', 0), 0, text)
-        self.cursor_x = getattr(self, 'cursor_x', 0) + cell_width
-
     def _page(self, canvas, doc):
         canvas.saveState()
         canvas.setFont('Times-Roman', 9)
@@ -426,32 +388,24 @@ class Carrier(object):
     def commercial_invoice(
             self, request, logo, signature, signed_by, extra_info={}):
         result = BytesIO()
-        #result = StringIO()
-
-        # from StringIO import StringIO
-        # result = StringIO()
-
-        from reportlab.lib import colors
-        from reportlab.lib.pagesizes import letter
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-        from reportlab.platypus import SimpleDocTemplate, Image
-
-        c = Canvas('asdf', pagesize=letter)
-        print c.getAvailableFonts()
 
         doc = SimpleDocTemplate(result, pagesize=letter)
-        #doc = BaseDocTemplate(result, pagesize=letter)
 
-        styleTableHead = ParagraphStyle(
-            'table head', fontName='Helvetica-Bold', fontSize=7, wordWrap=True, leading=7*1.2,
-            alignment=TA_CENTER)
-        styleTableCell = ParagraphStyle('table cell', fontName='Times-Roman', fontSize=10, wordWrap=True, leading=10*1.2)
-        styleHeading = ParagraphStyle('heading', fontName='Helvetica-Bold', fontSize=18, leading=18*1.2)
-        styleBody = ParagraphStyle('body', fontName='Times-Roman', fontSize=10, wordWrap=True, spaceAfter=15)
+        style_table_head = ParagraphStyle(
+            'table head', fontName='Helvetica-Bold', fontSize=7, wordWrap=True,
+            leading=7*1.2, alignment=TA_CENTER)
+        style_table_cell = ParagraphStyle(
+            'table cell', fontName='Times-Roman', fontSize=10, wordWrap=True,
+            leading=10*1.2)
+        style_heading = ParagraphStyle(
+            'heading', fontName='Helvetica-Bold', fontSize=18, leading=18*1.2)
+        style_body = ParagraphStyle(
+            'body', fontName='Times-Roman', fontSize=10, wordWrap=True,
+            spaceAfter=15)
 
         elements = []
 
-        elements.append(Paragraph('Commercial Invoice', styleHeading))
+        elements.append(Paragraph('Commercial Invoice', style_heading))
 
         logo_reader = ImageReader(BytesIO(logo))
         height = 1.5*inch
@@ -473,7 +427,8 @@ class Carrier(object):
         dest_lines = ['Consignee and Importer:'] \
                    + [dest.contact_name] \
                    + dest.street_lines \
-                   + [dest.city + ', ' + dest.subdivision + ' ' + dest.postal_code]\
+                   + ['%s, %s %s' % (
+                      dest.city, dest.subdivision, dest.postal_code)]\
                    + [dest.country.alpha2] \
                    + [dest.phone_number]
 
@@ -488,7 +443,6 @@ class Carrier(object):
             ('FONTSIZE', (0, 0), (-1, -1), 10)
         ]))
         elements.append(t)
-
 
         pairs = [
             ('Total Weight', '%s lbs' % request.total_weight()),
@@ -506,27 +460,23 @@ class Carrier(object):
         ]))
         elements.append(t)
 
-
         rows = [
-            [Paragraph(a, styleTableHead) for a in ['Line', 'Description', 'Harmonized Code', 'Country of Origin',
-             'Quantity', 'Value', 'Line Total']]
+            [Paragraph(a, style_table_head)
+             for a in ['Line', 'Description', 'Harmonized Code',
+                       'Country of Origin', 'Quantity', 'Value', 'Line Total']]
         ]
         for i, dec in enumerate(request.all_declarations(), 1):
             rows.append([
                 '%s' % i,
-                Paragraph(dec.description, styleTableCell),
+                Paragraph(dec.description, style_table_cell),
                 '', dec.origin_country.alpha2,
                 '%s' % dec.units, '%s' % dec.value, '%s' % dec.get_total_value()])
         rows.append([
             '', '', '', '', '',
             'Total:', '%s' % request.get_total_declared_value()])
 
-        t = Table(rows,
-                  #colWidths=6.5*inch
-            colWidths=[
-            .3*inch, 2.5*inch, .6*inch, .6*inch, .5*inch, .9*inch, .9*inch]
-            #rowHeights=[.175*inch] * len(rows)
-            )
+        t = Table(rows, colWidths=[
+            .3*inch, 2.5*inch, .6*inch, .6*inch, .5*inch, .9*inch, .9*inch])
         t.setStyle(TableStyle([
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 7),
@@ -544,295 +494,38 @@ class Carrier(object):
             'the United States in accordance with the '
             'Export Administration regulations. Diversion contrary to U.S. '
             'law is prohibited.',
-            style=styleBody
+            style=style_body
         ))
 
         elements.append(Paragraph(
             'I declare all information in this invoice to be true and correct.',
-            style=styleBody
+            style=style_body
         ))
-
 
         signature_reader = ImageReader(BytesIO(signature))
         height = .75*inch
-        width = height * signature_reader.getSize()[0] / signature_reader.getSize()[1]
+        width = height * \
+                signature_reader.getSize()[0] / signature_reader.getSize()[1]
         im = Image(BytesIO(signature), width=width, height=height)
         im.hAlign = 'LEFT'
         elements.append(im)
 
-
+        # horizontal line
         t = Table([['']], colWidths=[6.5*inch])
         t.setStyle(TableStyle([
             ("LINEBELOW", (0, 0), (-1, -1), 1, colors.black)]))
-            #("LINEBELOW", (0, 'splitlast'), (-1, 'splitlast'), 5, colors.black)]))
         elements.append(t)
 
-
-
         elements.append(Paragraph(
-            'Signature of authorized person', style=styleBody))
+            'Signature of authorized person', style=style_body))
         elements.append(Paragraph(
             'Signed by %s on %s' % (
                 signed_by, datetime.now().strftime('%b %d, %Y, %I:%M %p')),
-            style=styleBody
+            style=style_body
         ))
 
-        doc.build(elements)
+        doc.build(elements, onFirstPage=self._page, onLaterPages=self._page)
         return result.getvalue()
-
-
-
-
-
-
-
-        logo = ImageReader(logo)
-
-        result = BytesIO()
-        c = Canvas(result, pagesize=letter)
-        print c.getAvailableFonts()
-
-        c.translate(1*inch, 10*inch)
-
-        font_heading = ('Helvetica', 20)
-        font_label = ('Times-Bold', 11)
-        font_body = ('Times-Roman', 10)
-        font_table_head = ('Times-Bold', 7)
-        font_table_cell = ('Times-Roman', 10)
-
-        self._draw_text_line(c, font_heading, 'Commercial Invoice')
-        self._draw_image_line(c, logo, height=120)
-        self._draw_text_line(c, font_label, 'Exporter:', space_before=10, space_after=5)
-
-        origin = self.get_origin(request)
-        lines = [origin.contact_name] \
-              + origin.street_lines \
-              + ['%s, %s %s' % (
-                 origin.city, origin.subdivision, origin.postal_code)] \
-              + [origin.country.alpha2] \
-              + [origin.phone_number]
-        for line in lines:
-            self._draw_text_line(c, font_body, line, space_before=2)
-
-        dest = request.destination
-        lines = [dest.contact_name] \
-              + dest.street_lines \
-              + [dest.city + ', ' + dest.subdivision + ' ' + dest.postal_code]\
-              + [dest.country.alpha2] \
-              + [dest.phone_number]
-        # for i, line in enumerate(lines):
-        #     draw.text((900, 750 + i * 40), line, font=font_body, fill=0)
-
-        c.translate(0, -10)
-        pairs = [
-            ('Total Weight', '%s lbs' % request.total_weight()),
-            ('Country of Destination', dest.country.alpha2)
-        ] + extra_info.items()
-        for label, info in pairs:
-            self._draw_text_line(c, font_label, label + ': ', space_before=2)
-            # draw.text(
-            #     (left_margin, line_y), label + ': ', font=font_label, fill=0)
-            #
-            # w, h = font_label.getsize(label + ': ')
-            # draw.text((left_margin + w, line_y), info, font=font_body, fill=0)
-
-
-        # tx = c.beginText(1*inch, 1*inch)
-        # tx.setFont('Helvetica', size=20)
-        # tx.textLines('Commercial Invoice\n68rui76ri6u8n ig7fo7f8o7o87o 87fo87fo87fo78 87fo78fgi7gfo87fo7 87fogfki7ufkl7')
-        # c.drawText(tx)
-
-
-        rows = [
-            (font_table_head, 'Line', 'Description', 'Harmonized Code', 'Country of Origin',
-             'Quantity', 'Value', 'Line Total')
-        ]
-        for i, dec in enumerate(request.all_declarations(), 1):
-            rows.append((
-                font_table_cell,
-                '%s' % i, dec.description, '', dec.origin_country.alpha2,
-                '%s' % dec.units, '%s' % dec.value, '%s' % dec.get_total_value()))
-        rows.append((
-            font_table_cell,
-            '', '', '', '', '',
-            'Total:', '%s' % request.get_total_declared_value()))
-
-        c.translate(0, -10)
-        for row in rows:
-            #for j, cell in enumerate(row):
-            #
-            self._newline(c, row[0])
-            for cell in row[1:]:
-                self._draw_text_cell(c, row[0], cell, 6.5*inch/7)
-
-
-
-
-
-        c.showPage()
-
-
-
-        tx = c.beginText(1*inch, 2*inch)
-        tx.setFont('Helvetica', size=20)
-        tx.textLines('Commercial Invoice\n68rui76ri6u8n ig7fo7f8o7o87o 87fo87fo87fo78 87fo78fgi7gfo87fo7 87fogfki7ufkl7')
-        c.drawText(tx)
-
-        c.save()
-        return result.getvalue()
-
-
-
-
-
-
-        im = Image.new("RGB", (200 * 8 + 100, 200 * 11), "white")
-
-        font_head = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Arial.ttf", 40)
-        font_table_head = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf", 20)
-        font_label = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman_Bold.ttf", 30)
-        font_body = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf", 30)
-        font_table_cell = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf", 25)
-
-        draw = ImageDraw.Draw(im)
-
-        left_margin = 200
-        right_margin = 200 * 8 + 100 - 200
-        margin_width = right_margin - left_margin
-
-        draw.text(
-            (left_margin, 200), "Commercial Invoice", font=font_head, fill=0)
-
-        line_y = 275
-
-        logo_height = 300
-        if logo:
-            logo = logo.resize((int(logo_height * logo.size[0] / logo.size[1]), logo_height), Image.ANTIALIAS)
-            im.paste(logo, (left_margin, line_y, left_margin + logo.size[0], line_y + logo.size[1]))
-        else:
-            draw.rectangle((left_margin, line_y, left_margin + 375, line_y + logo_height), fill='#888')
-
-        draw.text((left_margin, 700), "Exporter:", font=font_label, fill=0)
-
-        origin = self.get_origin(request)
-        lines = [origin.contact_name] \
-              + origin.street_lines \
-              + ['%s, %s %s' % (
-                 origin.city, origin.subdivision, origin.postal_code)] \
-              + [origin.country.alpha2] \
-              + [origin.phone_number]
-
-        for i, line in enumerate(lines):
-            draw.text((left_margin, 750 + i * 40), line, font=font_body, fill=0)
-
-        draw.text(
-            (900, 700), "Consignee and Importer:", font=font_label, fill=0)
-
-        dest = request.destination
-        lines = [dest.contact_name] \
-              + dest.street_lines \
-              + [dest.city + ', ' + dest.subdivision + ' ' + dest.postal_code]\
-              + [dest.country.alpha2] \
-              + [dest.phone_number]
-
-        for i, line in enumerate(lines):
-            draw.text((900, 750 + i * 40), line, font=font_body, fill=0)
-
-        line_y = 1050
-
-        pairs = [
-            ('Total Weight', '%s lbs' % request.total_weight()),
-            ('Country of Destination', dest.country.alpha2)
-        ] + extra_info.items()
-        for label, info in pairs:
-            draw.text(
-                (left_margin, line_y), label + ': ', font=font_label, fill=0)
-
-            w, h = font_label.getsize(label + ': ')
-            draw.text((left_margin + w, line_y), info, font=font_body, fill=0)
-
-            line_y += 40
-
-        rows = [
-            ('Line', 'Description', 'Harmonized Code', 'Country of Origin',
-             'Quantity', 'Value', 'Line Total')
-        ]
-        for i, dec in enumerate(request.all_declarations(), 1):
-            rows.append((
-                '%s' % i, dec.description, '', dec.origin_country.alpha2,
-                '%s' % dec.units, '%s' % dec.value, '%s' % dec.get_total_value()))
-        rows.append((
-            '', '', '', '', '',
-            'Total:', '%s' % request.get_total_declared_value()))
-
-        line_y += 20
-
-        for i, row in enumerate(rows):
-            if i == 0:
-                font = font_table_head
-            else:
-                font = font_table_cell
-
-            for j, cell in enumerate(row):
-                draw.text((left_margin + j * 190, line_y), cell,
-                          font=font, fill=0)
-            line_y += 40
-        line_y += 20
-
-        draw.text(
-            (left_margin, line_y),
-            'These commodities, technology, or software were exported from '
-            'the United States in accordance with the',
-            font=font_body, fill=0)
-
-        line_y += 40
-
-        draw.text(
-            (left_margin, line_y),
-            'Export Administration Regulations. Diversion contrary to U.S. '
-            'law is prohibited.',
-            font=font_body, fill=0)
-
-        line_y += 60
-
-        draw.text(
-            (left_margin, line_y),
-            'I declare all information in this invoice to be true and correct.',
-            font=font_body, fill=0)
-
-        line_y += 50
-
-        signature_height = 100
-
-        if signature:
-            signature = signature.resize(
-                (int(signature_height * signature.size[0] / signature.size[1]), signature_height),
-                Image.ANTIALIAS)
-            im.paste(signature, (left_margin, line_y, left_margin + signature.size[0], line_y + signature.size[1]))
-        else:
-            signature_bounds = (
-                left_margin, line_y, left_margin + 800, line_y + signature_height)
-            draw.rectangle(signature_bounds, fill='#888')
-
-        line_y += signature_height + 20
-
-        draw.line((left_margin, line_y, 1000, line_y), fill=0, width=2)
-
-        line_y += 20
-
-        draw.text(
-            (left_margin, line_y), 'Signature of authorized person',
-            font=font_body, fill=0)
-
-        line_y += 30
-
-        draw.text(
-            (left_margin, line_y),
-            'Signed by %s on %s' % (
-                signed_by, datetime.now().strftime('%b %d, %Y, %I:%M %p')),
-            font=font_body, fill=0)
-
-        return [im]
 
 
 class Service(object):
