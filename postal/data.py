@@ -85,10 +85,12 @@ class Address(object):
         self.country = get_country(country)
 
     def _str(self):
-        return '    %s %s\n    %s\n    %s, %s %s %s' % (
+        return '    %s %s\n    %s\n    %s, %s %s %s%s' % (
             self.contact_name, self.phone_number, self.street_lines,
-            self.city, self.subdivision, self.postal_code, self.country.alpha2
-        ) + ((('\n    Residential' if self.residential else '')))
+            self.city, self.subdivision, self.postal_code,
+            getattr(self.country, 'alpha2', 'Unspecified country'),
+            ((('\n    Residential' if self.residential else '')))
+        )
 
     def __str__(self):
         return self._str().encode('utf8')
@@ -103,8 +105,7 @@ class Address(object):
         return Address(
             contact_name=self.contact_name,
             phone_number=self.phone_number,
-            # automatically copied by constructor
-            street_lines=self.street_lines,
+            street_lines=self.street_lines,  # copied by constructor
             city=self.city,
             subdivision=self.subdivision,
             postal_code=self.postal_code,
