@@ -322,6 +322,9 @@ class UPSApi(Carrier):
             # probably applies to the other ShipmentServiceOptions
             result = NotSupportedError('UPS does not support that accessory '
                                        'option to that address.')
+        elif error.Code == '120802':
+            result = NotSupportedError('UPS does not recognize that as a '
+                                       'valid destination address.')
         else:
             logger.error('UPS: Webfault#%s: %s'
                          % (error.Code, error.Description))
