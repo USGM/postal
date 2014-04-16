@@ -103,10 +103,11 @@ class USPSApi(Carrier):
         self.client = Client(url, plugins=[ClearEmpty()])
 
     def service_call(self, func, *args, **kwargs):
-        response = super(USPSApi, self).service_call(func, *args, **kwargs)
-
-        logger.sent(self.client.last_sent())
-        logger.received(self.client.last_received())
+        try:
+            response = super(USPSApi, self).service_call(func, *args, **kwargs)
+        finally:
+            logger.sent(self.client.last_sent())
+            logger.received(self.client.last_received())
 
         try:
             if response.Status != 0:
