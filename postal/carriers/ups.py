@@ -619,8 +619,16 @@ class UPSApi(Carrier):
         try:
             response = self._Ship.service.ProcessShipment(
                 api_request, api_shipment, label_spec, receipt_spec)
+            logger.sent(self._Ship.last_sent())
+            logger.sent(self._Ship.last_received())
         except WebFault as err:
+            logger.sent(self._Ship.last_sent())
+            logger.received(self._Ship.last_received())
             raise self._convert_webfault(err)
+        finally:
+            with logger.lock:
+                logger.debug(self._Ship.last_sent())
+                logger.debug(self._Ship.last_received())
 
         negotiated_rate = self._get_money(
             response.ShipmentResults.NegotiatedRateCharges.TotalCharge)
