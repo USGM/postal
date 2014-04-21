@@ -1,4 +1,5 @@
 import inspect
+from math import ceil
 import os
 import base64
 from pprint import pformat
@@ -413,9 +414,12 @@ class UPSApi(Carrier):
         return money.Money(node.MonetaryValue, node.CurrencyCode)
 
     @staticmethod
-    def _populate_money(node, value):
+    def _populate_money(node, value, whole_number=False):
         node.CurrencyCode = value.currency
-        node.MonetaryValue = str(value.amount)
+        if not whole_number:
+            node.MonetaryValue = str(value.amount)
+        else:
+            node.MonetaryValue = int(ceil(value.amount))
 
     @classmethod
     def is_large(cls, package):
@@ -901,7 +905,8 @@ class UPSApi(Carrier):
         weight.Weight = str(request.total_weight() or .1)
 
         invoice = self._TNTWS.factory.create('ns2:InvoiceLineTotalType')
-        self._populate_money(invoice, request.get_total_declared_value())
+        self._populate_money(
+            invoice, request.get_total_declared_value(), whole_number=True)
 
         if international and request.documents_only():
             documents = ''  # empty tag = true
