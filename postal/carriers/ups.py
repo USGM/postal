@@ -598,7 +598,8 @@ class UPSApi(Carrier):
         # Adult Signature
         # Required. Forwards
         # Only
-        signature_required = self.get_param(request, 'signature', None)
+        signature_required = request.extra_params.get(
+            'signature_required', None)
         if signature_required:
             confirm = api_shipment.ShipmentServiceOptions.DeliveryConfirmation
             if signature_required == 'Adult':

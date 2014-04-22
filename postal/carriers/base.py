@@ -278,37 +278,6 @@ class Carrier(object):
         """
         raise NotImplementedError
 
-    @classmethod
-    def get_param(cls, request, param, *args):
-        """
-        Get carrier-specific extra configuration information from request
-        object.
-
-        *args: [] | [object] = one object to use as the default value or no
-                               extra arguments to raise an exception if no
-                               parameter of the specified name is found
-        """
-        default = None
-        raise_exception = False
-        try:
-            default = args[0]
-        except IndexError:
-            raise_exception = True
-        if len(args) > 1:
-            # To make it a bit more like a dict's .get()
-            raise TypeError("get_param expected at most 3 arguments, got %i." %
-                            (len(args) + 2))
-        if cls.name not in request.extra_params:
-            if raise_exception:
-                raise KeyError(
-                    "%s not found in extra_params for this request object." %
-                    cls.name)
-            else:
-                return default
-        if raise_exception:
-            return request.extra_params[cls.name][param]
-        return request.extra_params[cls.name].get(param, default)
-
     @staticmethod
     def get_generic_package_types():
         return Carrier.generic_packaging_table.values()
@@ -385,10 +354,15 @@ class Carrier(object):
         canvas.drawCentredString(4.125*inch, .75*inch, '%s' % doc.page)
         canvas.restoreState()
 
-    def commercial_invoice(
-            self, request, logo, signature, signed_by, extra_info={}):
+    def commercial_invoice(self, request):
         result = BytesIO()
-
+        signature = request.extra_params(
+            request, 'ci_signature', self.postal_configuration['ci_signature'])
+        logo = request.extra_params(
+            request, 'ci_shipper_logo',
+            self.postal_configuration['ci_shipper_logo'])
+        signed_by = request.extra_params.get(
+            'ci_signed_by', self.postal_configuration['ci_signed_by'])
         doc = SimpleDocTemplate(result, pagesize=letter)
 
         style_table_head = ParagraphStyle(
@@ -435,19 +409,16 @@ class Carrier(object):
         t = Table(
             list(izip_longest(origin_lines, dest_lines, fillvalue='')),
             colWidths=[3.125*inch, 3.125*inch],
-            rowHeights=[.15*inch] * max(len(origin_lines), len(dest_lines))
-        )
+            rowHeights=[.15*inch] * max(len(origin_lines), len(dest_lines)))
         t.setStyle(TableStyle([
             ('FONTNAME', (0, 0), (-1, 0), 'Times-Bold'),
             ('FONTNAME', (0, 1), (-1, -1), 'Times-Roman'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10)
-        ]))
+            ('FONTSIZE', (0, 0), (-1, -1), 10)]))
         elements.append(t)
 
         pairs = [
             ('Total Weight', '%s lbs' % request.total_weight()),
-            ('Country of Destination', dest.country.alpha2)
-        ] + extra_info.items()
+            ('Country of Destination', dest.country.alpha2)]
         for i, (label, info) in enumerate(pairs):
             pairs[i] = (label + ': ', info)
 
@@ -456,27 +427,28 @@ class Carrier(object):
         t.setStyle(TableStyle([
             ('FONTNAME', (0, 0), (0, -1), 'Times-Bold'),
             ('FONTNAME', (1, 0), (1, -1), 'Times-Roman'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10)
-        ]))
+            ('FONTSIZE', (0, 0), (-1, -1), 10)]))
         elements.append(t)
 
         rows = [
             [Paragraph(a, style_table_head)
              for a in ['Line', 'Description', 'Harmonized Code',
-                       'Country of Origin', 'Quantity', 'Value', 'Line Total']]
-        ]
+                       'Country of Origin', 'Quantity',
+                       'Value', 'Line Total']]]
         for i, dec in enumerate(request.all_declarations(), 1):
             rows.append([
                 '%s' % i,
                 Paragraph(dec.description, style_table_cell),
                 '', dec.origin_country.alpha2,
-                '%s' % dec.units, '%s' % dec.value, '%s' % dec.get_total_value()])
+                '%s' % dec.units, '%s' % dec.value,
+                '%s' % dec.get_total_value()])
         rows.append([
             '', '', '', '', '',
             'Total:', '%s' % request.get_total_declared_value()])
 
         t = Table(rows, colWidths=[
-            .3*inch, 2.5*inch, .6*inch, .6*inch, .5*inch, .9*inch, .9*inch])
+            .3 * inch, 2.5 * inch, .6 * inch, .6 * inch,
+            .5 * inch, .9 * inch, .9 * inch])
         t.setStyle(TableStyle([
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 7),
@@ -485,8 +457,7 @@ class Carrier(object):
             ('ALIGNMENT', (0, 1), (0, -1), 'CENTER'),
             ('ALIGNMENT', (2, 1), (6, -1), 'CENTER'),
             ('FONTNAME', (0, 1), (-1, -1), 'Times-Roman'),
-            ('FONTSIZE', (0, 1), (-1, -1), 10)
-        ]))
+            ('FONTSIZE', (0, 1), (-1, -1), 10)]))
         elements.append(t)
 
         elements.append(Paragraph(
@@ -494,18 +465,17 @@ class Carrier(object):
             'the United States in accordance with the '
             'Export Administration regulations. Diversion contrary to U.S. '
             'law is prohibited.',
-            style=style_body
-        ))
+            style=style_body))
 
         elements.append(Paragraph(
-            'I declare all information in this invoice to be true and correct.',
-            style=style_body
-        ))
+            'I declare all information in this invoice to be '
+            'true and correct.',
+            style=style_body))
 
         signature_reader = ImageReader(BytesIO(signature))
         height = .75*inch
-        width = height * \
-                signature_reader.getSize()[0] / signature_reader.getSize()[1]
+        width = (height * signature_reader.getSize()[0] /
+                 signature_reader.getSize()[1])
         im = Image(BytesIO(signature), width=width, height=height)
         im.hAlign = 'LEFT'
         elements.append(im)
@@ -521,8 +491,7 @@ class Carrier(object):
         elements.append(Paragraph(
             'Signed by %s on %s' % (
                 signed_by, datetime.now().strftime('%b %d, %Y, %I:%M %p')),
-            style=style_body
-        ))
+            style=style_body))
 
         doc.build(elements, onFirstPage=self._page, onLaterPages=self._page)
         return result.getvalue()

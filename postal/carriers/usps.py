@@ -413,8 +413,8 @@ class USPSApi(Carrier):
         if package.documents_only:
             label_request.CustomsInfo.ContentsType = 'Documents'
         else:
-            label_request.CustomsInfo.ContentsType = self.get_param(
-                request, 'contents', 'Gift')
+            label_request.CustomsInfo.ContentsType = request.extra_params.get(
+                'purpose', 'Commercial')
 
     def ship_package(self, request, service, package):
         label_request = self.client.factory.create('LabelRequest')

@@ -560,7 +560,7 @@ class FedExApi(Carrier):
             for method in response.RateReplyDetails}
 
     def sig_handler(self, request, client):
-        sig = self.get_param(request, 'signature', None)
+        sig = request.extra_params.get('signature_required', None)
         if not sig:
             return None
         if not sig in ['Direct', 'Adult', 'Indirect']:
