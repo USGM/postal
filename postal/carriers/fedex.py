@@ -587,10 +587,15 @@ class FedExApi(Carrier):
             logger.debug_header('Get Services')
             logger.debug(request)
 
-        response = self.service_call(
-            self.rates_client.service.getRates,
-            auth, client, transaction_detail, version, return_transit, codes,
-            variable_options, requested_shipment)
+        try:
+            response = self.service_call(
+                self.rates_client.service.getRates,
+                auth, client, transaction_detail, version, return_transit,
+                codes, variable_options, requested_shipment)
+        except Exception as err:
+            logger.sent(self.rates_client.last_sent())
+            logger.received(self.rates_client.last_received())
+            raise err
 
         logger.sent(self.rates_client.last_sent())
         logger.received(self.rates_client.last_received())
