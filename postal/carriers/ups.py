@@ -26,7 +26,7 @@ from suds.sax.element import Element
 from suds import WebFault
 
 from ..data import Address, Shipment
-from ..exceptions import CarrierError, NotSupportedError
+from ..exceptions import CarrierError, NotSupportedError, AddressError
 
 __author__ = 'Nathan Everitt'
 
@@ -297,42 +297,53 @@ class UPSApi(Carrier):
     def _convert_webfault(webfault):
         error = webfault.fault.detail.Errors.ErrorDetail.PrimaryErrorCode
 
-        if error.Code == '111210':
+        code = error.Code
+        if code == '111210':
             result = NotSupportedError('UPS does not offer that service to '
                                        'that destination. (Double-check your '
-                                       'address.)')
-        elif error.Code == '270005':
-            result = NotSupportedError('UPS requires a valid postal code for '
-                                       'that region. (If one was specified, '
-                                       'it is invalid.)')
-        elif error.Code == '270040':  # "City is ambiguous"
+                                       'address.)', code=code)
+        elif code == '270005':
+            message = ('UPS requires a valid postal code for that region. '
+                       '(If one was specified, it is invalid.)')
+            result = AddressError(
+                message, fields={'postal_code': message}, code=code)
+        elif code == '270040':  # "City is ambiguous"
             # Once had this problem with an address where the city was
             # correct but the postal code was wrong. Because UPS.
-            result = NotSupportedError('UPS has no rates for that address. '
-                                       'The city and/or the postal code may '
-                                       'be incorrect.')
-        elif error.Code == '111285':
-            result = NotSupportedError('UPS has no rates for that address. '
-                                       'The postal code/city/country may be '
-                                       'incorrect.')
-        elif error.Code == '111286':
-            result = NotSupportedError('UPS has no rates for that address. '
-                                       'The state/province may be incorrect.')
-        elif error.Code == '121211':
+            result = AddressError(
+                'City is ambiguous. If it should not be, double check the '
+                'postal code.', fields={
+                    'city': 'City may be ambiguous.',
+                    'postal_code': 'If the city is not ambiguous, check to '
+                                   'make sure this postal code is for this '
+                                   'city.'})
+
+        elif code == '111285':
+            result = NotSupportedError(
+                'UPS has no rates for that address. '
+                'The postal code/city/country may be incorrect.',
+                fields={'postal_code': 'Please double-check the postal code.'},
+                code=code)
+        elif code == '111286':
+            result = NotSupportedError(
+                'UPS has no rates for that address.',
+                fields={
+                    'subdivision': 'The state/province may be incorrect.'},
+                code=code)
+        elif code == '121211':
             # Got this error for the Adult Signature Only option, though it
             # probably applies to the other ShipmentServiceOptions
             result = NotSupportedError('UPS does not support that accessory '
-                                       'option to that address.')
-        elif error.Code == '120802':
+                                       'option to that address.', code=code)
+        elif code == '120802':
             result = NotSupportedError('UPS does not recognize that as a '
-                                       'valid destination address.')
+                                       'valid destination address.', code=code)
         else:
             logger.error('UPS: Webfault#%s: %s'
                          % (error.Code, error.Description))
             result = CarrierError('Webfault#%s: %s'
-                                  % (error.Code, error.Description))
+                                  % (error.Code, error.Description), code=code)
 
-        result.code = error.Code
         return result
 
     @staticmethod
@@ -689,6 +700,8 @@ class UPSApi(Carrier):
 
             if self.auto_time_in_transit:
                 info['delivery_datetime'] = self.delivery_datetime(service, request)
+            else:
+                info['delivery_datetime'] = None
 
             shipment_info.put((service, info))
 

@@ -12,7 +12,8 @@ from PyPDF2 import PdfFileReader, PdfFileWriter
 from suds.client import Client
 
 from .base import Carrier, ClearEmpty, get_logger
-from ..exceptions import CarrierError, NotSupportedError, PostalError
+from ..exceptions import CarrierError, NotSupportedError, PostalError, \
+    AddressError
 from ..data import Address, Shipment, Declaration
 
 from io import BytesIO
@@ -143,17 +144,19 @@ class FedExApi(Carrier):
             code = response.Notifications[0].Code
 
             if code == '521':
-                err = NotSupportedError('FedEx requires a valid postal code '
-                                        'for that region. (If one was '
-                                        'specified, it is invalid.)')
+                message = ('FedEx requires a valid postal code '
+                           'for that region. (If one was '
+                           'specified, it is invalid.)')
+                err = AddressError(
+                    message, fields={'postal_code': message}, code=code)
             elif code == '711':
-                err = NotSupportedError('FedEx does not ship to that postal '
-                                        'code.')
+                message = 'FedEx does not ship to that postal code.'
+                err = AddressError(
+                    message, fields={'postal_code': message}, code=code)
             else:
                 err = CarrierError('Error#%s: %s' % (
-                    code, response.Notifications[0].Message))
+                    code, response.Notifications[0].Message), code=code)
 
-            err.code = code
             raise err
         return response
 

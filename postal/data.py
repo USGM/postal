@@ -279,8 +279,7 @@ class Package(object):
         return Package(
             self.length, self.width, self.height, self.weight,
             self.package_type, self.documents_only, self.carrier_conversion,
-            self.declarations, True
-        )
+            self.declarations, True)
 
     def get_total_declared_value(self):
         return stack_values(self.declarations, 'get_total_value')
@@ -325,7 +324,7 @@ class Package(object):
     def __repr__(self):
         return str(self)
 
-    def __deepcopy__(self, memo):
+    def __deepcopy__(self, _):
         return Package(
             length=self.length,
             width=self.width,
@@ -394,6 +393,7 @@ class Declaration(object):
         else:
             return 0
 
+    # TODO: Figure out what this is used for and fix whatever that is.
     def get_uninsured_value(self):
         if self.insure:
             return 0
@@ -417,8 +417,7 @@ class Declaration(object):
                 self.value == other.value,
                 self.units == other.units,
                 self.origin_country == other.origin_country,
-                self.insure == other.insure
-            ])
+                self.insure == other.insure])
         except AttributeError:
             return False
 

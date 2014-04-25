@@ -289,7 +289,8 @@ class Carrier(object):
             # generics that have been translated inappropriately.
             # Translations should never be stored outside of Postal but this
             # function shouldn't fail or raise an exception when they are.
-            for generic_code, carrier_code in self._generic_package_translation.values():
+            for generic_code, carrier_code in \
+                    self._generic_package_translation.values():
                 if code == carrier_code:
                     # This does happen to lose some information about what the
                     # type of the object is because some carriers treat all
@@ -324,6 +325,18 @@ class Carrier(object):
                     self, code, self._package_id_to_description[code])
         raise NotSupportedError("Package type %s is not available on %s."
                                 % (package_type, self.name))
+
+    def expected_package_type(self, request, package):
+        """
+        Given a request and a package, returns the package type the package can
+        be expected to be converted to if applicable, or the generic if not.
+        """
+        if not package.carrier_conversion:
+            return package.package_type
+        if len(request.packages) > 1 and self.atomic_multiship:
+            return PackageType(None, 'package', 'Package')
+
+        return self.to_proprietary_package_type(package.package_type)
 
     def _get_internal_package_type_code(
             self, package_type, to_proprietary=False):

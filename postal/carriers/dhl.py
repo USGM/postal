@@ -14,6 +14,7 @@ them results in a lot of traps. We therefore disable domestic shipments with
 DHL.
 """
 from copy import copy, deepcopy
+from decimal import Decimal
 from io import BytesIO
 from math import ceil
 from pprint import pformat
@@ -152,7 +153,7 @@ class DHLApi(Carrier):
                 "DHL gave a nonsense response to a pricing request.")
         currency = correct_price.find('CurrencyCode').text
         amount = correct_price.find('TotalAmount').text
-        return Money(amount, currency)
+        return Money(Decimal(amount).quantize(Decimal('0.01')), currency)
 
     @staticmethod
     def from_timestr(time_string):

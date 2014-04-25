@@ -39,6 +39,7 @@ logger = get_logger(__name__, 'USPS')
 class USPSApi(Carrier):
     name = 'USPS'
     address_validation = False
+    atomic_multiship = False
     _code_to_description = {
         'PriorityExpress': 'Priority Mail Express',
         'First': 'First-Class Mail',
