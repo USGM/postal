@@ -319,7 +319,7 @@ class UPSApi(Carrier):
                                    'city.'})
 
         elif code == '111285':
-            result = NotSupportedError(
+            result = AddressError(
                 'UPS has no rates for that address. '
                 'The postal code/city/country may be incorrect.',
                 fields={'postal_code': 'Please double-check the postal code.'},

@@ -203,7 +203,7 @@ class Request(object):
         return unicode(self._str())
 
     def __repr__(self):
-        return repr(self._str())
+        return self._str()
 
 
 class PackageType(object):

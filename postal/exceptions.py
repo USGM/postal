@@ -9,7 +9,7 @@ class PostalError(Exception):
     """
     def __init__(self, *args, **kwargs):
         self.code = kwargs.pop('code', None)
-        super(PostalError, self).__init__(*args, **kwargs)
+        super(PostalError, self).__init__(*args)
 
 
 class AddressError(PostalError):
