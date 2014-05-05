@@ -253,17 +253,20 @@ class TestCarrier(object):
 
     def ship_package(self):
         services = self.carrier.get_services(self.request)
+        self.assertTrue(services)
         sdict = services.keys()[0].ship(self.request)
         self.shipment_dict_check(sdict)
 
     def multiship(self):
         self.request.packages.append(self.package2)
         services = self.carrier.get_services(self.request)
+        self.assertTrue(services)
         sdict = services.keys()[0].ship(self.request)
         self.shipment_dict_check(sdict)
 
     def rate_ship_match(self):
         services = self.carrier.get_services(self.request)
+        self.assertTrue(services)
         service, serv_dict = services.items()[0]
         ship_dict = service.ship(self.request)
         self.assertEqual(ship_dict['price'], serv_dict['price'])
@@ -271,6 +274,7 @@ class TestCarrier(object):
     def rate_ship_match_multiship(self):
         self.request.packages.append(self.package2)
         services = self.carrier.get_services(self.request)
+        self.assertTrue(services)
         service, serv_dict = services.items()[0]
         ship_dict = service.ship(self.request)
         self.assertEqual(ship_dict['price'], serv_dict['price'])
@@ -279,6 +283,7 @@ class TestCarrier(object):
         self.request.packages = [self.documents]
         self.documents.declarations = []
         services = self.carrier.get_services(self.request)
+        self.assertTrue(services)
         sdict = services.keys()[0].ship(self.request)
         self.shipment_dict_check(sdict)
 

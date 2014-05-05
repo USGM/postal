@@ -13,6 +13,7 @@ DHL rarely ships domestically, and trying to handle domestic shipments with
 them results in a lot of traps. We therefore disable domestic shipments with
 DHL.
 """
+from collections import OrderedDict
 from copy import copy, deepcopy
 from decimal import Decimal
 from io import BytesIO
@@ -489,9 +490,11 @@ class DHLApi(Carrier):
         if not labels:
             raise CarrierError('DHL generated no labels.')
         labels = self.format_labels(labels)
-        package_details = {
-            package: {'label': label, 'tracking_number': tracking_number}
-            for package, label in zip(request.packages, labels)}
+
+        package_details = OrderedDict(
+            (package, {'label': label, 'tracking_number': tracking_number})
+            for package, label in zip(request.packages, labels)
+        )
         shipment_dict = {
             'shipment': Shipment(self, tracking_number),
             'packages': package_details,

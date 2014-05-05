@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import inspect
 from math import ceil
 import os
@@ -441,7 +442,6 @@ class UPSApi(Carrier):
         Handling Charge will not be assessed when a Large Package
         Surcharge is applied.
         """
-
         if package.package_type.code in ['01', 'envelope']:
             return False
         return cls.get_length_plus_girth(package) > 130
@@ -655,7 +655,7 @@ class UPSApi(Carrier):
         master_tracking_number = \
             response.ShipmentResults.ShipmentIdentificationNumber
 
-        packages = {}
+        packages = OrderedDict()
 
         for index, pak in enumerate(response.ShipmentResults.PackageResults):
             pdf = BytesIO()
@@ -673,10 +673,9 @@ class UPSApi(Carrier):
                 'tracking_number': pak.TrackingNumber,
                 'label': pdf.getvalue()}
 
-        result = {
-            'shipment': Shipment(self, master_tracking_number),
-            'packages': packages,
-            'price': negotiated_rate}
+        result = {'shipment': Shipment(self, master_tracking_number),
+                  'packages': packages,
+                  'price': negotiated_rate}
 
         with logger.lock:
             logger.debug_header('Response')
@@ -692,11 +691,10 @@ class UPSApi(Carrier):
         try:
             service = self.get_service(rated_shipment.Service.Code)
 
-            info = {
-                'price': self._get_negotiated_charge(rated_shipment),
-                'alerts': [
-                    a.Description for a in rated_shipment.RatedShipmentAlert],
-                'trackable': True}
+            info = {'price': self._get_negotiated_charge(rated_shipment),
+                    'alerts': [a.Description
+                               for a in rated_shipment.RatedShipmentAlert],
+                    'trackable': True}
 
             if self.auto_time_in_transit:
                 info['delivery_datetime'] = self.delivery_datetime(service, request)
@@ -721,9 +719,8 @@ class UPSApi(Carrier):
         # Each request takes multiple web service calls.
         # We thread for efficiency.
         for rated_shipment in rates.RatedShipment:
-            thread = Thread(
-                target=self._task,
-                args=(request, rated_shipment, shipment_info))
+            thread = Thread(target=self._task,
+                            args=(request, rated_shipment, shipment_info))
             thread.start()
             
         result = {}

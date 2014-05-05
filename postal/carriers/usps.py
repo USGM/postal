@@ -15,6 +15,7 @@ do so would mean that some packages would have been shipped, and others would
 not have. Automatically refunding the packages would also be problematic, as
 the cause of the original problem might also prevent the refund working.
 """
+from collections import OrderedDict
 from copy import copy, deepcopy
 from pprint import pformat
 import random
@@ -125,7 +126,7 @@ class USPSApi(Carrier):
     @staticmethod
     def _service_day(proposed_datetime):
         """
-        This doesn't catch all holidays, but will stop it from displaying a few
+        This doesn't catch all holidays but will stop it from displaying a few
         and Sundays.
         """
         # Sundays
@@ -476,7 +477,7 @@ class USPSApi(Carrier):
 
     def compile_shipments(self, response_list):
         packages_source = [response['packages'] for response in response_list]
-        packages = {}
+        packages = OrderedDict()
         for pack in packages_source:
             packages.update(pack)
         shipments = [

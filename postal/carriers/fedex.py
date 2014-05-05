@@ -2,6 +2,7 @@
 This is the module for interfacing with FedEx's web services APIs.
 """
 from base64 import b64decode
+from collections import OrderedDict
 from copy import copy, deepcopy
 from datetime import datetime
 from math import ceil
@@ -338,7 +339,7 @@ class FedExApi(Carrier):
         logger.sent(self.ship_client.last_sent())
         logger.received(self.ship_client.last_received())
 
-        package_details = {}
+        package_details = OrderedDict()
         if len(request.packages) > 1:
             master_tracking_id = (
                 result.CompletedShipmentDetail.MasterTrackingId)
