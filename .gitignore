@@ -1,6 +1,8 @@
 .idea*
 *.pyc
 postal/tests/test_credentials.py
+postal/tests/logo.jpg
+postal/tests/signature.jpg
 build/*
 dist/*
 Postal*.egg-*

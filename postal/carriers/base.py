@@ -7,10 +7,11 @@ This module also contains the base Service class. Service objects are
 instantiated by Carrier classes to describe a method by which a package may
 be sent.
 """
+from base64 import b64encode
 import sys
 import logging
 from threading import RLock
-from io import BytesIO, StringIO
+from io import BytesIO
 from datetime import datetime
 import inspect
 import os
@@ -26,7 +27,6 @@ from reportlab.lib.utils import ImageReader
 from reportlab.lib.units import inch
 from reportlab.platypus import Table, TableStyle, SimpleDocTemplate, Image
 from reportlab.platypus.para import Paragraph
-from reportlab.pdfgen.canvas import Canvas
 
 from suds.plugin import MessagePlugin
 
@@ -369,10 +369,10 @@ class Carrier(object):
 
     def commercial_invoice(self, request):
         result = BytesIO()
-        signature = request.extra_params(
-            request, 'ci_signature', self.postal_configuration['ci_signature'])
-        logo = request.extra_params(
-            request, 'ci_shipper_logo',
+        signature = request.extra_params.get(
+            'ci_signature', self.postal_configuration['ci_signature'])
+        logo = request.extra_params.get(
+            'ci_shipper_logo',
             self.postal_configuration['ci_shipper_logo'])
         signed_by = request.extra_params.get(
             'ci_signed_by', self.postal_configuration['ci_signed_by'])
@@ -507,7 +507,7 @@ class Carrier(object):
             style=style_body))
 
         doc.build(elements, onFirstPage=self._page, onLaterPages=self._page)
-        return result.getvalue()
+        return b64encode(result.getvalue())
 
 
 class Service(object):

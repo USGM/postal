@@ -3,7 +3,6 @@ This is the module for interfacing with FedEx's web services APIs.
 """
 from base64 import b64decode
 from collections import OrderedDict
-from copy import copy, deepcopy
 from datetime import datetime
 from math import ceil
 from pprint import pformat
@@ -12,7 +11,7 @@ from money import Money
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from suds.client import Client
 
-from .base import Carrier, ClearEmpty, get_logger
+from .base import Carrier, ClearEmpty, get_logger, PY3
 from ..exceptions import CarrierError, NotSupportedError, PostalError, \
     AddressError
 from ..data import Address, Shipment, Declaration
@@ -127,6 +126,9 @@ class FedExApi(Carrier):
             'AddressValidationService_v2.wsdl')
 
         self.ship_client = self.create_client('ShipService_v13.wsdl')
+
+        self.upload_client = self.create_client(
+            'UploadDocumentService_v1.wsdl')
 
         self.contact_type = (
             self.rates_client.factory.create('Party').__class__)
@@ -249,6 +251,14 @@ class FedExApi(Carrier):
         version.Minor = 0
         return version
 
+    def upload_version_id(self):
+        version = self.upload_client.factory.create('VersionId')
+        version.ServiceId = 'cdus'
+        version.Major = 1
+        version.Intermediate = 2
+        version.Minor = 0
+        return version
+
     def label_specification(self, spec):
         spec.LabelFormatType = 'COMMON2D'
         spec.ImageType = 'PDF'
@@ -270,6 +280,31 @@ class FedExApi(Carrier):
         output_stream = BytesIO()
         output.write(output_stream)
         return output_stream.getvalue()
+
+    def upload_commercial_invoice(self, request):
+        origin = self.get_origin(request)
+        if request.documents_only():
+            return None
+        if not request.international(origin=origin):
+            return None
+        if PY3:
+            invoice = self.commercial_invoice(request).encode('utf-8')
+        else:
+            invoice = self.commercial_invoice(request)
+        authentication = self.authentication(self.upload_client)
+        client = self.user_client(self.upload_client)
+        transaction = self.transaction_detail(self.upload_client)
+        version = self.upload_version_id()
+        document = self.upload_client.factory.create('UploadDocumentDetail')
+        document.LineNumber = 1
+        document.CustomerReference = 'refId-1'
+        document.DocumentType = 'COMMERCIAL_INVOICE'
+        document.FileName = 'CommercialInvoice.pdf'
+        document.DocumentContent = invoice
+        return self.service_call(
+            self.upload_client.service.uploadDocuments, authentication,
+            client, transaction, version, origin.country.alpha2,
+            request.destination.country.alpha2, [document])
 
     def requested_shipment(
             self, service, request, package, sequence_num=None,
@@ -314,9 +349,25 @@ class FedExApi(Carrier):
         signature = self.sig_handler(request, self.ship_client)
         special_services = api_request.SpecialServicesRequested
         if signature:
-            special_services.SpecialServicesTypes = ['SIGNATURE_OPTION']
+            types = special_services.SpecialServicesTypes
+            if types:
+                types.append('SIGNATURE_OPTION')
+            else:
+                types = ['SIGNATURE_OPTION']
+            special_services.SpecialServiceTypes = types
             special_services.SignatureOptionDetail = signature
         return api_request
+
+    def set_commercial_invoice(self, invoice, api_request):
+        services = api_request.SpecialServicesRequested
+        services.SpecialServiceTypes = ['ELECTRONIC_TRADE_DOCUMENTS']
+        invoice = invoice.DocumentStatuses[0].DocumentId
+        reference = self.ship_client.factory.create(
+            'UploadDocumentReferenceDetail')
+        etd = api_request.SpecialServicesRequested.EtdDetail
+        reference.DocumentType = 'COMMERCIAL_INVOICE'
+        reference.DocumentId = invoice
+        etd.DocumentReferences = [reference]
 
     def ship(self, service, request):
         self._ensure_supported(request)
@@ -326,6 +377,10 @@ class FedExApi(Carrier):
         version_id = self.ship_version_id()
         package = request.packages[0]
         requested_shipment = self.requested_shipment(service, request, package)
+
+        invoice = self.upload_commercial_invoice(request)
+        if invoice:
+            self.set_commercial_invoice(invoice, requested_shipment)
 
         with logger.lock:
             logger.debug_header('Shipment')
@@ -356,6 +411,8 @@ class FedExApi(Carrier):
             requested_shipment = self.requested_shipment(
                 service, request, package, sequence_num=sequence_num,
                 tracking_number=master_tracking_id)
+            if invoice:
+                self.set_commercial_invoice(invoice, requested_shipment)
             result = self.service_call(
                 self.ship_client.service.processShipment, auth, client_detail,
                 transaction_detail, version_id, requested_shipment)

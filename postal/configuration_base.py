@@ -19,6 +19,24 @@ base_postal_configuration = {
     # The Tax ID of your shipping organization.
     'tax_id': '',
 
+    # A bytestring containing the logo of your organization for commercial
+    # invoices. Opening a .jpg file and doing a read() on it would get you the
+    # desired string here.
+    # This can be overwritten on a per-request basis by setting the extra_param
+    # ci_shipper_logo.
+    'ci_shipper_logo': '',
+
+    # A bytestring containing the default shipper's signature. The manager of
+    # your warehouse would be the best person to sign this. You may also
+    # override this on a per-request basis by setting the extra_param
+    # ci_signature.
+    'ci_signature': '',
+
+    # The name of the person whose signature is in ci_signature.
+    # You may override this in the same manner as you can ci_shipper_logo and
+    # ci_signature.
+    'ci_signed_by': '',
+
     # The following are options for setting up the default carriers. Each
     # carrier's options are paired with their key, which is their name
     # property.
