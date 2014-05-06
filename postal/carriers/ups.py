@@ -13,7 +13,7 @@ from datetime import datetime
 from io import BytesIO
 
 import PIL.Image
-from .base import Carrier, get_logger
+from .base import Carrier, PostalLogger
 import suds.cache
 
 try:
@@ -32,7 +32,7 @@ from ..exceptions import CarrierError, NotSupportedError, AddressError
 __author__ = 'Nathan Everitt'
 
 
-logger = get_logger(__name__, 'UPS')
+logger = PostalLogger(carrier_name='UPS')
 
 
 class FixBrokenNamespace(MessagePlugin):

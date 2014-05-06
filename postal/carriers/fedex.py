@@ -11,7 +11,7 @@ from money import Money
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from suds.client import Client
 
-from .base import Carrier, ClearEmpty, get_logger, PY3
+from .base import Carrier, ClearEmpty, PY3, PostalLogger
 from ..exceptions import CarrierError, NotSupportedError, PostalError, \
     AddressError
 from ..data import Address, Shipment, Declaration
@@ -19,7 +19,7 @@ from ..data import Address, Shipment, Declaration
 from io import BytesIO
 
 
-logger = get_logger(__name__, 'FedEx')
+logger = PostalLogger(carrier_name='FedEx')
 
 
 class FedExApi(Carrier):
@@ -301,10 +301,18 @@ class FedExApi(Carrier):
         document.DocumentType = 'COMMERCIAL_INVOICE'
         document.FileName = 'CommercialInvoice.pdf'
         document.DocumentContent = invoice
-        return self.service_call(
-            self.upload_client.service.uploadDocuments, authentication,
-            client, transaction, version, origin.country.alpha2,
-            request.destination.country.alpha2, [document])
+        try:
+            return self.service_call(
+                self.upload_client.service.uploadDocuments, authentication,
+                client, transaction, version, origin.country.alpha2,
+                request.destination.country.alpha2, [document])
+        except CarrierError as err:
+            if err.code == '1200':
+                raise NotSupportedError(
+                    "ETDs aren't supported for either the source or the "
+                    "destination country. Please print a commercial invoice "
+                    "for this shipment.")
+            raise err
 
     def requested_shipment(
             self, service, request, package, sequence_num=None,
@@ -376,23 +384,25 @@ class FedExApi(Carrier):
         transaction_detail = self.transaction_detail(self.ship_client)
         version_id = self.ship_version_id()
         package = request.packages[0]
+        alerts = []
         requested_shipment = self.requested_shipment(service, request, package)
+        invoice = None
 
-        invoice = self.upload_commercial_invoice(request)
+        try:
+            invoice = self.upload_commercial_invoice(request)
+        except NotSupportedError as err:
+            alerts.append(str(err))
         if invoice:
             self.set_commercial_invoice(invoice, requested_shipment)
 
-        with logger.lock:
-            logger.debug_header('Shipment')
-            logger.debug(service)
-            logger.debug(request)
+        with self.logger.lock:
+            self.logger.debug_header('Shipment')
+            self.logger.debug(service)
+            self.logger.debug(request)
 
         result = self.service_call(
             self.ship_client.service.processShipment, auth, client_detail,
             transaction_detail, version_id, requested_shipment)
-
-        logger.sent(self.ship_client.last_sent())
-        logger.received(self.ship_client.last_received())
 
         package_details = OrderedDict()
         if len(request.packages) > 1:
@@ -411,14 +421,9 @@ class FedExApi(Carrier):
             requested_shipment = self.requested_shipment(
                 service, request, package, sequence_num=sequence_num,
                 tracking_number=master_tracking_id)
-            if invoice:
-                self.set_commercial_invoice(invoice, requested_shipment)
             result = self.service_call(
                 self.ship_client.service.processShipment, auth, client_detail,
                 transaction_detail, version_id, requested_shipment)
-
-            logger.sent(self.ship_client.last_sent())
-            logger.received(self.ship_client.last_received())
 
             detail = result.CompletedShipmentDetail.CompletedPackageDetails[0]
             package_details[package] = {
@@ -437,7 +442,8 @@ class FedExApi(Carrier):
         shipment_dict = {
             'shipment': Shipment(self, tracking_number),
             'packages': package_details,
-            'price': price}
+            'price': price,
+            'alerts': alerts}
 
         with logger.lock:
             logger.debug_header('Response')
@@ -644,22 +650,19 @@ class FedExApi(Carrier):
         variable_options = []
         requested_shipment = self.requested_shipment_rate(request)
 
-        with logger.lock:
-            logger.debug_header('Get Services')
-            logger.debug(request)
+        with self.logger.lock:
+            self.logger.debug_header('Get Services')
+            self.logger.debug(request)
 
         try:
             response = self.service_call(
                 self.rates_client.service.getRates,
                 auth, client, transaction_detail, version, return_transit,
                 codes, variable_options, requested_shipment)
-        except Exception as err:
-            logger.sent(self.rates_client.last_sent())
-            logger.received(self.rates_client.last_received())
-            raise err
-
-        logger.sent(self.rates_client.last_sent())
-        logger.received(self.rates_client.last_received())
+        finally:
+            with self.logger.lock:
+                self.logger.sent(self.rates_client.last_sent())
+                self.logger.received(self.rates_client.last_received())
 
         result = self.rate_response_dict(response)
         self.cache_results(request, result)

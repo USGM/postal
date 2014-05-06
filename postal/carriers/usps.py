@@ -30,11 +30,11 @@ from PyPDF2 import PdfFileReader, PdfFileWriter
 from money import Money
 from suds.client import Client
 
-from base import Carrier, ClearEmpty, PY3, get_logger
+from base import Carrier, ClearEmpty, PY3, PostalLogger
 from ..exceptions import CarrierError, NotSupportedError
 from ..data import Shipment, sigfig, TWOPLACES, Declaration
 
-logger = get_logger(__name__, 'USPS')
+logger = PostalLogger('USPS')
 
 
 class USPSApi(Carrier):

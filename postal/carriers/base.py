@@ -39,7 +39,7 @@ PY3 = sys.version_info[0] == 3
 
 
 class PostalLogger(object):
-    def __init__(self, logger_name, carrier_name):
+    def __init__(self, logger_name='postal', carrier_name='Unknown Carrier'):
         self.logger = logging.getLogger(logger_name)
         self.carrier_name = carrier_name
         self.lock = RLock()
@@ -70,10 +70,6 @@ class PostalLogger(object):
 
     def warning(self, message):
         self.logger.warning(message)
-
-
-def get_logger(logger_name, carrier_name):
-    return PostalLogger(logger_name, carrier_name)
 
 
 class ClearEmpty(MessagePlugin):
@@ -155,6 +151,7 @@ class Carrier(object):
 
     def __init__(self, postal_configuration):
         self.postal_configuration = postal_configuration
+        self.logger = PostalLogger(carrier_name=self.name)
         if not postal_configuration:
             raise PostalError("Postal Configuration not set.")
 
@@ -169,17 +166,17 @@ class Carrier(object):
     def __hash__(self):
         return hash(self.name)
 
-    @staticmethod
-    def service_call(func, *args, **kwargs):
+    def service_call(self, func, *args, **kwargs):
         try:
             return func(*args, **kwargs)
         except Exception as err:
             if hasattr(err, 'document'):
                 raise CarrierError(err.document)
-            #elif str(err.message).strip():
-            #    raise CarrierError(str(err.message))
             else:
                 raise CarrierError(repr(err))
+        finally:
+            self.logger.sent(func.client.last_sent())
+            self.logger.received(func.client.last_received())
 
     @classmethod
     def service_url(cls, wsdl_name):

@@ -14,7 +14,6 @@ them results in a lot of traps. We therefore disable domestic shipments with
 DHL.
 """
 from collections import OrderedDict
-from copy import copy, deepcopy
 from decimal import Decimal
 from io import BytesIO
 from math import ceil
@@ -23,7 +22,7 @@ import random
 from base64 import b64decode
 from datetime import datetime
 from time import timezone
-from xml.etree.ElementTree import fromstring, tostring
+from xml.etree.ElementTree import fromstring
 
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from dateutil.relativedelta import relativedelta
@@ -31,13 +30,13 @@ from dateutil.relativedelta import relativedelta
 from money import Money
 from requests import post, RequestException
 
-from .base import Carrier, get_logger
+from .base import Carrier, PostalLogger
 from .templates.constructor import load_template, populate_template
 from ..exceptions import CarrierError, NotSupportedError
 from ..data import Shipment, TWOPLACES, sigfig
 
 
-logger = get_logger(__name__, 'DHL')
+logger = PostalLogger(__name__, 'DHL')
 
 
 class DHLApi(Carrier):
@@ -111,8 +110,8 @@ class DHLApi(Carrier):
         except RequestException as err:
             raise CarrierError("%s" % err)
 
-        logger.sent(call)
-        logger.received(response.text)
+        self.logger.sent(call)
+        self.logger.received(response.text)
 
         root = fromstring(response.text)
         # DHL has about three or four ways to send an error message.
@@ -211,9 +210,9 @@ class DHLApi(Carrier):
 
         rate_request = self.rates_request(request)
 
-        with logger.lock:
-            logger.debug_header('Get Services')
-            logger.debug(request)
+        with self.logger.lock:
+            self.logger.debug_header('Get Services')
+            self.logger.debug(request)
 
         response = self.make_call(rate_request)[0][1]
         try:
@@ -229,9 +228,9 @@ class DHLApi(Carrier):
                 'trackable': True}
             for key, value in response_dict.items()}
 
-        with logger.lock:
-            logger.debug_header('Response')
-            logger.debug(pformat(result, width=1))
+        with self.logger.lock:
+            self.logger.debug_header('Response')
+            self.logger.debug(pformat(result, width=1))
 
         return result
 
@@ -479,10 +478,10 @@ class DHLApi(Carrier):
         self._ensure_supported(request)
         ship_request = self.shipment_request(service, request)
 
-        with logger.lock:
-            logger.debug_header('Shipment')
-            logger.debug(service)
-            logger.debug(request)
+        with self.logger.lock:
+            self.logger.debug_header('Shipment')
+            self.logger.debug(service)
+            self.logger.debug(request)
 
         response = self.make_call(ship_request)
         tracking_number = response.findtext('AirwayBillNumber')
@@ -500,9 +499,9 @@ class DHLApi(Carrier):
             'packages': package_details,
             'price': price}
 
-        with logger.lock:
-            logger.debug_header('Response')
-            logger.shipment_response(shipment_dict)
+        with self.logger.lock:
+            self.logger.debug_header('Response')
+            self.logger.shipment_response(shipment_dict)
 
         return shipment_dict
 
