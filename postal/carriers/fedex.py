@@ -352,18 +352,10 @@ class FedExApi(Carrier):
                 [pack.weight for pack in request.packages])
             api_request.TotalWeight.Units = 'LB'
         api_request.PackageCount = len(request.packages)
-        self.line_items(
-            self.ship_client, api_request, [package], sequence_num)
         signature = self.sig_handler(request, self.ship_client)
-        special_services = api_request.SpecialServicesRequested
-        if signature:
-            types = special_services.SpecialServicesTypes
-            if types:
-                types.append('SIGNATURE_OPTION')
-            else:
-                types = ['SIGNATURE_OPTION']
-            special_services.SpecialServiceTypes = types
-            special_services.SignatureOptionDetail = signature
+        self.line_items(
+            self.ship_client, api_request, [package], sequence_num, signature)
+
         return api_request
 
     def set_commercial_invoice(self, invoice, api_request):
@@ -455,7 +447,8 @@ class FedExApi(Carrier):
         return [codes.FDXE, codes.FDXG]
 
     def line_items(
-            self, client, api_request, packages, sequence_num=None):
+            self, client, api_request, packages, sequence_num=None,
+            signature=None):
         commodities = False
         detail = api_request.CustomsClearanceDetail
         for index, package in enumerate(packages):
@@ -506,6 +499,15 @@ class FedExApi(Carrier):
                 detail.CustomsValue.Amount = '1.00'
             else:
                 commodities = True
+            if signature:
+                special_services = item.SpecialServicesRequested
+                types = special_services.SpecialServiceTypes
+                if types:
+                    types.append('SIGNATURE_OPTION')
+                else:
+                    types = ['SIGNATURE_OPTION']
+                special_services.SpecialServiceTypes = types
+                special_services.SignatureOptionDetail = signature
         if commodities:
             detail.DutiesPayment.PaymentType = 'RECIPIENT'
 
@@ -584,8 +586,10 @@ class FedExApi(Carrier):
         else:
             api_request.PackagingType = 'YOUR_PACKAGING'
 
+        signature = self.sig_handler(request, self.rates_client)
         self.line_items(
-            self.rates_client, api_request, request.packages)
+            self.rates_client, api_request, request.packages,
+            signature=signature)
         api_request.ShipTimestamp = request.ship_datetime
 
         signature = self.sig_handler(request, self.ship_client)
