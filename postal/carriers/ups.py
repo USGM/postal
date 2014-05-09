@@ -294,6 +294,9 @@ class UPSApi(Carrier):
             self._Ship.set_options(
                 location='https://onlinetools.ups.com/webservices/Ship')
 
+        self._PaperlessDocumentAPI = self._create_client(
+            'PaperlessDocumentAPI.wsdl', plugins=[authentication])
+
     @staticmethod
     def _convert_webfault(webfault):
         error = webfault.fault.detail.Errors.ErrorDetail.PrimaryErrorCode
@@ -340,11 +343,11 @@ class UPSApi(Carrier):
             result = NotSupportedError('UPS does not recognize that as a '
                                        'valid destination address.', code=code)
         else:
-            logger.error('UPS: Webfault#%s: %s'
-                         % (error.Code, error.Description))
             result = CarrierError('Webfault#%s: %s'
                                   % (error.Code, error.Description), code=code)
 
+        logger.error('UPS: Webfault#%s: %s'
+                     % (error.Code, error.Description))
         return result
 
     @staticmethod
@@ -460,6 +463,33 @@ class UPSApi(Carrier):
         if package.weight > 150:
             raise NotSupportedError('UPS does not ship packages that weigh '
                                     'more than 150 pounds.')
+
+    def upload_commercial_invoice(self, request):
+        origin = self.get_origin(request)
+        if request.documents_only():
+            return None
+        if not request.international(origin=origin):
+            return None
+
+        req = self._PaperlessDocumentAPI.factory.create('ns0:RequestType')
+
+        form = self._PaperlessDocumentAPI.factory.create('ns2:UserCreatedForm')
+        form.UserCreatedFormFileName = 'a'
+        form.UserCreatedFormFile = self.commercial_invoice(request)
+        form.UserCreatedFormFileFormat = 'pdf'
+        form.UserCreatedFormDocumentType = '003'
+
+        with logger.lock:
+            logger.debug_header('Commercial Invoice')
+        try:
+            return self._PaperlessDocumentAPI.service.ProcessUploading(
+                req, self.shipper_number, [form])
+        except WebFault as err:
+            raise self._convert_webfault(err)
+        finally:
+            with logger.lock:
+                logger.debug(self._PaperlessDocumentAPI.last_sent())
+                logger.debug(self._PaperlessDocumentAPI.last_received())
 
     def ship(self, service, request, receiver_account_number=None):
         self._ensure_request_supported(request)

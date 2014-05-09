@@ -287,10 +287,9 @@ class FedExApi(Carrier):
             return None
         if not request.international(origin=origin):
             return None
+        invoice = self.commercial_invoice(request)
         if PY3:
-            invoice = self.commercial_invoice(request).encode('utf-8')
-        else:
-            invoice = self.commercial_invoice(request)
+            invoice = invoice.encode('utf-8')
         authentication = self.authentication(self.upload_client)
         client = self.user_client(self.upload_client)
         transaction = self.transaction_detail(self.upload_client)
@@ -446,9 +445,7 @@ class FedExApi(Carrier):
         codes = self.rates_client.factory.create('CarrierCodeType')
         return [codes.FDXE, codes.FDXG]
 
-    def line_items(
-            self, client, api_request, packages, sequence_num=None,
-            signature=None):
+    def line_items(self, client, api_request, packages, sequence_num=None):
         commodities = False
         detail = api_request.CustomsClearanceDetail
         for index, package in enumerate(packages):
