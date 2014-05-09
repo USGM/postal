@@ -487,7 +487,7 @@ class UPSApi(Carrier):
         if request.destination.country.alpha2 in ('CA', 'PR'):
             self._populate_money(
                 api_shipment.InvoiceLineTotal,
-                request.get_total_declared_value())
+                request.get_total_declared_value(), whole_number=True)
 
         self._populate_shipper(
             api_shipment.Shipper, origin, self.shipper_number,
