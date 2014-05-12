@@ -189,7 +189,7 @@ class USPSApi(Carrier):
         dims = api_request.MailpieceDimensions
         dims.Length, dims.Width, dims.Height = sorted(
             [sigfig(package.length), sigfig(package.width),
-                sigfig(package.height)])
+                sigfig(package.height)], reverse=True)
         ounces = int(ceil(package.weight * 16))
         if not ounces:
             ounces = 1
@@ -418,7 +418,7 @@ class USPSApi(Carrier):
             label_request.CustomsInfo.ContentsType = 'Documents'
         else:
             label_request.CustomsInfo.ContentsType = request.extra_params.get(
-                'purpose', 'Commercial')
+                'purpose', 'Merchandise')
 
     def ship_package(self, request, service, package):
         label_request = self.client.factory.create('LabelRequest')
