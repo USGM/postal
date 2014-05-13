@@ -500,7 +500,7 @@ class DHLApi(Carrier):
         try:
             response = self.make_call(ship_request)
         except CarrierError as err:
-            if err.code.startswith('PLT'):
+            if err.code and err.code.startswith('PLT'):
                 ship_request = self.shipment_request(
                     service, request, paperless=False)
                 response = self.make_call(ship_request)
