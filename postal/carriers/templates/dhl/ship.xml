@@ -36,6 +36,8 @@
         <ShipperID>{account_number}</ShipperID>
         {origin_address}
     </Shipper>
+    {special_services}
     <EProcShip>N</EProcShip>
+    {commercial_invoice}
     <LabelImageFormat>PDF</LabelImageFormat>
 </req:ShipmentRequest>

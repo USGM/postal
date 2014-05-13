@@ -1,0 +1,7 @@
+	<DocImages>
+		<DocImage>
+			<Type>CIN</Type>
+			<Image>{invoice}</Image>
+			<ImageFormat>PDF</ImageFormat>
+		</DocImage>
+	</DocImages>

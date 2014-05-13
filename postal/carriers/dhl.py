@@ -22,7 +22,7 @@ import random
 from base64 import b64decode
 from datetime import datetime
 from time import timezone
-from xml.etree.ElementTree import fromstring
+from xml.etree.ElementTree import fromstring, tostring
 
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from dateutil.relativedelta import relativedelta
@@ -132,9 +132,8 @@ class DHLApi(Carrier):
                     or (error_tag.findtext('ActionNote') == 'Success')):
                 condition = error_tag.find('Condition')
         if condition is not None:
-            raise CarrierError("Error %s. %s" % (
-                condition.findtext('ConditionCode'),
-                condition.findtext('ConditionData')))
+            raise CarrierError("%s" % condition.findtext('ConditionData'),
+                               code=condition.findtext('ConditionCode'))
         return root
 
     @staticmethod
@@ -381,7 +380,7 @@ class DHLApi(Carrier):
             request_template, escape_variables, non_escape_variables)
         return request
 
-    def shipment_request(self, service, request):
+    def shipment_request(self, service, request, paperless=True):
         ship_template = load_template('dhl', 'ship.xml')
         ship_datetime = request.ship_datetime or datetime.now()
         ship_date = ship_datetime.strftime('%Y-%m-%d')
@@ -395,8 +394,20 @@ class DHLApi(Carrier):
         insured = request.get_total_insured_value()
         if request.documents_only():
             is_dutiable = 'N'
+            commercial_invoice = ''
+            special_services = ''
         else:
             is_dutiable = 'Y'
+            invoice_template = load_template('dhl', 'commercial_invoice.xml')
+            if paperless:
+                commercial_invoice = populate_template(
+                    invoice_template,
+                    {'invoice': self.commercial_invoice(request)})
+                special_services = '<SpecialService><SpecialServiceType>WY' \
+                                   '</SpecialServiceType></SpecialService>'
+            else:
+                commercial_invoice = ''
+                special_services = ''
 
         escape_variables = {
             'origin_country': origin.country.alpha2,
@@ -419,7 +430,9 @@ class DHLApi(Carrier):
             'pieces': self.enumerate_pieces('ship_piece.xml', request),
             'request_header': self.create_header(),
             'insured_amount': insured.amount.quantize(TWOPLACES),
-            'insured_currency': insured.currency}
+            'insured_currency': insured.currency,
+            'commercial_invoice': commercial_invoice,
+            'special_services': special_services}
 
         request = populate_template(
             ship_template, escape_variables, non_escape_variables)
@@ -477,13 +490,25 @@ class DHLApi(Carrier):
         price = self.quote(service, request)
         self._ensure_supported(request)
         ship_request = self.shipment_request(service, request)
+        alerts = []
 
         with self.logger.lock:
             self.logger.debug_header('Shipment')
             self.logger.debug(service)
             self.logger.debug(request)
 
-        response = self.make_call(ship_request)
+        try:
+            response = self.make_call(ship_request)
+        except CarrierError as err:
+            if err.code.startswith('PLT'):
+                ship_request = self.shipment_request(
+                    service, request, paperless=False)
+                response = self.make_call(ship_request)
+                alerts.append(
+                    'Could not send paperless invoice. Please print and '
+                    'attach a commercial invoice to this shipment.')
+            else:
+                raise err
         tracking_number = response.findtext('AirwayBillNumber')
         labels = response.findtext('LabelImage/OutputImage')
         if not labels:
@@ -497,7 +522,8 @@ class DHLApi(Carrier):
         shipment_dict = {
             'shipment': Shipment(self, tracking_number),
             'packages': package_details,
-            'price': price}
+            'price': price,
+            'alerts': alerts}
 
         with self.logger.lock:
             self.logger.debug_header('Response')
