@@ -483,7 +483,8 @@ class UPSApi(Carrier):
             logger.debug_header('Commercial Invoice')
         try:
             return self._PaperlessDocumentAPI.service.ProcessUploading(
-                req, self.shipper_number, [form])
+                req, self.shipper_number, [form]
+            ).FormsHistoryDocumentID.DocumentID[0]
         except WebFault as err:
             raise self._convert_webfault(err)
         finally:
