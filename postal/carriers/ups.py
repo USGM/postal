@@ -504,6 +504,44 @@ class UPSApi(Carrier):
 
         api_shipment = self._Ship.factory.create('ns3:ShipmentType')
 
+        shipper_charge = self._Ship.factory.create('ns3:ShipmentChargeType')
+        # A shipment charge type of 01 means Transportation is required.
+        #
+        # A shipment charge type of 02 means Duties and Taxes are not
+        # required; however, this charge type is invalid for Qualified Domestic
+        # Shipments. A Qualified Domestic Shipment is any shipment in which
+        # one of the following applies:
+        #
+        # 1) The origin and destination country
+        # is the same
+        # 2) US to PR shipment
+        # 3) PR to USshipment
+        # 4) The origin and destination country are both European Union
+        # Countries and the GoodsNotInFreeCirculation indicator is not
+        # present
+        # 5) The origin and destination IATA code is the same
+        shipper_charge.Type = '01'
+        shipper_charge.BillShipper.AccountNumber = self.shipper_number
+
+        api_shipment.PaymentInformation.ShipmentCharge = [shipper_charge]
+        if international:
+            api_shipment.ShipmentServiceOptions.InternationalForms \
+                .UserCreatedForm.DocumentID = \
+                self.upload_commercial_invoice(request)
+
+            if 'ups_duties_account' in request.extra_params:
+                receiver_charge = self._Ship.factory.create(
+                    'ns3:ShipmentChargeType')
+                #print  receiver_charge
+                receiver_charge.Type = '02'
+                receiver_charge.BillReceiver.AccountNumber = \
+                    request.extra_params['ups_duties_account']
+                receiver_charge.BillReceiver.Address.PostalCode = \
+                    request.destination.postal_code
+
+                api_shipment.PaymentInformation.ShipmentCharge.append(
+                    receiver_charge)
+
         if international and request.documents_only():
             api_shipment.DocumentsOnlyIndicator = ''
 
@@ -532,27 +570,6 @@ class UPSApi(Carrier):
             api_shipment.ShipFrom, origin, use_phone=True,
             use_attn=True, international=international)
 
-        shipper_charge = self._Ship.factory.create('ns3:ShipmentChargeType')
-        api_shipment.PaymentInformation.ShipmentCharge = [shipper_charge]
-
-        # A shipment charge type of 01 means Transportation is required.
-        #
-        # A shipment charge type of 02 means Duties and Taxes are not
-        # required; however, this charge type is invalid for Qualified Domestic
-        # Shipments. A Qualified Domestic Shipment is any shipment in which
-        # one of the following applies:
-        #
-        # 1) The origin and destination country
-        # is the same
-        # 2) US to PR shipment
-        # 3) PR to USshipment
-        # 4) The origin and destination country are both European Union
-        # Countries and the GoodsNotInFreeCirculation indicator is not
-        # present
-        # 5) The origin and destination IATA code is the same
-
-        shipper_charge.Type = '01'
-        shipper_charge.BillShipper.AccountNumber = self.shipper_number
 
         api_package = []
         api_product = []
@@ -601,11 +618,7 @@ class UPSApi(Carrier):
             bill_receiver.BillReceiver.AccountNumber = receiver_account_number
 
             form = api_shipment.ShipmentServiceOptions.InternationalForms
-            form.FormType = '01'
-            form.CurrencyCode = request.get_total_insured_value().currency
-            form.InvoiceDate = datetime.now().strftime('%Y%m%d')
-
-            form.Product = api_product
+            form.FormType = '07'
 
             # TODO: Should eventually be parameterized
             form.ReasonForExport = 'GIFT'

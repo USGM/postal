@@ -58,7 +58,7 @@ test_no_etd = {
     'contact_name': 'Amjad',
     'city': 'Bangkok',
     'country': 'TH',
-    'postal_code': '10001',
+    'postal_code': '10140',
     'phone_number': '5555555555'}
 
 
@@ -321,7 +321,7 @@ class TestCarrier(object):
     test_domestic_multiship = domestic(multiship)
     test_domestic_rate_ship_match = domestic(rate_ship_match)
     test_domestic_rate_ship_match_multiship = domestic(
-       rate_ship_match_multiship)
+        rate_ship_match_multiship)
     test_domestic_ship_documents = domestic(ship_documents)
     test_international_services = international(services)
     test_international_services_multiship = international(services_multiship)
@@ -332,5 +332,5 @@ class TestCarrier(object):
     test_international_multiship = international(multiship)
     test_international_rate_ship_match = international(rate_ship_match)
     test_international_rate_ship_match_multiship = international(
-       rate_ship_match_multiship)
+        rate_ship_match_multiship)
     test_international_ship_documents = international(ship_documents)
