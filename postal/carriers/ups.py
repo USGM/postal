@@ -293,6 +293,8 @@ class UPSApi(Carrier):
         if not test:
             self._Ship.set_options(
                 location='https://onlinetools.ups.com/webservices/Ship')
+            self._PaperlessDocumentAPI.set_options(location=
+                'https://filexfer.ups.com/webservices/PaperlessDocumentAPI')
 
         self._PaperlessDocumentAPI = self._create_client(
             'PaperlessDocumentAPI.wsdl', plugins=[authentication])
