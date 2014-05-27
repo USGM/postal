@@ -797,6 +797,9 @@ class UPSApi(Carrier):
         try:
             rates = self._RateWS.service.ProcessRate(
                 api_request, _pickup_type, _customer_classification, shipment)
+            with logger.lock:
+                logger.debug(self._RateWS.last_sent())
+                logger.debug(self._RateWS.last_received())
         except WebFault as err:
             raise self._convert_webfault(err)
 
