@@ -722,7 +722,7 @@ class UPSApi(Carrier):
             thread = Thread(target=self._task,
                             args=(request, rated_shipment, shipment_info))
             thread.start()
-            
+
         result = {}
         for _ in rates.RatedShipment:
             info = shipment_info.get()

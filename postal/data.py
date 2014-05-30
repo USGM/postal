@@ -185,16 +185,16 @@ class Request(object):
                 yield dec
 
     def _str(self):
-        origin = None
-        if self.origin:
-            origin = self.origin._str()
-        destination = None
-        if self.destination:
-            destination = self.destination._str()
+        extra_params = dict(self.extra_params)
+        if 'invoice' in extra_params:
+            extra_params['invoice'] = '[Invoice]'  # Fix for hanging tests
+
+        origin = self.origin and self.origin._str()
+        destination = self.destination and self.destination._str()
         return 'Request(\n  origin=\n%s\n  destination=\n%s\n  packages=%s' \
                '\n  ship_datetime=%s\n  extra_params=%s\n)' \
                % (origin, destination, self.packages, self.ship_datetime,
-                  self.extra_params)
+                  extra_params)
 
     def __str__(self):
         return self._str().encode('utf8')

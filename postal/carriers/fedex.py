@@ -635,7 +635,7 @@ class FedExApi(Carrier):
         if not sig:
             return None
         if not sig in ['Direct', 'Adult', 'Indirect']:
-            raise NotSupportedError("Signature type not supportedL %s." % sig)
+            raise NotSupportedError("Signature type not supported: %s." % sig)
         sig_option = client.factory.create('SignatureOptionDetail')
         sig_option.OptionType = sig.upper()
         return sig_option

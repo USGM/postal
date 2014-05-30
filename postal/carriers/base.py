@@ -61,9 +61,7 @@ class PostalLogger(object):
         self.logger.info(message)
 
     def debug_header(self, title):
-        self.debug(
-            ('='*10) + ' ' + str(self.carrier_name) + ': ' + str(title) + ' '
-            + ('='*10))
+        self.debug((" %s: %s " % (self.carrier_name, title)).center(50, "="))
 
     def error(self, message):
         self.logger.error(message)
