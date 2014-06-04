@@ -106,6 +106,10 @@ base_postal_configuration = {
         'USPS': {
             'account_id': 123456,
             'passphrase': 'password',
+            # If you have clearance to use IPA labels through a consolidator,
+            # set this to True to automatically convert eligible labels into
+            # IPA labels.
+            'ipa_convert': False,
             'requester_id': 123456,
             'token': 123456}}}
             # Like DHL, USPS uses the same credentials for both production and

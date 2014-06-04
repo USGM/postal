@@ -16,7 +16,6 @@ not have. Automatically refunding the packages would also be problematic, as
 the cause of the original problem might also prevent the refund working.
 """
 from collections import OrderedDict
-from copy import copy, deepcopy
 from pprint import pformat
 import random
 import re
@@ -55,6 +54,9 @@ class USPSApi(Carrier):
                                                  'International Service',
         'PriorityMailInternational': 'Priority Mail International'}
 
+    _IPA_services = [
+        'FirstClassMailInternational', 'FirstClassPackageInternationalService']
+
     _generic_package_translation = {
         'envelope': 'Flat',
         'softpak': 'Parcel',
@@ -87,12 +89,13 @@ class USPSApi(Carrier):
         'PriorityMailInternational': (6, 10)}
 
     def __init__(
-            self, account_id, passphrase, requester_id, test=True,
-            postal_configuration=None):
+            self, account_id, passphrase, requester_id, ipa_convert=False,
+            test=True, postal_configuration=None):
         super(USPSApi, self).__init__(postal_configuration)
         self.account_id = account_id
         self.passphrase = passphrase
         self.requester_id = requester_id
+        self.ipa_convert = ipa_convert
         self.postal_configuration = postal_configuration
 
         if test:
@@ -420,9 +423,19 @@ class USPSApi(Carrier):
             label_request.CustomsInfo.ContentsType = request.extra_params.get(
                 'purpose', 'Merchandise')
 
+    def ipa_shipment(self, request, service):
+        if not (service.service_id in self._IPA_services and self.ipa_convert):
+            return False
+        return request.extra_params.get('IPA', True)
+
     def ship_package(self, request, service, package):
         label_request = self.client.factory.create('LabelRequest')
-        label_request.MailClass = service.service_id
+        if self.ipa_shipment(request, service):
+            label_request.MailClass = 'IPA'
+            label_request.PrintConsolidatorLabel = 'TRUE'
+            label_request.IncludePostage = 'FALSE'
+        else:
+            label_request.MailClass = service.service_id
         label_request.PartnerTransactionID = self.ref_number()
         self._insurance_params(label_request, package)
         self._set_creds(label_request)
