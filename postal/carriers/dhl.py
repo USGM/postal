@@ -85,26 +85,37 @@ class DHLApi(Carrier):
 
     def __init__(
             self, account_number, region_code, company_name, site_id,
-            password, test_mode=False, postal_configuration=None):
+            password, test_mode=False, rates_url=None, insecure_rates=False,
+            postal_configuration=None):
         super(DHLApi, self).__init__(postal_configuration)
         self.site_id = site_id
         self.password = password
         self.account_number = account_number
         self.region_code = region_code
         self.company_name = company_name
+        self.insecure_rates = insecure_rates
 
         if test_mode:
             self.url = 'https://xmlpitest-ea.dhl.com/XMLShippingServlet'
         else:
             self.url = 'https://xmlpi-ea.dhl.com/XMLShippingServlet'
 
-    def make_call(self, call):
+        if not rates_url:
+            self.rates_url = self.url
+        else:
+            self.rates_url = rates_url
+
+    def make_call(self, call, rates=False):
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
             "Connection": "Close"}
+        if rates:
+            url = self.rates_url
+        else:
+            url = self.url
         try:
             response = post(
-                self.url, data=call, headers=headers,
+                url, data=call, headers=headers,
                 timeout=self.postal_configuration['timeout'])
             response.raise_for_status()
         except RequestException as err:
@@ -213,7 +224,7 @@ class DHLApi(Carrier):
             self.logger.debug_header('Get Services')
             self.logger.debug(request)
 
-        response = self.make_call(rate_request)[0][1]
+        response = self.make_call(rate_request, rates=True)[0][1]
         try:
             response_dict = self.response_to_dict(response.findall('QtdShp'))
         except:
@@ -254,14 +265,20 @@ class DHLApi(Carrier):
              'company_name': company_name},
             {'lines': lines})
 
-    def create_header(self):
+    def create_header(self, rates=False):
         message_time = self.make_datetime_string()
         message_reference = self.ref_number()
         template = load_template('dhl', 'header.xml')
+        if rates and self.insecure_rates:
+            site_id = 'XXX'
+            password = 'XXX'
+        else:
+            site_id = self.site_id
+            password = self.password
         return populate_template(template, {
             'message_time': message_time,
             'message_reference': message_reference,
-            'site_id': self.site_id, 'password': self.password})
+            'site_id': site_id, 'password': password})
 
     @staticmethod
     def timezone_offset():
@@ -332,7 +349,7 @@ class DHLApi(Carrier):
     def rates_request(self, request):
         origin = request.origin or self.postal_configuration['shipper_address']
 
-        request_header = self.create_header()
+        request_header = self.create_header(rates=True)
 
         pieces = self.enumerate_pieces('rates_piece.xml', request)
 
