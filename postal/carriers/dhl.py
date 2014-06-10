@@ -477,18 +477,17 @@ class DHLApi(Carrier):
         return labels
 
     def _ensure_supported(self, request):
-        if request.destination.country == (request.origin
-                or self.postal_configuration['shipper_address']).country:
+        if request.destination.country == self.get_origin(request).country:
             raise NotSupportedError("DHL does not support domestic shipments.")
 
         for pak in request.packages:
-            if (pak.package_type.carrier == None
-                and pak.package_type.code == 'envelope'
-                and pak.carrier_conversion
-               ) or (
-                pak.package_type.carrier == self
-                and pak.package_type.code == 'EE'
-               ):
+            envelope = all([pak.package_type.carrier is None,
+                            pak.package_type.code == 'envelope',
+                            pak.carrier_conversion])
+            express = all([pak.package_type.carrier == self,
+                           pak.package_type.code == 'EE'])
+
+            if envelope and express:
                 # express envelope or generic conversion to one
                 if pak.weight > .5:
                     raise NotSupportedError('DHL does not ship express '
