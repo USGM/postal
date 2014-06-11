@@ -494,6 +494,13 @@ class UPSApi(Carrier):
                 logger.debug(self._PaperlessDocumentAPI.last_sent())
                 logger.debug(self._PaperlessDocumentAPI.last_received())
 
+    def _convert_alert(self, alert):
+        if alert.Code == 120023:
+            return 'UPS does not support ETDs for this shipment. Attach a ' \
+                   'paper commercial invoice to this shipment.'
+        else:
+            return str(alert.Description)
+
     def ship(self, service, request, receiver_account_number=None):
         self._ensure_request_supported(request)
 
@@ -698,6 +705,11 @@ class UPSApi(Carrier):
         if response.Response.ResponseStatus.Code != '1':
             self._on_unknown_error()
 
+        alerts = []
+        if hasattr(response.Response, 'Alert'):
+            alerts = [self._convert_alert(alert)
+                      for alert in response.Response.Alert]
+
         master_tracking_number = \
             response.ShipmentResults.ShipmentIdentificationNumber
 
@@ -721,7 +733,8 @@ class UPSApi(Carrier):
 
         result = {'shipment': Shipment(self, master_tracking_number),
                   'packages': packages,
-                  'price': negotiated_rate}
+                  'price': negotiated_rate,
+                  'alerts': alerts}
 
         with logger.lock:
             logger.debug_header('Response')
