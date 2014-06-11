@@ -445,7 +445,8 @@ class FedExApi(Carrier):
         codes = self.rates_client.factory.create('CarrierCodeType')
         return [codes.FDXE, codes.FDXG]
 
-    def line_items(self, client, api_request, packages, sequence_num=None):
+    def line_items(self, client, api_request, packages, sequence_num=None,
+                   signature=None):
         commodities = False
         detail = api_request.CustomsClearanceDetail
         for index, package in enumerate(packages):
