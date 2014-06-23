@@ -458,7 +458,11 @@ class UPSApi(Carrier):
 
     @classmethod
     def _ensure_package_supported(cls, package):
-        if package.package_type.code not in ['01', 'envelope']:
+        if package.package_type.code == '01':
+            if package.weight > 1.5:
+                raise NotSupportedError('UPS does not ship express envelopes '
+                                        'that weigh more than 1.5 pounds.')
+        elif package.package_type.code != 'envelope':
             if cls.get_length_plus_girth(package) > 165:
                 raise NotSupportedError('UPS does not ship packages of '
                                         'that size.')
