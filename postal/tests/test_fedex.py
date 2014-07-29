@@ -87,5 +87,13 @@ class TestFedEx(TestCarrier, unittest.TestCase):
         self.assertTrue(response)
         response.keys()[0].ship(request)
 
+    def test_duties_account(self):
+        params = self.international_request.extra_params
+        params['fedex_duties_account'] = '510087968'
+        params['duties_address'] = Address(**test_from)
+        response = self.carrier.get_services(self.international_request)
+        self.assertTrue(response)
+        response.keys()[0].ship(self.international_request)
+
 if __name__ == '__main__':
     unittest.main()

@@ -353,7 +353,8 @@ class FedExApi(Carrier):
         api_request.PackageCount = len(request.packages)
         signature = self.sig_handler(request, self.ship_client)
         self.line_items(
-            self.ship_client, api_request, [package], sequence_num, signature)
+            self.ship_client, request, api_request, [package], sequence_num,
+            signature)
 
         return api_request
 
@@ -445,8 +446,8 @@ class FedExApi(Carrier):
         codes = self.rates_client.factory.create('CarrierCodeType')
         return [codes.FDXE, codes.FDXG]
 
-    def line_items(self, client, api_request, packages, sequence_num=None,
-                   signature=None):
+    def line_items(self, client, request, api_request, packages,
+                   sequence_num=None, signature=None):
         commodities = False
         detail = api_request.CustomsClearanceDetail
         for index, package in enumerate(packages):
@@ -507,7 +508,15 @@ class FedExApi(Carrier):
                 special_services.SpecialServiceTypes = types
                 special_services.SignatureOptionDetail = signature
         if commodities:
-            detail.DutiesPayment.PaymentType = 'RECIPIENT'
+            if 'fedex_duties_account' in request.extra_params:
+                detail.DutiesPayment.PaymentType = 'THIRD_PARTY'
+                party = detail.DutiesPayment.Payor.ResponsibleParty
+                self.set_address(party, request.extra_params.get(
+                    'duties_address', self.get_origin(request)))
+                party.AccountNumber = request.extra_params[
+                    'fedex_duties_account']
+            else:
+                detail.DutiesPayment.PaymentType = 'RECIPIENT'
 
     @staticmethod
     def set_address(target, address):
@@ -586,7 +595,7 @@ class FedExApi(Carrier):
 
         signature = self.sig_handler(request, self.rates_client)
         self.line_items(
-            self.rates_client, api_request, request.packages,
+            self.rates_client, request, api_request, request.packages,
             signature=signature)
         api_request.ShipTimestamp = request.ship_datetime
 
