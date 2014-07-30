@@ -1,19 +1,18 @@
-from collections import OrderedDict
 import inspect
-from math import ceil
 import os
-import base64
-from pprint import pformat
 import sys
 
+from base64 import b64decode
+from collections import OrderedDict
+from datetime import datetime
+from math import ceil
+from pprint import pformat
 from Queue import Queue
 from threading import Thread
-
-from datetime import datetime
 from io import BytesIO
 
+
 import PIL.Image
-from .base import Carrier, PostalLogger
 import suds.cache
 
 try:
@@ -25,6 +24,8 @@ from suds.client import Client
 from suds.plugin import MessagePlugin
 from suds.sax.element import Element
 from suds import WebFault
+
+from .base import Carrier, PostalLogger
 
 from ..data import Address, Shipment
 from ..exceptions import CarrierError, NotSupportedError, AddressError
@@ -257,10 +258,15 @@ class UPSApi(Carrier):
 
     def __init__(
             self, username, password, access_license_number, shipper_number,
-            test, auto_time_in_transit=True, postal_configuration=None):
+            test, auto_time_in_transit=True, paperless=True,
+            postal_configuration=None):
         super(UPSApi, self).__init__(postal_configuration)
         self.shipper_number = shipper_number
         self.auto_time_in_transit = auto_time_in_transit
+        if not test:
+            self.paperless = paperless
+        else:
+            self.paperless = False
 
         authentication = AuthenticationPlugin(
             username, password, access_license_number)
@@ -538,9 +544,10 @@ class UPSApi(Carrier):
 
         api_shipment.PaymentInformation.ShipmentCharge = [shipper_charge]
         if international:
-            api_shipment.ShipmentServiceOptions.InternationalForms \
-                .UserCreatedForm.DocumentID = \
-                self.upload_commercial_invoice(request)
+            if self.paperless:
+                api_shipment.ShipmentServiceOptions.InternationalForms \
+                    .UserCreatedForm.DocumentID = \
+                    self.upload_commercial_invoice(request)
 
             if 'ups_duties_account' in request.extra_params:
                 receiver_charge = self._Ship.factory.create(
@@ -549,8 +556,10 @@ class UPSApi(Carrier):
                 receiver_charge.Type = '02'
                 receiver_charge.BillReceiver.AccountNumber = \
                     request.extra_params['ups_duties_account']
+                duties_address = request.extra_params.get(
+                    'duties_address', origin)
                 receiver_charge.BillReceiver.Address.PostalCode = \
-                    request.destination.postal_code
+                    duties_address.postal_code
 
                 api_shipment.PaymentInformation.ShipmentCharge.append(
                     receiver_charge)
@@ -630,16 +639,17 @@ class UPSApi(Carrier):
             ### in order to acquire billing information.
             bill_receiver.BillReceiver.AccountNumber = receiver_account_number
 
-            form = api_shipment.ShipmentServiceOptions.InternationalForms
-            form.FormType = '07'
+            if self.paperless:
+                form = api_shipment.ShipmentServiceOptions.InternationalForms
+                form.FormType = '07'
 
-            # TODO: Should eventually be parameterized
-            form.ReasonForExport = 'GIFT'
+                # TODO: Should eventually be parameterized
+                form.ReasonForExport = 'GIFT'
 
-            self._populate_address(
-                form.Contacts.SoldTo,
-                request.destination, use_phone=True, use_attn=True,
-                international=True)
+                self._populate_address(
+                    form.Contacts.SoldTo,
+                    request.destination, use_phone=True, use_attn=True,
+                    international=True)
 
             descriptions = []
             for pack in request.packages:
@@ -724,7 +734,7 @@ class UPSApi(Carrier):
             label = pak.ShippingLabel.GraphicImage
             if isinstance(label, bytes):
                 label = label.decode('utf-8')
-            label = base64.b64decode(label)
+            label = b64decode(label)
             image = BytesIO(label)
             image = PIL.Image.open(image)
             image = image.transpose(PIL.Image.ROTATE_270)
