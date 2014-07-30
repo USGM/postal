@@ -549,7 +549,7 @@ class UPSApi(Carrier):
                     .UserCreatedForm.DocumentID = \
                     self.upload_commercial_invoice(request)
 
-            if 'ups_duties_account' in request.extra_params:
+            if request.extra_params.get('ups_duties_account', False):
                 receiver_charge = self._Ship.factory.create(
                     'ns3:ShipmentChargeType')
                 #print  receiver_charge
@@ -557,7 +557,7 @@ class UPSApi(Carrier):
                 receiver_charge.BillReceiver.AccountNumber = \
                     request.extra_params['ups_duties_account']
                 duties_address = request.extra_params.get(
-                    'duties_address', origin)
+                    'duties_address', request.destination)
                 receiver_charge.BillReceiver.Address.PostalCode = \
                     duties_address.postal_code
 
