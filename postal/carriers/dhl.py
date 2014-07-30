@@ -23,6 +23,7 @@ from base64 import b64decode
 from datetime import datetime
 from time import timezone
 from xml.etree.ElementTree import fromstring, tostring
+from xml.sax.saxutils import escape
 
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from dateutil.relativedelta import relativedelta
@@ -409,6 +410,7 @@ class DHLApi(Carrier):
         total_weight = sum([package.weight for package in request.packages])
 
         insured = request.get_total_insured_value()
+
         if request.documents_only():
             is_dutiable = 'N'
             commercial_invoice = ''
@@ -426,6 +428,15 @@ class DHLApi(Carrier):
                 commercial_invoice = ''
                 special_services = ''
 
+        if request.extra_params.get('dhl_duties_account', False):
+            duties_payment = 'T'
+            duties_account = (
+                '<DutyAccountNumber>%s</DutyAccountNumber>'
+                % escape(request.extra_params['dhl_duties_account']))
+        else:
+            duties_payment = 'R'
+            duties_account = ''
+
         escape_variables = {
             'origin_country': origin.country.alpha2,
             'origin_postal_code': origin.postal_code,
@@ -439,6 +450,7 @@ class DHLApi(Carrier):
             'default_currency': self.postal_configuration['default_currency'],
             'contents': self.contents(request),
             'is_dutiable': is_dutiable,
+            'duties_payment': duties_payment,
             'product_code': service.service_id}
         non_escape_variables = {
             'origin_address': origin_address,
@@ -449,6 +461,7 @@ class DHLApi(Carrier):
             'insured_amount': insured.amount.quantize(TWOPLACES),
             'insured_currency': insured.currency,
             'commercial_invoice': commercial_invoice,
+            'duties_account': duties_account,
             'special_services': special_services}
 
         request = populate_template(
