@@ -508,11 +508,11 @@ class FedExApi(Carrier):
                 special_services.SpecialServiceTypes = types
                 special_services.SignatureOptionDetail = signature
         if commodities:
-            if 'fedex_duties_account' in request.extra_params:
+            if request.extra_params.get('fedex_duties_account', False):
                 detail.DutiesPayment.PaymentType = 'THIRD_PARTY'
                 party = detail.DutiesPayment.Payor.ResponsibleParty
                 self.set_address(party, request.extra_params.get(
-                    'duties_address', self.get_origin(request)))
+                    'duties_address', request.destination))
                 party.AccountNumber = request.extra_params[
                     'fedex_duties_account']
             else:
