@@ -281,12 +281,16 @@ class FedExApi(Carrier):
         output.write(output_stream)
         return output_stream.getvalue()
 
-    def upload_commercial_invoice(self, request):
+    def upload_commercial_invoice(self, request, service):
         origin = self.get_origin(request)
-        if request.documents_only():
-            return None
         if not request.international(origin=origin):
             return None
+        if request.documents_only() and (
+                not service.service_id == 'FEDEX_GROUND'):
+            return None
+        if not request.all_declarations():
+            raise NotSupportedError(
+                "This shipment requires Declarations.", code=404)
         invoice = self.commercial_invoice(request)
         if PY3:
             invoice = invoice.encode('utf-8')
@@ -310,7 +314,7 @@ class FedExApi(Carrier):
                 raise NotSupportedError(
                     "ETDs aren't supported for either the source or the "
                     "destination country. Please print a commercial invoice "
-                    "for this shipment.")
+                    "for this shipment.", code=1200)
             raise err
 
     def requested_shipment(
@@ -381,8 +385,10 @@ class FedExApi(Carrier):
         invoice = None
 
         try:
-            invoice = self.upload_commercial_invoice(request)
+            invoice = self.upload_commercial_invoice(request, service)
         except NotSupportedError as err:
+            if err.code == 404:
+                raise
             alerts.append(str(err))
         if invoice:
             self.set_commercial_invoice(invoice, requested_shipment)
