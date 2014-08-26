@@ -10,7 +10,7 @@ cwd = os.path.split(os.path.abspath(
 def load_template(namespace, name):
     template_name = os.path.join(cwd, namespace, name)
     f = open(template_name)
-    text = f.read()
+    text = f.read().decode('utf-8')
     f.close()
     return text
 
@@ -18,7 +18,7 @@ def load_template(namespace, name):
 def populate_template(template, escape_variables, no_escape_variables=None):
     variables = {
         name: escape(
-            str(variable)) for name, variable in escape_variables.items()}
+            u"%s" % variable) for name, variable in escape_variables.items()}
     if no_escape_variables:
         variables.update(no_escape_variables)
 
