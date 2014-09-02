@@ -15,7 +15,6 @@ else:
         'suds>=0.4', 'python-money>=0.5', 'PyPDF2==1.19', 'Pillow>=2.2.1',
         'requests>=2.0.1', 'python-money>=0.5', 'pycountry>=1.2',
         'python-dateutil>=2.1']
-    dependency_links = ['https://github.com/USGM/PyPDF2/tarball/master#egg=PyPDF2-1.19']
 
 def get_data_files():
     paths = [
