@@ -41,7 +41,6 @@ setup(
     use_2to3=True,
     license='None',
     install_requires=install_requires,
-    dependency_links=dependency_links,
     packages=find_packages(),
     zip_safe=False,
     data_files=get_data_files(),
