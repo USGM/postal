@@ -10,10 +10,6 @@ if PY3:
         'PyPDF2', 'Pillow>=2.2.1',
         'requests>=2.0.1', 'pycountry>=1.2',
         'python-dateutil>=2.1', 'python-money', 'suds==0.5.1']
-    dependency_links = [
-        'https://github.com/USGM/PyPDF2/tarball/master#egg=PyPDF2-1.19',
-        'https://github.com/USGM/python-money/tarball/master#egg=python-money-0.5.1',
-        'https://github.com/USGM/suds/tarball/master#egg=suds-0.5.1']
 else:
     install_requires=[
         'suds>=0.4', 'python-money>=0.5', 'PyPDF2==1.19', 'Pillow>=2.2.1',
