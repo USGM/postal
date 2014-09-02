@@ -6,6 +6,8 @@ from collections import OrderedDict
 from datetime import datetime
 from math import ceil
 from pprint import pformat
+import warnings
+from PyPDF2.utils import PdfReadWarning
 
 from money import Money
 from PyPDF2 import PdfFileReader, PdfFileWriter
@@ -20,6 +22,7 @@ from io import BytesIO
 
 
 logger = PostalLogger(carrier_name='FedEx')
+warnings.filterwarnings("ignore", category=PdfReadWarning)
 
 
 class FedExApi(Carrier):
@@ -271,6 +274,7 @@ class FedExApi(Carrier):
             label = label.decode('utf-8')
         label = b64decode(label)
         input = PdfFileReader(BytesIO(label))
+        input.strict = False
         output = PdfFileWriter()
 
         page = input.getPage(0)
