@@ -95,5 +95,12 @@ class TestFedEx(TestCarrier, unittest.TestCase):
         self.assertTrue(response)
         response.keys()[0].ship(self.international_request)
 
+    def test_signature_confiramtion(self):
+        params = self.domestic_request.extra_params
+        params['signature_required'] = 'Adult'
+        response = self.carrier.get_services(self.domestic_request)
+        self.assertTrue(response)
+        response.keys()[0].ship(self.domestic_request)
+
 if __name__ == '__main__':
     unittest.main()

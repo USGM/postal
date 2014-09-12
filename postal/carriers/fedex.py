@@ -359,10 +359,9 @@ class FedExApi(Carrier):
                 [pack.weight for pack in request.packages])
             api_request.TotalWeight.Units = 'LB'
         api_request.PackageCount = len(request.packages)
-        signature = self.sig_handler(request, self.ship_client)
+
         self.line_items(
-            self.ship_client, request, api_request, [package], sequence_num,
-            signature)
+            self.ship_client, request, api_request, [package], sequence_num)
 
         return api_request
 
@@ -457,7 +456,7 @@ class FedExApi(Carrier):
         return [codes.FDXE, codes.FDXG]
 
     def line_items(self, client, request, api_request, packages,
-                   sequence_num=None, signature=None):
+                   sequence_num=None):
         commodities = False
         detail = api_request.CustomsClearanceDetail
         for index, package in enumerate(packages):
@@ -466,6 +465,7 @@ class FedExApi(Carrier):
             item.GroupNumber = 1
             item.GroupPackageCount = 1
             item.Weight.Units.value = 'LB'
+            self.sig_handler(request, item)
 
             # FedEx seems to have an internal error when there are too many
             # decimal digits and it raises a more intelligent error when
@@ -508,15 +508,7 @@ class FedExApi(Carrier):
                 detail.CustomsValue.Amount = '1.00'
             else:
                 commodities = True
-            if signature:
-                special_services = api_request.SpecialServicesRequested
-                types = special_services.SpecialServiceTypes
-                if types:
-                    types.append('SIGNATURE_OPTION')
-                else:
-                    types = ['SIGNATURE_OPTION']
-                special_services.SpecialServiceTypes = types
-                special_services.SignatureOptionDetail = signature
+
         if commodities:
             if request.extra_params.get('fedex_duties_account', False):
                 detail.DutiesPayment.PaymentType = 'THIRD_PARTY'
@@ -603,17 +595,10 @@ class FedExApi(Carrier):
         else:
             api_request.PackagingType = 'YOUR_PACKAGING'
 
-        signature = self.sig_handler(request, self.rates_client)
         self.line_items(
-            self.rates_client, request, api_request, request.packages,
-            signature=signature)
-        api_request.ShipTimestamp = request.ship_datetime
+            self.rates_client, request, api_request, request.packages)
 
-        signature = self.sig_handler(request, self.ship_client)
-        special_services = api_request.SpecialServicesRequested
-        if signature:
-            special_services.SpecialServicesTypes = ['SIGNATURE_OPTION']
-            special_services.SignatureOptionDetail = signature
+        api_request.ShipTimestamp = request.ship_datetime
 
         return api_request
 
@@ -647,15 +632,16 @@ class FedExApi(Carrier):
                     method, 'DeliveryTimestamp', None)}
             for method in response.RateReplyDetails}
 
-    def sig_handler(self, request, client):
+    @staticmethod
+    def sig_handler(request, item):
         sig = request.extra_params.get('signature_required', None)
         if not sig:
-            return None
+            return
         if not sig in ['Direct', 'Adult', 'Indirect']:
             raise NotSupportedError("Signature type not supported: %s." % sig)
-        sig_option = client.factory.create('SignatureOptionDetail')
-        sig_option.OptionType = sig.upper()
-        return sig_option
+        special_services = item.SpecialServicesRequested
+        special_services.SpecialServiceTypes = ['SIGNATURE_OPTION']
+        special_services.SignatureOptionDetail.OptionType = sig.upper()
 
     def get_services(self, request):
         """
