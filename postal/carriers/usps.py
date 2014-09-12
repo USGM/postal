@@ -166,8 +166,7 @@ class USPSApi(Carrier):
     @staticmethod
     def _get_price(rate):
         postage = rate._TotalAmount
-        fees = rate.Fees._TotalAmount
-        price = Money(postage, 'USD') + Money(fees, 'USD')
+        price = Money(postage, 'USD')
         price.amount = price.amount.quantize(TWOPLACES)
         return price
 
