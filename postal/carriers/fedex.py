@@ -509,7 +509,7 @@ class FedExApi(Carrier):
             else:
                 commodities = True
             if signature:
-                special_services = item.SpecialServicesRequested
+                special_services = api_request.SpecialServicesRequested
                 types = special_services.SpecialServiceTypes
                 if types:
                     types.append('SIGNATURE_OPTION')
