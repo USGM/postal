@@ -226,10 +226,12 @@ class USPSApi(Carrier):
     @staticmethod
     def _signature_params(api_request, request):
         signature = request.extra_params.get('signature_required', '')
-        if signature.lower() == 'adult':
+        if signature == 'Adult':
             api_request.Services._AdultSignature = 'ON'
-        elif signature.lower() == 'direct':
+        elif signature == 'Direct':
             api_request.Services._AdultSignatureRestrictedDelivery = 'ON'
+        elif signature == 'Indirect':
+            api_request.Services._SignatureConfirmation = 'ON'
 
 
     @staticmethod
