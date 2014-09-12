@@ -225,6 +225,15 @@ class USPSApi(Carrier):
         api_request.InsuredValue = package.get_total_insured_value().amount
 
     @staticmethod
+    def _signature_params(api_request, request):
+        signature = request.extra_params.get('signature_required', '')
+        if signature.lower() == 'adult':
+            api_request.Services._AdultSignature = 'ON'
+        elif signature.lower() == 'direct':
+            api_request.Services._AdultSignatureRestrictedDelivery = 'ON'
+
+
+    @staticmethod
     def _format_phone(phone_number):
         phone_number = re.sub('[^\d]', '', phone_number)
         if phone_number[0] == '1':
@@ -438,6 +447,7 @@ class USPSApi(Carrier):
             label_request.MailClass = service.service_id
         label_request.PartnerTransactionID = self.ref_number()
         self._insurance_params(label_request, package)
+        self._signature_params(label_request, request)
         self._set_creds(label_request)
         self._set_address_info(label_request, request)
         label_request._ImageFormat = 'PDF'
@@ -612,6 +622,7 @@ class USPSApi(Carrier):
             self._set_dims(postage_request, package, softpack_convert=False)
             self._set_address_info(postage_request, request, short=True)
             self._set_creds(postage_request, inset=True)
+            self._signature_params(postage_request, request)
             self._insurance_params(postage_request, package)
             postage_request.DeliveryTimeDays = "TRUE"
             response = self.service_call(
