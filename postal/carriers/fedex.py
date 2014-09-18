@@ -335,6 +335,7 @@ class FedExApi(Carrier):
         api_request.ShipTimestamp = request.ship_datetime or datetime.now()
         api_request.ServiceType = service.service_id
         api_request.DropoffType = 'REGULAR_PICKUP'
+        self.set_saturday_delivery(request, api_request)
         if len(request.packages) == 1:
             api_request.PackagingType = self._get_internal_package_type_code(
                 package.package_type, to_proprietary=package.carrier_conversion
@@ -367,7 +368,9 @@ class FedExApi(Carrier):
 
     def set_commercial_invoice(self, invoice, api_request):
         services = api_request.SpecialServicesRequested
-        services.SpecialServiceTypes = ['ELECTRONIC_TRADE_DOCUMENTS']
+        types = services.SpecialServiceTypes or []
+        types.append('ELECTRONIC_TRADE_DOCUMENTS')
+        services.SpecialServiceTypes = types
         invoice = invoice.DocumentStatuses[0].DocumentId
         reference = self.ship_client.factory.create(
             'UploadDocumentReferenceDetail')
@@ -375,6 +378,16 @@ class FedExApi(Carrier):
         reference.DocumentType = 'COMMERCIAL_INVOICE'
         reference.DocumentId = invoice
         etd.DocumentReferences = [reference]
+
+    @staticmethod
+    def set_saturday_delivery(request, api_request):
+        if not request.extra_params.get('saturday_delivery', False):
+            return
+        services = api_request.SpecialServicesRequested
+        types = services.SpecialServiceTypes or []
+        types.append('SATURDAY_DELIVERY')
+        services.SpecialServiceTypes = types
+        print "Added SATURDAY_DELIVERY!"
 
     def ship(self, service, request):
         self._ensure_supported(request)
@@ -585,6 +598,7 @@ class FedExApi(Carrier):
         origin = request.origin or self.postal_configuration['shipper_address']
         self.set_address(api_request.Shipper, origin)
         self.set_address(api_request.Recipient, request.destination)
+        self.set_saturday_delivery(request, api_request)
 
         api_request.RateRequestTypes = 'ACCOUNT'
         api_request.PackageCount = len(request.packages)
