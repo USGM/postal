@@ -511,6 +511,12 @@ class UPSApi(Carrier):
         else:
             return str(alert.Description)
 
+    @staticmethod
+    def saturday_delivery_handler(request, api_shipment):
+        if not request.extra_params.get('saturday_delivery', False):
+            return
+        api_shipment.ShipmentServiceOptions.SaturdayDeliveryIndicator = ''
+
     def ship(self, service, request, receiver_account_number=None):
         self._ensure_request_supported(request)
 
@@ -541,6 +547,8 @@ class UPSApi(Carrier):
         # 5) The origin and destination IATA code is the same
         shipper_charge.Type = '01'
         shipper_charge.BillShipper.AccountNumber = self.shipper_number
+
+        self.saturday_delivery_handler(request, api_shipment)
 
         api_shipment.PaymentInformation.ShipmentCharge = [shipper_charge]
         if international:
@@ -840,6 +848,8 @@ class UPSApi(Carrier):
 
         shipment = self._RateWS.factory.create('ns2:ShipmentType')
         shipment.ShipmentRatingOptions.NegotiatedRatesIndicator = ''
+
+        self.saturday_delivery_handler(request, shipment)
 
         if request.documents_only():
             shipment.DocumentsOnlyIndicator = ''
