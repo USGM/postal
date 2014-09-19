@@ -5,13 +5,14 @@ shipments.
 from decimal import Decimal
 from datetime import datetime
 from money import Money
-from pycountry import countries
+from pycountry import countries, subdivisions
 try:
     import money
 except ImportError:
     import Money
 
 from exceptions import AddressError
+
 
 TWOPLACES = Decimal('0.01')  # used by DHL
 
@@ -21,6 +22,18 @@ def get_country(country_code):
         return countries.get(alpha2=country_code)
     except KeyError:
         raise AddressError('"%s" is not a valid country code.' % country_code)
+
+subdivision_map = {
+    country.alpha2:
+        {subdivision.code[3:]: subdivision.name
+            for subdivision in subdivisions.get(
+                country_code=country.alpha2)}
+            if country.alpha2 in subdivisions.indices['country_code']
+                else {}
+    for country in countries.objects}
+
+for code in ('AE', 'AA', 'AP'):
+    subdivision_map['US']['US-' + code] = code
 
 
 def stack_values(iter, func_name):

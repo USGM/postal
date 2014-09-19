@@ -1,9 +1,11 @@
+# coding=utf-8
 import unittest
 from unittest import SkipTest
 
 from money import Money
 from base import TestCarrier, domestic, international
 from ..carriers.usps import USPSApi
+from postal import Address
 from postal.carriers import Carrier
 
 
@@ -34,6 +36,19 @@ class TestUSPS(TestCarrier, unittest.TestCase):
         services = self.carrier.get_services(self.request)
         sdict = services.keys()[0].ship(self.request)
         self.shipment_dict_check(sdict)
+
+    def test_number_subdivision(self):
+        destination = Address(contact_name='Someone',
+                              street_lines=['6 Someplace'],
+                              city=u'Nüziders',
+                              phone_number='5555555555',
+                              subdivision='8',
+                              postal_code='6714',
+                              country='AU')
+        self.international_request.destination = destination
+        result = self.carrier.get_services(self.international_request)
+        self.assertTrue(result)
+
 
     test_domestic_softpack = domestic(softpack)
     test_international_softpack = international(softpack)

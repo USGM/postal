@@ -31,7 +31,8 @@ from suds.client import Client
 
 from base import Carrier, ClearEmpty, PY3, PostalLogger
 from ..exceptions import CarrierError, NotSupportedError
-from ..data import Shipment, sigfig, TWOPLACES, Declaration
+from ..data import Shipment, sigfig, TWOPLACES, Declaration, subdivision_map
+
 
 logger = PostalLogger('USPS')
 
@@ -236,6 +237,7 @@ class USPSApi(Carrier):
 
     @staticmethod
     def _format_phone(phone_number):
+        print phone_number
         phone_number = re.sub('[^\d]', '', phone_number)
         if phone_number[0] == '1':
             phone_number = phone_number[1:]
@@ -261,6 +263,18 @@ class USPSApi(Carrier):
                 raise NotSupportedError("USPS cannot take more than 3 address "
                                         "lines.")
             setattr(api_request, '%sAddress%s' % (prefix, line_num), line)
+
+    @staticmethod
+    def convert_state(address):
+        state = address.subdivision.upper()
+        try:
+            int(state)
+        except ValueError:
+            return state
+        try:
+            return subdivision_map[address.country.alpha2][state]
+        except KeyError:
+            return state
 
     def _set_address_info(self, api_request, request, short=False):
         origin = self.get_origin(request)
@@ -289,12 +303,12 @@ class USPSApi(Carrier):
                 api_request.MailClass = 'Domestic'
             return
         if origin.subdivision:
-            from_state = origin.subdivision.upper()
+            from_state = self.convert_state(origin)
         else:
             from_state = None
 
         if request.destination.subdivision:
-            to_state = request.destination.subdivision.upper()
+            to_state = self.convert_state(request.destination)
         else:
             to_state = None
 

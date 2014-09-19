@@ -110,6 +110,8 @@ class DHLApi(Carrier):
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
             "Connection": "Close"}
+        call = u'%s' % call
+        call = call.encode('utf-8')
         if rates:
             url = self.rates_url
         else:
