@@ -237,7 +237,6 @@ class USPSApi(Carrier):
 
     @staticmethod
     def _format_phone(phone_number):
-        print phone_number
         phone_number = re.sub('[^\d]', '', phone_number)
         if phone_number[0] == '1':
             phone_number = phone_number[1:]
@@ -268,13 +267,9 @@ class USPSApi(Carrier):
     def convert_state(address):
         state = address.subdivision.upper()
         try:
-            int(state)
-        except ValueError:
-            return state
-        try:
             return subdivision_map[address.country.alpha2][state]
         except KeyError:
-            return state
+            return address.subdivision
 
     def _set_address_info(self, api_request, request, short=False):
         origin = self.get_origin(request)
