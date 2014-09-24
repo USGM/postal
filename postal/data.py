@@ -33,12 +33,12 @@ subdivision_map = {
     for country in countries.objects}
 
 for code in ('AE', 'AA', 'AP'):
-    subdivision_map['US']['US-' + code] = code
+    subdivision_map['US'][code] = code
 
 
-def stack_values(iter, func_name):
+def stack_values(iterable, func_name):
     result = 0
-    for item in iter:
+    for item in iterable:
         result += getattr(item, func_name)()
     if result == 0:
         return money.Money(0, 'USD')  # so as not to break interface
