@@ -512,6 +512,22 @@ class UPSApi(Carrier):
             return str(alert.Description)
 
     @staticmethod
+    def _set_signature(request, api_shipment):
+        signature_required = request.extra_params.get(
+            'signature_required', None)
+        if signature_required:
+            for package in api_shipment.Package:
+                confirm = package.PackageServiceOptions.DeliveryConfirmation
+                if signature_required == 'Adult':
+                    confirm.DCISType = 2
+                elif signature_required == 'Indirect':
+                    confirm.DCISType = 1
+                else:
+                    raise NotSupportedError('UPS does not support that signature '
+                                            'confirmation method - only indirect '
+                                            'and adult-only.')
+
+    @staticmethod
     def saturday_delivery_handler(request, api_shipment):
         if not request.extra_params.get('saturday_delivery', False):
             return
@@ -676,26 +692,7 @@ class UPSApi(Carrier):
             ### UPS does not allow descriptions longer than 50 characters.
             api_shipment.Description = description[0:50]
 
-        ### signature requirement upon receipt
-        # Valid values are: 1 -
-        # Delivery Confirmation
-        # Signature Required 2 -
-        # Delivery Confirmation
-        # Adult Signature
-        # Required. Forwards
-        # Only
-        signature_required = request.extra_params.get(
-            'signature_required', None)
-        if signature_required:
-            confirm = api_shipment.ShipmentServiceOptions.DeliveryConfirmation
-            if signature_required == 'Adult':
-                confirm.DCISType = 2
-            elif signature_required == 'Indirect':
-                confirm.DCISType = 1
-            else:
-                raise NotSupportedError('UPS does not support that signature '
-                                        'confirmation method - only indirect '
-                                        'and adult-only.')
+        self._set_signature(request, api_shipment)
 
         label_spec = self._Ship.factory.create('ns3:LabelSpecificationType')
         label_spec.LabelImageFormat.Code = 'GIF'
@@ -876,6 +873,8 @@ class UPSApi(Carrier):
             self._populate_package(pak, package)
             paks.append(pak)
         shipment.Package = paks
+
+        self._set_signature(request, shipment)
 
         try:
             rates = self._RateWS.service.ProcessRate(

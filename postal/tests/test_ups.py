@@ -22,39 +22,32 @@ class TestUPS(TestCarrier, unittest.TestCase):
     test_domestic_rate_ship_match = skipper
 
     def test_adult_signature(self):
-        try:
-            self.carrier.get_service('03').ship(Request(
-                Address(**{
-                    'street_lines': ['1321 Upland Drive'],
-                    'contact_name': 'Jonathan Piacenti',
-                    'city': 'Houston',
-                    'postal_code': '77043',
-                    'phone_number': '18665968965',
-                    'subdivision': 'TX',
-                    'country': 'US'
-                }),
-                Address(
-                    contact_name='TEST',
-                    phone_number='0000000000',
-                    street_lines=['DO NOT SHIP'],
-                    city='MCLEAN',
-                    subdivision='VA',
-                    postal_code='22102',
-                    country='US',
-                    residential=True
-                ),
-                [
-                    Package(1, 1, 1, 1, Carrier.GENERIC_PACKAGE, carrier_conversion=False, declarations=[
-                        Declaration('your faec', Money('1000', 'USD'), 'US', 1, insure=True),
-                    ], documents_only=False)
-                ],
-                extra_params={'UPS': {'signature': 'Adult'}}
-            ))
-        except NotSupportedError as err:
-            if err.code == '121211':  # invalid accessory option
-                return
-            else:
-                raise
+        from_address = Address(
+                street_lines=['1321 Upland Drive'],
+                contact_name='Jonathan Piacenti',
+                city='Houston',
+                postal_code='77043',
+                phone_number='18665968965',
+                subdivision='TX',
+                country='US')
+        to_address = Address(
+                street_lines=['1730 Mustang Trail'],
+                contact_name='Jonathan Piacenti',
+                city='Kingwood',
+                postal_code='77339',
+                phone_number='18665968965',
+                subdivision='TX',
+                country='US')
+        declaration = Declaration('Test Declaration',
+                                  Money('1000', 'USD'), 'US', 1, insure=True)
+        package = Package(1, 1, 1, 1, Carrier.GENERIC_PACKAGE, 
+                          carrier_conversion=False,
+                          declarations=[declaration],
+                          documents_only=False)
+        extra_params={'signature_required': 'Adult'}
+        request = Request(from_address, to_address, packages=[package],
+                          extra_params=extra_params)
+        self.carrier.get_service('03').ship(request)
 
 if __name__ == '__main__':
     unittest.main()
