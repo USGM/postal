@@ -586,7 +586,7 @@ class FedExApi(Carrier):
             total_value += value
         api_request.CustomsClearanceDetail.Commodities.extend(commodities)
         value = api_request.CustomsClearanceDetail.CustomsValue
-        if value.Amount is None:
+        if not value.Amount:
             value.Amount = 0
         value.Amount += total_value.amount
         value.Currency = total_value.currency
