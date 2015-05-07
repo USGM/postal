@@ -236,14 +236,15 @@ class USPSApi(Carrier):
 
 
     @staticmethod
-    def _format_phone(phone_number):
+    def _format_phone(phone_number, international=False):
         phone_number = re.sub('[^\d]', '', phone_number)
         if phone_number[0] == '1':
             phone_number = phone_number[1:]
-        phone_number = phone_number[:10]
-        if len(phone_number) != 10:
-            raise NotSupportedError('USPS requires a standard US 10 digit '
-                                    'phone number.')
+        if not international:
+            phone_number = phone_number[:10]
+            if len(phone_number) != 10:
+                raise NotSupportedError('USPS requires a standard US 10 digit '
+                                        'phone number.')
         return phone_number
 
     @staticmethod
@@ -271,7 +272,7 @@ class USPSApi(Carrier):
         except KeyError:
             return address.subdivision
 
-    def _set_address_info(self, api_request, request, short=False):
+    def _set_address_info(self, api_request, request, short=False, label=False):
         origin = self.get_origin(request)
 
         # Endicia doesn't support US postal code extensions
@@ -294,8 +295,14 @@ class USPSApi(Carrier):
             if request.international(origin):
                 api_request.MailClass = 'International'
                 api_request.ToCountryCode = request.destination.country.alpha2
+                if label:
+                    api_request.ToPhone = self._format_phone(
+                        request.destination.phone_number, international=True)
             else:
                 api_request.MailClass = 'Domestic'
+                if label:
+                    api_request.ToPhone = self._format_phone(
+                        request.destination.phone_number)
             return
         if origin.subdivision:
             from_state = self.convert_state(origin)
@@ -459,7 +466,7 @@ class USPSApi(Carrier):
         self._insurance_params(label_request, package)
         self._signature_params(label_request, request)
         self._set_creds(label_request)
-        self._set_address_info(label_request, request)
+        self._set_address_info(label_request, request, label=True)
         label_request._ImageFormat = 'PDF'
         label_format = self._label_type(request, service, package)
         if request.international(origin=self.get_origin(request)):

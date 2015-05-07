@@ -41,7 +41,7 @@ class TestUSPS(TestCarrier, unittest.TestCase):
         destination = Address(contact_name='Someone',
                               street_lines=['6 Someplace'],
                               city=u'Nüziders',
-                              phone_number='5555555555',
+                              phone_number='5555555555888884444333',
                               subdivision='8',
                               postal_code='6714',
                               country='AU')
