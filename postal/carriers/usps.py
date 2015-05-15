@@ -304,6 +304,9 @@ class USPSApi(Carrier):
                     api_request.ToPhone = self._format_phone(
                         request.destination.phone_number)
             return
+        if label:
+            api_request.ToPhone = self._format_phone(
+                request.destination.phone_number, international=request.international(origin))
         if origin.subdivision:
             from_state = self.convert_state(origin)
         else:
