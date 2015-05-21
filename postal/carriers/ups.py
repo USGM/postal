@@ -465,9 +465,9 @@ class UPSApi(Carrier):
     @classmethod
     def _ensure_package_supported(cls, package):
         if package.package_type.code == '01':
-            if package.weight > 1.5:
+            if package.weight > 5:
                 raise NotSupportedError('UPS does not ship express envelopes '
-                                        'that weigh more than 1.5 pounds.')
+                                        'that weigh more than 5 pounds.')
         elif package.package_type.code != 'envelope':
             if cls.get_length_plus_girth(package) > 165:
                 raise NotSupportedError('UPS does not ship packages of '
@@ -1129,7 +1129,10 @@ class UPSApi(Carrier):
 
         api_package.PackageWeight.UnitOfMeasurement.Code = 'LBS'
 
-        api_package.PackageWeight.Weight = '%.1f' % max(.1, package.weight)
+        if packaging_code == '01' and package.weight > .5:
+            api_package.PackageWeight.Weight = '.5'
+        else:
+            api_package.PackageWeight.Weight = '%.1f' % max(.1, package.weight)
 
         if self.is_large(package):
             # Make sure this tag shows up.
