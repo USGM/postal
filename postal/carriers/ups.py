@@ -568,7 +568,7 @@ class UPSApi(Carrier):
 
         api_shipment.PaymentInformation.ShipmentCharge = [shipper_charge]
         if international:
-            if self.paperless:
+            if self.paperless and not request.documents_only():
                 api_shipment.ShipmentServiceOptions.InternationalForms \
                     .UserCreatedForm.DocumentID = \
                     self.upload_commercial_invoice(request)
@@ -663,7 +663,7 @@ class UPSApi(Carrier):
             ### in order to acquire billing information.
             bill_receiver.BillReceiver.AccountNumber = receiver_account_number
 
-            if self.paperless:
+            if self.paperless and not request.documents_only():
                 form = api_shipment.ShipmentServiceOptions.InternationalForms
                 form.FormType = '07'
 
