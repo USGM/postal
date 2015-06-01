@@ -589,7 +589,9 @@ class UPSApi(Carrier):
                     receiver_charge)
 
         if international and request.documents_only():
-            api_shipment.DocumentsOnlyIndicator = ''
+            if (not origin.country.alpha2 == 'US') and (
+                    request.destination.country.alpha2 not in ['CA', 'MX', 'PR']):
+                api_shipment.DocumentsOnlyIndicator = ''
 
         api_shipment.ShipmentRatingOptions.NegotiatedRatesIndicator = ''
         api_shipment.Service.Code = service.service_id
