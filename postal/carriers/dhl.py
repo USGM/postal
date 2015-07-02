@@ -127,7 +127,7 @@ class DHLApi(Carrier):
         self.logger.sent(call)
         self.logger.received(response.text)
 
-        root = fromstring(response.text)
+        root = fromstring(u'%s' % response.text)
         # DHL has about three or four ways to send an error message.
         response = root
         response_tag = response.find('Response')
