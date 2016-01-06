@@ -173,8 +173,14 @@ class Carrier(object):
             else:
                 raise CarrierError(repr(err))
         finally:
-            self.logger.sent(func.client.last_sent())
-            self.logger.received(func.client.last_received())
+            try:
+                self.logger.sent(func.client.last_sent())
+            except AttributeError:
+                self.logger.sent("Nothing sent!")
+            try:
+                self.logger.received(func.client.last_received())
+            except AttributeError:
+                self.logger.received("Nothing received!")
 
     @classmethod
     def service_url(cls, wsdl_name):

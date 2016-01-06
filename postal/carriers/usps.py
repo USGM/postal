@@ -100,8 +100,8 @@ class USPSApi(Carrier):
         self.postal_configuration = postal_configuration
 
         if test:
-            url = 'https://www.envmgr.com/LabelService/EwsLabelService.' \
-                  'asmx?WSDL'
+            url = 'https://elstestserver.endicia.com/LabelService/' \
+                  'EwsLabelService.asmx?WSDL'
         else:
             url = 'https://labelserver.endicia.com/LabelService/' \
                   'EwsLabelService.asmx?WSDL'
@@ -112,8 +112,14 @@ class USPSApi(Carrier):
         try:
             response = super(USPSApi, self).service_call(func, *args, **kwargs)
         finally:
-            logger.sent(self.client.last_sent())
-            logger.received(self.client.last_received())
+            try:
+                logger.sent(self.client.last_sent())
+            except AttributeError:
+                logger.sent("Nothing sent!")
+            try:
+                logger.received(self.client.last_received())
+            except AttributeError:
+                logger.received("Nothing received!")
 
         try:
             if response.Status != 0:
@@ -400,9 +406,16 @@ class USPSApi(Carrier):
         pretend they do.
         """
         if service.service_id in [
-                'First', 'FirstClassMailInternational',
+                'FirstClassMailInternational',
                 'FirstClassPackageInternationalService']:
             return False
+        if service.service_id == 'First':
+            for pak in request.packages:
+                code = self._get_internal_package_type_code(
+                    pak.package_type, to_proprietary=pak.carrier_conversion
+                )
+                if code != 'Parcel':
+                    return False
         if not request.international(self.get_origin(request)):
             return True
 

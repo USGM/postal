@@ -23,10 +23,11 @@ class TestUSPS(TestCarrier, unittest.TestCase):
     def test_refill(self):
         self.carrier.refill(Money('50.00', 'USD'))
 
-    def test_repass(self):
-        passphrase = 'asdfv87b34yubw3rg'
-        self.carrier.change_passphrase('asdfv87b34yubw3rg')
-        self.assertEqual(self.carrier.passphrase, passphrase)
+    # Actually change3s the password now, so can't test this very easily.
+    # def test_repass(self):
+    #     passphrase = 'asdfv87b34yubw3rg'
+    #     self.carrier.change_passphrase('asdfv87b34yubw3rg')
+    #     self.assertEqual(self.carrier.passphrase, passphrase)
 
     def insurance(self):
         raise SkipTest("Insurance can't be checked on the test server.")
