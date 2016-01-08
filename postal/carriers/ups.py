@@ -302,8 +302,7 @@ class UPSApi(Carrier):
             self._PaperlessDocumentAPI.set_options(location=
                 'https://filexfer.ups.com/webservices/PaperlessDocumentAPI')
 
-    @staticmethod
-    def _convert_webfault(webfault):
+    def _convert_webfault(self, webfault):
         error = webfault.fault.detail.Errors.ErrorDetail.PrimaryErrorCode
 
         code = error.Code
@@ -355,19 +354,17 @@ class UPSApi(Carrier):
                      % (error.Code, error.Description))
         return result
 
-    @staticmethod
-    def _on_unknown_error():
+    def _on_unknown_error(self):
         self.logger.error('UPS: Unknown error.')
         raise CarrierError('UPS encountered an unknown error.')
 
-    @classmethod
-    def _get_negotiated_charge(cls, rated_shipment):
+    def _get_negotiated_charge(self, rated_shipment):
         if hasattr(rated_shipment, 'NegotiatedRateCharges'):
-            return cls._get_money(
+            return self._get_money(
                 rated_shipment.NegotiatedRateCharges.TotalCharge)
         else:
             self.logger.debug('UPS: No negotiated rates given.')
-            return cls._get_money(rated_shipment.TotalCharges)
+            return self._get_money(rated_shipment.TotalCharges)
 
     @staticmethod
     def get_length_plus_girth(package):
@@ -527,17 +524,6 @@ class UPSApi(Carrier):
         if not request.extra_params.get('saturday_delivery', False):
             return
         api_shipment.ShipmentServiceOptions.SaturdayDeliveryIndicator = ''
-
-    def log_transmission(self, client):
-        with self.logger.lock:
-            try:
-                self.logger.debug(client.last_sent())
-            except AttributeError:
-                self.logger.debug("Nothing sent!")
-            try:
-                self.logger.debug(client.last_received())
-            except AttributeError:
-                self.logger.debug("Nothing received!") 
 
     def ship(self, service, request, receiver_account_number=None):
         self._ensure_request_supported(request)
