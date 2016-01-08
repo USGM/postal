@@ -327,6 +327,20 @@ class Carrier(object):
         raise NotSupportedError("Package type %s is not available on %s."
                                 % (package_type, self.name))
 
+    def log_transmission(self, client):
+        """
+        Log last send/receive action from a SUDs client.
+        """
+        with self.logger.lock:
+            try:
+                self.logger.debug(client.last_sent())
+            except AttributeError:
+                self.logger.debug("Nothing sent!")
+            try:
+                self.logger.debug(client.last_received())
+            except AttributeError:
+                self.logger.debug("Nothing received!")
+
     def expected_package_type(self, request, package):
         """
         Given a request and a package, returns the package type the package can

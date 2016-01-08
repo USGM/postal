@@ -227,8 +227,7 @@ class FedExApi(Carrier):
             auth, client_detail, transaction_detail, version_id,
             request_timestamp, address_validation_options, address_item)
 
-        logger.sent(self.address_client.last_sent())
-        logger.received(self.address_client.last_received())
+        self.log_transmission(self.address_client)
 
         result = result.AddressResults[0][0][0]
         success = result.Score
@@ -681,9 +680,7 @@ class FedExApi(Carrier):
                 auth, client, transaction_detail, version, return_transit,
                 codes, variable_options, requested_shipment)
         finally:
-            with self.logger.lock:
-                self.logger.sent(self.rates_client.last_sent())
-                self.logger.received(self.rates_client.last_received())
+            self.log_transmission(self.rates_client)
 
         result = self.rate_response_dict(response)
         self.cache_results(request, result)

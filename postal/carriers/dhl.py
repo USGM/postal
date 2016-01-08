@@ -124,8 +124,9 @@ class DHLApi(Carrier):
         except RequestException as err:
             raise CarrierError("%s" % err)
 
-        self.logger.sent(call)
-        self.logger.received(response.text)
+        with self.logger.lock:
+            self.logger.sent(call)
+            self.logger.received(response.text)
 
         root = fromstring(u'%s' % response.text)
         # DHL has about three or four ways to send an error message.

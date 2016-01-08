@@ -112,14 +112,15 @@ class USPSApi(Carrier):
         try:
             response = super(USPSApi, self).service_call(func, *args, **kwargs)
         finally:
-            try:
-                logger.sent(self.client.last_sent())
-            except AttributeError:
-                logger.sent("Nothing sent!")
-            try:
-                logger.received(self.client.last_received())
-            except AttributeError:
-                logger.received("Nothing received!")
+            with logger.lock:
+                try:
+                    logger.sent(self.client.last_sent())
+                except AttributeError:
+                    logger.sent("Nothing sent!")
+                try:
+                    logger.received(self.client.last_received())
+                except AttributeError:
+                    logger.received("Nothing received!")
 
         try:
             if response.Status != 0:
