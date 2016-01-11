@@ -29,7 +29,7 @@ from PyPDF2 import PdfFileReader, PdfFileWriter
 from money import Money
 from suds.client import Client
 
-from base import Carrier, ClearEmpty, PY3, PostalLogger
+from base import Carrier, ClearEmpty, PY3, PostalLogger, LoggingWebServicePlugin
 from ..exceptions import CarrierError, NotSupportedError
 from ..data import Shipment, sigfig, TWOPLACES, Declaration, subdivision_map
 
@@ -106,7 +106,7 @@ class USPSApi(Carrier):
             url = 'https://labelserver.endicia.com/LabelService/' \
                   'EwsLabelService.asmx?WSDL'
 
-        self.client = Client(url, plugins=[ClearEmpty()])
+        self.client = Client(url, plugins=[ClearEmpty(), LoggingWebServicePlugin()])
 
     def service_call(self, func, *args, **kwargs):
         try:

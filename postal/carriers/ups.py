@@ -43,7 +43,7 @@ class FixBrokenNamespace(MessagePlugin):
             children = tag.getChildren()
             if children:
                 self.swap_namespaces(namespace, children)
-            tag.prefix = namespace
+            tag.setPrefix(namespace)
 
     def get_namespace(self, context):
         declarations = context.envelope.nsdeclarations().split()
@@ -60,7 +60,7 @@ class FixBrokenNamespace(MessagePlugin):
                 self.propname).getChild('Request')])
 
 
-class FixMissingNegotiatedRates(FixBrokenNamespace):
+class FixMissingTags(FixBrokenNamespace):
 
     def marshalled(self, context):
         shipment_rating_options = Element('ShipmentRatingOptions')
@@ -68,22 +68,15 @@ class FixMissingNegotiatedRates(FixBrokenNamespace):
         shipment_rating_options.append(negotiated_rates_indicator)
 
         namespace = self.get_namespace(context)
-        context.envelope.getChild('Body').getChild(self.propname).getChild(
-            'Shipment').append(shipment_rating_options)
+        shipment = context.envelope.getChild('Body').getChild(self.propname).getChild(
+            'Shipment')
         self.swap_namespaces(namespace, [shipment_rating_options])
-
-
-class FixInternationalNamespaces(MessagePlugin):
-    def marshalled(self, context):
-        request = context.envelope.getChild('Body').getChild('ShipmentRequest')
-        options = request.getChild(
-            'Shipment').getChild('ShipmentServiceOptions')
-        rating_options = request.getChild('Shipment').getChild(
-            'ShipmentRatingOptions')
-
-        if options:
-            rating_options.prefix = 'ns2'
-            rating_options.getChild('NegotiatedRatesIndicator').prefix = 'ns2'
+        shipment.append(shipment_rating_options)
+        options = shipment.getChild('ShipmentServiceOptions')
+        if options.children:
+            indicator = options.getChild('SaturdayDeliveryIndicator')
+            if indicator is not None:
+                indicator.text = ''
 
 
 class AuthenticationPlugin(MessagePlugin):
@@ -249,7 +242,7 @@ class UPSApi(Carrier):
         client = Client(
             self._get_path(name),
             cache=suds.cache.NoCache(),
-            plugins=plugins,
+            plugins=plugins + [self.log_service],
             timeout=self.postal_configuration.get('timeout', None))
         return client
 
@@ -272,26 +265,33 @@ class UPSApi(Carrier):
             'RateWS.wsdl',
             plugins=[
                 authentication, FixBrokenNamespace('RateRequest', self.common),
-                FixMissingNegotiatedRates('RateRequest', self.rates)])
+                FixMissingTags('RateRequest', self.rates),
+            ]
+        )
 
         self._XAV = self._create_client(
             'XAV.wsdl',
-            plugins=[authentication, FixBrokenNamespace(
-                'XAVRequest', self.common)])
+            plugins=[
+                authentication, FixBrokenNamespace('XAVRequest', self.common),
+            ]
+        )
 
         self._TNTWS = self._create_client(
             'TNTWS.wsdl',
             plugins=[
-                authentication, FixBrokenNamespace(
-                    'TimeInTransitRequest', self.common)])
+                authentication,
+                FixBrokenNamespace('TimeInTransitRequest', self.common),
+            ]
+        )
 
         self._Ship = self._create_client(
             'Ship.wsdl',
             plugins=[
                 authentication, FixBrokenNamespace(
                     'ShipmentRequest', self.common),
-                FixMissingNegotiatedRates('ShipmentRequest', self.shipment),
-                FixInternationalNamespaces()])
+                FixMissingTags('ShipmentRequest', self.shipment),
+            ]
+        )
 
         self._PaperlessDocumentAPI = self._create_client(
             'PaperlessDocumentAPI.wsdl', plugins=[authentication])
@@ -523,7 +523,7 @@ class UPSApi(Carrier):
     def saturday_delivery_handler(request, api_shipment):
         if not request.extra_params.get('saturday_delivery', False):
             return
-        api_shipment.ShipmentServiceOptions.SaturdayDeliveryIndicator = ''
+        api_shipment.ShipmentServiceOptions.SaturdayDeliveryIndicator = True
 
     def ship(self, service, request, receiver_account_number=None):
         self._ensure_request_supported(request)
@@ -568,7 +568,6 @@ class UPSApi(Carrier):
             if request.extra_params.get('ups_duties_account', False):
                 receiver_charge = self._Ship.factory.create(
                     'ns3:ShipmentChargeType')
-                #print  receiver_charge
                 receiver_charge.Type = '02'
                 receiver_charge.BillReceiver.AccountNumber = \
                     request.extra_params['ups_duties_account']
@@ -585,7 +584,6 @@ class UPSApi(Carrier):
                     request.destination.country.alpha2 not in ['CA', 'MX', 'PR']):
                 api_shipment.DocumentsOnlyIndicator = ''
 
-        api_shipment.ShipmentRatingOptions.NegotiatedRatesIndicator = ''
         api_shipment.Service.Code = service.service_id
 
         ### Other destinations require the invoice line total to be set in
@@ -693,7 +691,6 @@ class UPSApi(Carrier):
 
         receipt_spec = self._Ship.factory.create(
             'ns3:ReceiptSpecificationType')
-
         with self.logger.lock:
             self.logger.debug_header('Shipment')
             self.logger.debug(service)
@@ -832,7 +829,6 @@ class UPSApi(Carrier):
         _customer_classification.Code = SHIPPER
 
         shipment = self._RateWS.factory.create('ns2:ShipmentType')
-        shipment.ShipmentRatingOptions.NegotiatedRatesIndicator = ''
 
         self.saturday_delivery_handler(request, shipment)
 

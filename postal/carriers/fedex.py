@@ -100,7 +100,7 @@ class FedExApi(Carrier):
 
     def create_client(self, wsdl_name):
         client = Client(
-            self.service_url(wsdl_name), plugins=[ClearEmpty()],
+            self.service_url(wsdl_name), plugins=[ClearEmpty(), self.log_service],
             timeout=self.postal_configuration.get('timeout', None))
         location = ''
         for service in client.wsdl.services:
@@ -125,13 +125,11 @@ class FedExApi(Carrier):
 
         self.rates_client = self.create_client('RateService_v14.wsdl')
 
-        self.address_client = self.create_client(
-            'AddressValidationService_v2.wsdl')
+        self.address_client = self.create_client('AddressValidationService_v2.wsdl')
 
         self.ship_client = self.create_client('ShipService_v13.wsdl')
 
-        self.upload_client = self.create_client(
-            'UploadDocumentService_v1.wsdl')
+        self.upload_client = self.create_client('UploadDocumentService_v1.wsdl')
 
         self.contact_type = (
             self.rates_client.factory.create('Party').__class__)

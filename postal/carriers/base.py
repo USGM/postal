@@ -83,6 +83,29 @@ class ClearEmpty(MessagePlugin):
         self.clear_empty_tags(context.envelope.getChildren()[:])
 
 
+class LoggingWebServicePlugin(MessagePlugin):
+    """
+    Adds logged messages to recent transmissions.
+    """
+    def __init__(self):
+        self.last_sent_message = None
+        self.last_received_reply = None
+
+    def sending(self, context):
+        if context.envelope:
+            self.last_sent_message = context.envelope
+
+    def parsed(self, context):
+        if context.reply:
+            self.last_received_reply = context.reply.str()
+
+    def last_sent(self):
+        return self.last_sent_message
+
+    def last_received(self):
+        return self.last_received_reply
+
+
 class Carrier(object):
     name = 'Undefined Carrier'
     # If a carrier provides Address Validation Services, this should be set
@@ -150,6 +173,9 @@ class Carrier(object):
     def __init__(self, postal_configuration):
         self.postal_configuration = postal_configuration
         self.logger = PostalLogger(carrier_name=self.name)
+        # Add this to any suds clients as a plugin and then use 
+        # last_sent() and last_received() on it to grab recent messages.
+        self.log_service = LoggingWebServicePlugin()
         if not postal_configuration:
             raise PostalError("Postal Configuration not set.")
 
@@ -173,14 +199,7 @@ class Carrier(object):
             else:
                 raise CarrierError(repr(err))
         finally:
-            try:
-                self.logger.sent(func.client.last_sent())
-            except AttributeError:
-                self.logger.sent("Nothing sent!")
-            try:
-                self.logger.received(func.client.last_received())
-            except AttributeError:
-                self.logger.received("Nothing received!")
+            self.log_transmission(func.client)
 
     @classmethod
     def service_url(cls, wsdl_name):
@@ -332,14 +351,8 @@ class Carrier(object):
         Log last send/receive action from a SUDs client.
         """
         with self.logger.lock:
-            try:
-                self.logger.debug(client.last_sent())
-            except AttributeError:
-                self.logger.debug("Nothing sent!")
-            try:
-                self.logger.debug(client.last_received())
-            except AttributeError:
-                self.logger.debug("Nothing received!")
+            self.logger.debug(self.log_service.last_sent())
+            self.logger.debug(self.log_service.last_received())
 
     def expected_package_type(self, request, package):
         """
