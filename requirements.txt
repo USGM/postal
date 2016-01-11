@@ -4,5 +4,5 @@ python-money==0.5
 PyPDF2==1.23
 Pillow==2.2.1
 requests==2.0.1
-suds==0.4
+suds-jurko==0.7
 python-reportlab
