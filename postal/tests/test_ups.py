@@ -3,13 +3,12 @@ import unittest
 from money.Money import Money
 
 from ..carriers.ups import UPSApi
-from base import TestCarrier
+from base import _AbstractTestCarrier
 from ..data import Request, Address, Package, Declaration
 from ..carriers.base import Carrier
-from postal.exceptions import NotSupportedError
 
 
-class TestUPS(TestCarrier, unittest.TestCase):
+class TestUPS(_AbstractTestCarrier, unittest.TestCase):
     carrier_class = UPSApi
 
     def skipper(self):
@@ -48,6 +47,3 @@ class TestUPS(TestCarrier, unittest.TestCase):
         request = Request(from_address, to_address, packages=[package],
                           extra_params=extra_params)
         self.carrier.get_service('03').ship(request)
-
-if __name__ == '__main__':
-    unittest.main()

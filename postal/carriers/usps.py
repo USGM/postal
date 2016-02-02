@@ -173,10 +173,16 @@ class USPSApi(Carrier):
 
     @staticmethod
     def _get_price(rate):
-        postage = rate._TotalAmount
-        price = Money(postage, 'USD')
-        price.amount = price.amount.quantize(TWOPLACES)
-        return price
+        total = Money(rate._TotalAmount, 'USD')
+        total.amount = total.amount.quantize(TWOPLACES)
+        base_price = Money(rate.Postage._TotalAmount, 'USD')
+        base_price.amount = total.amount.quantize(TWOPLACES)
+        fees = total - base_price
+        return {
+            'total': total,
+            'base_price': base_price,
+            'fees': fees,
+        }
 
     def _request_response_table(self, request, response):
         table = {}
@@ -516,7 +522,9 @@ class USPSApi(Carrier):
             tracking_number = 'N/A'
         shipment = Shipment(
             self, tracking_number, transaction_id=transaction_id)
-        price = Money(response.FinalPostage, 'USD')
+        total = Money(response.FinalPostage, 'USD')
+        # After this point, USPS doesn't track total postage.
+        price = {'total': total, 'fees': Money('0.00', 'USD'), 'base_price': total}
         try:
             label = self._format_label(response.Base64LabelImage, label_format)
         except AttributeError:
@@ -540,8 +548,7 @@ class USPSApi(Carrier):
         shipments = [
             response['shipment'].transaction_id for response in response_list
             if 'shipment' in response]
-        price = sum(response['price'] for response in response_list
-                    if 'price' in response)
+        price = self.total_price([response['price'] for response in response_list if 'price' in response])
         shipment = Shipment(
             self, 'N/A', transaction_id=':'.join(shipments))
         if not shipment.transaction_id:
@@ -613,6 +620,20 @@ class USPSApi(Carrier):
             raise CarrierError(error)
         self.passphrase = new_passphrase
 
+    @staticmethod
+    def total_price(prices):
+        """
+        Gets the total price from a set of prices.
+        """
+        total = sum([price['total'] for price in prices])
+        base_price = sum([price['base_price'] for price in prices])
+        fees = total - base_price
+        return {
+            'total': total,
+            'base_price': base_price,
+            'fees': fees,
+        }
+
     def compile_options(self, request, response_list):
         service_sets = [
             {service for service in response.keys()}
@@ -624,8 +645,8 @@ class USPSApi(Carrier):
             return {}
         final_response = {}
         for service in services:
-            price = sum(
-                [response[service]['price'] for response in response_list])
+            price = self.total_price([response[service]['price'] for response in response_list])
+
             # The latest delivery date will be our estimate.
             datetimes = []
             trackable = self.is_trackable(request, service)

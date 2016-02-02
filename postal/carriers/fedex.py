@@ -384,7 +384,6 @@ class FedExApi(Carrier):
         types = services.SpecialServiceTypes or []
         types.append('SATURDAY_DELIVERY')
         services.SpecialServiceTypes = types
-        print "Added SATURDAY_DELIVERY!"
 
     def ship(self, service, request):
         self._ensure_supported(request)
@@ -445,7 +444,7 @@ class FedExApi(Carrier):
 
         try:
             rating = result.CompletedShipmentDetail.ShipmentRating
-            price = self.get_real_price(rating, rating.ShipmentRateDetails)
+            price = self.get_price_dict(rating, rating.ShipmentRateDetails)
         except (CarrierError, AttributeError):
             raise CarrierError("FedEx returned a nonsense price. Please "
                                "contact their customer service about tracking "
@@ -614,18 +613,23 @@ class FedExApi(Carrier):
         return api_request
 
     @staticmethod
-    def get_real_price(info, method_details):
+    def get_price_dict(info, method_details):
         actual_type = info.ActualRateType  # May raise AttributeError
-        price = None
+        price = {}
         for rating in method_details:
             try:
                 rating = rating.ShipmentRateDetail
             except AttributeError:
                 pass
             if actual_type == rating.RateType:
-                price = Money(
+                price['total'] = Money(
                     rating.TotalNetCharge.Amount,
                     rating.TotalNetCharge.Currency)
+                price['base_price'] = Money(
+                    rating.TotalBaseCharge.Amount,
+                    rating.TotalBaseCharge.Currency
+                )
+                price['fees'] = (price['total'] - price['base_price'])
         if not price:
             raise CarrierError("FedEx returned a nonsense price.")
         return price
@@ -637,7 +641,7 @@ class FedExApi(Carrier):
         return {
             method.ServiceType: {
                 #'service': method.ServiceType,
-                'price': FedExApi.get_real_price(
+                'price': FedExApi.get_price_dict(
                     method, method.RatedShipmentDetails),
                 'delivery_datetime': getattr(
                     method, 'DeliveryTimestamp', None)}

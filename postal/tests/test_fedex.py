@@ -1,12 +1,12 @@
 import unittest
-from base import TestCarrier, test_from, test_to
+from base import _AbstractTestCarrier, test_from, test_to
 from ..carriers.fedex import FedExApi
 from ..carriers.base import Carrier
 from ..data import Request, Address, Package, Declaration, Shipment
 from money import Money
 
 
-class TestFedEx(TestCarrier, unittest.TestCase):
+class TestFedEx(_AbstractTestCarrier, unittest.TestCase):
     carrier_class = FedExApi
 
     def test_arbitrary_shipment_000(self):
@@ -46,7 +46,10 @@ class TestFedEx(TestCarrier, unittest.TestCase):
         self.assertIn('price', response)
         self.assertIn('packages', response)
         self.assertIsInstance(response['shipment'], Shipment)
-        self.assertIsInstance(response['price'], Money)
+        self.assertIsInstance(response['price'], dict)
+        self.assertIsInstance(response['price']['total'], Money)
+        self.assertIsInstance(response['price']['fees'], Money)
+        self.assertIsInstance(response['price']['base_price'], Money)
         self.assertIsInstance(response['packages'], dict)
         self.assertEqual(len(response['packages']), 1)
         self.assertIn(package, response['packages'])
@@ -95,12 +98,9 @@ class TestFedEx(TestCarrier, unittest.TestCase):
         self.assertTrue(response)
         response.keys()[0].ship(self.international_request)
 
-    def test_signature_confiramtion(self):
+    def test_signature_confirmation(self):
         params = self.domestic_request.extra_params
         params['signature_required'] = 'Adult'
         response = self.carrier.get_services(self.domestic_request)
         self.assertTrue(response)
         response.keys()[0].ship(self.domestic_request)
-
-if __name__ == '__main__':
-    unittest.main()

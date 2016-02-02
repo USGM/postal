@@ -12,12 +12,6 @@ from .test_configuration import config
 from ..data import Address, Package, Declaration, Shipment, Request, \
     PackageType
 
-#import logging
-#import sys
-#logger = logging.getLogger('postal.carriers')
-#logger.setLevel(logging.DEBUG)
-#logger.addHandler(logging.StreamHandler(sys.stderr))
-
 
 test_from = {
     'street_lines': ['1321 Upland Drive'],
@@ -63,6 +57,9 @@ test_no_etd = {
 
 
 def domestic(func):
+    """
+    Wraps a test function to use domestic packages/addresses.
+    """
     def wrapped(self, *args, **kwargs):
         if not self.carrier.domestic:
             raise SkipTest("Domestic service not supported.")
@@ -71,6 +68,9 @@ def domestic(func):
         self.request = self.domestic_request
         self.declarations = self.declarations
         return func(self, *args, **kwargs)
+    # Needed for Nosetests' autoresolution.
+    wrapped.__name__ = 'test_domestic_' + func.__name__
+    wrapped.__doc__ = func.__doc__
     return wrapped
 
 
@@ -83,10 +83,13 @@ def international(func):
         self.request = self.international_request
         self.declarations = self.declarations
         return func(self, *args, **kwargs)
+    # Needed for Nosetests' autoresolution.
+    wrapped.__name__ = 'test_international_' + func.__name__
+    wrapped.__doc__ = func.__doc__
     return wrapped
 
 
-class TestCarrier(object):
+class _AbstractTestCarrier(object):
     """
     Base test class that should be used for most carriers to make sure they
     have a consistent interface. Subclassing requires multiple inheritance here
@@ -137,12 +140,21 @@ class TestCarrier(object):
         self.international_package2.declarations = self.declarations2
         self.documents.declarations = self.document_declaration
 
+    def tearDown(self):
+        # Nose appears to keep a copy of the test class around after each run. The carrier object is going to have a lot
+        # of leftover data which can be dropped to keep memory from ballooning.
+        del self.carrier
+
     def services(self):
         services = self.carrier.get_services(self.request)
         self.assertTrue(services)
         for service, info in services.items():
             self.assertTrue(isinstance(service, Service))
-            self.assertIsInstance(info['price'], Money)
+            self.assertIsInstance(info['price'], dict)
+            self.assertIsInstance(info['price']['total'], Money)
+            self.assertIsInstance(info['price']['base_price'], Money)
+            self.assertIsInstance(info['price']['fees'], Money)
+            self.assertEqual(info['price']['total'], (info['price']['base_price'] + info['price']['fees']))
             if info['delivery_datetime'] is not None:
                 self.assertIsInstance(info['delivery_datetime'], datetime)
 
@@ -198,11 +210,11 @@ class TestCarrier(object):
         composite_set = commercial.intersection(residential)
 
         residential = [
-            info['price'] for service, info in services_residential.items()
+            info['price']['total'] for service, info in services_residential.items()
             if service in composite_set]
         self.carrier.cache = cache_save
         commercial = [
-            info['price'] for service, info in services.items()
+            info['price']['total'] for service, info in services.items()
             if service in composite_set]
         residential = sum(residential)
         commercial = sum(commercial)
@@ -224,11 +236,11 @@ class TestCarrier(object):
 
         for service, info in normal_rates.items():
             self.assertEqual(
-                info['price'], declaration_rates[service]['price'])
+                info['price']['total'], declaration_rates[service]['price']['total'])
 
             if service in insurance_rates:
                 self.assertLess(
-                    info['price'], insurance_rates[service]['price'])
+                    info['price']['total'], insurance_rates[service]['price']['total'])
 
     def address_validation(self):
         if not self.carrier.address_validation:
@@ -250,7 +262,7 @@ class TestCarrier(object):
         self.assertTrue(services)
 
     def shipment_dict_check(self, sdict):
-        self.assertIsInstance(sdict['price'], Money)
+        self.assertIsInstance(sdict['price']['total'], Money)
         self.assertIsInstance(sdict['shipment'], Shipment)
         self.assertIsInstance(sdict['shipment'].tracking_number, basestring)
         for key, value in sdict['packages'].items():
@@ -277,7 +289,7 @@ class TestCarrier(object):
         self.assertTrue(services)
         service, serv_dict = services.items()[0]
         ship_dict = service.ship(self.request)
-        self.assertEqual(ship_dict['price'], serv_dict['price'])
+        self.assertEqual(ship_dict['price']['total'], serv_dict['price']['total'])
 
     def rate_ship_match_multiship(self):
         self.request.packages.append(self.package2)
@@ -285,7 +297,7 @@ class TestCarrier(object):
         self.assertTrue(services)
         service, serv_dict = services.items()[0]
         ship_dict = service.ship(self.request)
-        self.assertEqual(ship_dict['price'], serv_dict['price'])
+        self.assertEqual(ship_dict['price']['total'], serv_dict['price']['total'])
 
     def ship_documents(self):
         self.request.packages = [self.documents]

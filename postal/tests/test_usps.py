@@ -3,13 +3,13 @@ import unittest
 from unittest import SkipTest
 
 from money import Money
-from base import TestCarrier, domestic, international
+from base import _AbstractTestCarrier, domestic, international
 from ..carriers.usps import USPSApi
 from postal import Address
 from postal.carriers import Carrier
 
 
-class TestUSPS(TestCarrier, unittest.TestCase):
+class TestUSPS(_AbstractTestCarrier, unittest.TestCase):
     carrier_class = USPSApi
 
     def test_international_delayed_shipment(self):
@@ -55,6 +55,3 @@ class TestUSPS(TestCarrier, unittest.TestCase):
     test_international_softpack = international(softpack)
     test_domestic_insurance = domestic(insurance)
     test_international_insurance = international(insurance)
-
-if __name__ == '__main__':
-    unittest.main()

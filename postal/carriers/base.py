@@ -195,7 +195,7 @@ class Carrier(object):
             return func(*args, **kwargs)
         except Exception as err:
             if hasattr(err, 'document'):
-                raise CarrierError(err.document)
+                raise CarrierError(u"{}".format(err.document))
             else:
                 raise CarrierError(repr(err))
         finally:

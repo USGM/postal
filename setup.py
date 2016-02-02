@@ -12,9 +12,11 @@ if PY3:
         'python-dateutil>=2.1', 'python-money', 'suds==0.5.1']
 else:
     install_requires=[
-        'suds>=0.4', 'python-money>=0.5', 'PyPDF2', 'Pillow>=2.2.1',
-        'requests>=2.0.1', 'python-money>=0.5', 'pycountry>=1.2',
-        'python-dateutil>=2.1']
+        'suds-jurko==0.6', 'PyPDF2==1.23', 'Pillow==2.2.1',
+        'requests==2.0.1', 'python-money==0.5', 'pycountry==1.2',
+        'reportlab==2.7',
+        'python-dateutil==2.1'
+    ]
 
 def get_data_files():
     paths = [
