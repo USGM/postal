@@ -361,10 +361,10 @@ class UPSApi(Carrier):
     def _get_negotiated_charge(self, rated_shipment):
         if hasattr(rated_shipment, 'NegotiatedRateCharges'):
             return self._get_money(
-                rated_shipment.NegotiatedRateCharges.TotalCharge)
+                rated_shipment.NegotiatedRateCharges)
         else:
             self.logger.debug('UPS: No negotiated rates given.')
-            return self._get_money(rated_shipment.TotalCharges)
+            return self._get_money(rated_shipment)
 
     @staticmethod
     def get_length_plus_girth(package):
@@ -428,7 +428,16 @@ class UPSApi(Carrier):
 
     @staticmethod
     def _get_money(node):
-        return money.Money(node.MonetaryValue, node.CurrencyCode)
+        total = money.Money(node.TotalCharge.MonetaryValue, node.TotalCharge.CurrencyCode)
+        if hasattr(node, 'TransportationCharges'):
+            base_price = money.Money(node.TransportationCharges.MonetaryValue, node.TransportationCharges.CurrencyCode)
+        else:
+            base_price = total
+        return {
+            'total': total,
+            'base_price': base_price,
+            'fees': (total - base_price),
+        }
 
     @staticmethod
     def _populate_money(node, value, whole_number=False):
@@ -704,7 +713,7 @@ class UPSApi(Carrier):
             self.log_transmission(self._Ship)
 
         negotiated_rate = self._get_money(
-            response.ShipmentResults.NegotiatedRateCharges.TotalCharge)
+            response.ShipmentResults.NegotiatedRateCharges)
 
         if response.Response.ResponseStatus.Code != '1':
             self._on_unknown_error()

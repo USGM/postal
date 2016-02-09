@@ -1,10 +1,11 @@
 import unittest
-from base import TestCarrier
+
+from base import _AbstractTestCarrier
 from ..carriers.dhl import DHLApi
 
 
-class TestDHL(TestCarrier, unittest.TestCase):
+class TestDHL(_AbstractTestCarrier, unittest.TestCase):
     carrier_class = DHLApi
 
-if __name__ == '__main__':
-    unittest.main()
+    def test_international_delayed_shipment(self):
+        raise unittest.SkipTest("Test server doesn't calculate offsets.")

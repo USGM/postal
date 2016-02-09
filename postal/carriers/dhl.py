@@ -166,8 +166,11 @@ class DHLApi(Carrier):
             raise CarrierError(
                 "DHL gave a nonsense response to a pricing request.")
         currency = correct_price.find('CurrencyCode').text
-        amount = correct_price.find('TotalAmount').text
-        return Money(Decimal(amount).quantize(Decimal('0.01')), currency)
+        total = correct_price.find('TotalAmount').text
+        total = Money(Decimal(total).quantize(Decimal('0.01')), currency)
+        base_price = correct_price.find('WeightCharge').text
+        base_price = Money(Decimal(base_price).quantize(Decimal('0.01')), currency)
+        return {'total': total, 'base_price': base_price, 'fees': (total - base_price)}
 
     @staticmethod
     def from_timestr(time_string):
@@ -582,7 +585,7 @@ class DHLApi(Carrier):
         if not data:
             raise NotSupportedError(
                 "DHL does not support shipment of that package(s).")
-        return Money(data['price'].amount, data['price'].currency)
+        return data['price']
 
 
 # DHL product code (

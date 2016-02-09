@@ -1,10 +1,6 @@
-pip install pycountry
-pip install python-money
-pip install suds
-
-# from http://stackoverflow.com/questions/4632261/pil-jpeg-library-help
-# Do this BEFORE installing Pillow:
-# apt-get install libjpeg8-dev
-# ln -s /usr/lib/x86_64-linux-gnu/libjpeg.so /usr/lib
-
-pip install Pillow
+pycountry==1.2
+python-money==0.5
+suds-jurko==0.6
+reportlab==2.7
+Pillow==2.2.1
+nose==1.3.7  # For running tests.
