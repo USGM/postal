@@ -39,8 +39,6 @@ class Postal:
                 print 'with these args: ' + str(carrier_configs[name])
                 raise
 
-        self.thread_pool = ThreadPool(processes=len(self.carriers))
-
     def options(self, request):
         """
         Gets all service options from all carriers.
@@ -67,8 +65,13 @@ class Postal:
                 raise NotSupportedError('The dimensions of package #%s are '
                                         'invalid.' % i)
 
-        return dict(self.thread_pool.map(
+        thread_pool = ThreadPool(processes=len(self.carriers))
+
+        result = dict(thread_pool.map(
             _task, [(carrier, request) for carrier in self.carriers.values()]))
+        thread_pool.terminate()
+        thread_pool.join()
+        return result
 
     def get_all_services(self):
         """
