@@ -14,7 +14,7 @@ else:
     install_requires=[
         'suds-jurko==0.6', 'PyPDF2==1.23', 'Pillow==2.2.1',
         'requests==2.0.1', 'python-money==0.5', 'pycountry==1.2',
-        'reportlab==2.7',
+        'reportlab==3.3.0',
         'python-dateutil==2.1'
     ]
 
