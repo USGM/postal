@@ -23,14 +23,16 @@ def get_country(country_code):
     except KeyError:
         raise AddressError('"%s" is not a valid country code.' % country_code)
 
+# Force pycountry to fetch data.
+subdivisions.get(country_code='US')
+
 subdivision_map = {
     country.alpha2:
-        {subdivision.code[3:]: subdivision.name
-            for subdivision in subdivisions.get(
-                country_code=country.alpha2)}
-            if country.alpha2 in subdivisions.indices['country_code']
-                else {}
-    for country in countries.objects}
+        {subdivision.code[3:]: subdivision.name for subdivision in subdivisions.get(country_code=country.alpha2)}
+        if country.alpha2 in subdivisions.indices['country_code']
+        else {}
+    for country in countries
+}
 
 for code in ('AE', 'AA', 'AP'):
     subdivision_map['US'][code] = code
