@@ -6,17 +6,18 @@ from setuptools import setup, find_packages
 PY3 = version_info[0] == 3
 
 if PY3:
-    install_requires=[
+    install_requires = [
         'PyPDF2', 'Pillow>=2.2.1',
         'requests>=2.0.1', 'pycountry>=1.2',
         'python-dateutil>=2.1', 'python-money', 'suds==0.5.1']
 else:
-    install_requires=[
+    install_requires = [
         'suds-jurko==0.6', 'PyPDF2==1.23', 'Pillow==2.2.1',
         'requests==2.0.1', 'python-money==0.5', 'pycountry==1.2',
         'reportlab==3.3.0',
         'python-dateutil==2.1'
     ]
+
 
 def get_data_files():
     paths = [
@@ -29,7 +30,9 @@ def get_data_files():
             for f in files:
                 file_name = os.path.join(root, f)
                 file_set.append((root, [file_name]))
-    return file_set
+    print "I ran!"
+    print file_set
+    return dict(file_set)
 
 setup(
     name='Postal',
@@ -45,7 +48,7 @@ setup(
     install_requires=install_requires,
     packages=find_packages(),
     zip_safe=False,
-    data_files=get_data_files(),
+    include_package_data=True,
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Environment :: Console',
