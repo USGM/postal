@@ -338,6 +338,10 @@ class UPSApi(Carrier):
                 fields={
                     'subdivision': 'The state/province may be incorrect.'},
                 code=code)
+        elif code == '110007':
+            result = AddressError(
+                'UPS does not currently ship to this country.', code=code
+            )
         elif code == '121211':
             # Got this error for the Adult Signature Only option, though it
             # probably applies to the other ShipmentServiceOptions
