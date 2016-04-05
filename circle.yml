@@ -4,6 +4,6 @@ checkout:
     - cp config/dev_secrets/test_credentials.py ~/postal/postal/tests/
     - cp config/dev_secrets/logo.jpg ~/postal/postal/tests/
     - cp config/dev_secrets/signature.jpg ~/postal/postal/tests/
-tests:
+test:
   override:
     - nosetests --nologcapture
