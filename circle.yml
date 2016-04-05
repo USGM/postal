@@ -1,0 +1,9 @@
+checkout:
+  post:
+    - git clone git@github.com:USGM/config.git
+    - cp config/dev_secrets/test_credentials.py ~/postal/postal/tests/
+    - cp config/dev_secrets/logo.jpg ~/postal/postal/tests/
+    - cp config/dev_secrets/signature.jpg ~/postal/postal/tests/
+test:
+  override:
+    - nosetests --nologcapture

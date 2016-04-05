@@ -1,22 +1,9 @@
 import os
-from sys import version_info
 
 from setuptools import setup, find_packages
 
-PY3 = version_info[0] == 3
 
-if PY3:
-    install_requires = [
-        'PyPDF2', 'Pillow>=2.2.1',
-        'requests>=2.0.1', 'pycountry>=1.2',
-        'python-dateutil>=2.1', 'python-money', 'suds==0.5.1']
-else:
-    install_requires = [
-        'suds-jurko==0.6', 'PyPDF2==1.23', 'Pillow==2.2.1',
-        'requests==2.0.1', 'python-money==0.5', 'pycountry==1.2',
-        'reportlab==3.3.0',
-        'python-dateutil==2.1'
-    ]
+install_requires = open('requirements.txt').read().strip().split()
 
 
 def get_data_files():
@@ -30,8 +17,6 @@ def get_data_files():
             for f in files:
                 file_name = os.path.join(root, f)
                 file_set.append((root, [file_name]))
-    print "I ran!"
-    print file_set
     return dict(file_set)
 
 setup(
