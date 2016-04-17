@@ -157,11 +157,17 @@ class FedExApi(Carrier):
                 message = 'FedEx does not ship to that postal code.'
                 err = AddressError(
                     message, fields={'postal_code': message}, code=code)
+            elif code == '712':
+                message = 'FedEx does not currently ship to this country.'
+                err = AddressError(
+                    message, code=code
+                )
             else:
                 err = CarrierError('Error#%s: %s' % (
                     code, response.Notifications[0].Message), code=code)
 
             raise err
+
         return response
 
     def user_client(self, client):
