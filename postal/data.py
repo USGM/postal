@@ -320,6 +320,10 @@ class Package(object):
         return number * 0.453592
 
     @staticmethod
+    def weight_unit():
+        return 'LB'
+
+    @staticmethod
     def to_pounds(number):
         return number / 0.453592
 
