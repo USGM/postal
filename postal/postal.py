@@ -25,7 +25,7 @@ class Postal:
         """
         # Give carriers a back reference to the main postal object.
         configuration_dict['postal'] = self
-
+        self.carrier_country = configuration_dict['carrier_country']
         self.carriers = {carrier.name: carrier
                          for carrier in configuration_dict['enabled_carriers']}
         carrier_configs = configuration_dict['carrier_inits']
@@ -34,6 +34,7 @@ class Postal:
                 self.carriers[name] = carrier(
                     postal_configuration=configuration_dict,
                     **carrier_configs[name])
+                self.carrier_list = self.carriers
             except:
                 print 'Error while constructing carrier ' + str(name)
                 print 'with these args: ' + str(carrier_configs[name])
@@ -65,13 +66,20 @@ class Postal:
                 raise NotSupportedError('The dimensions of package #%s are '
                                         'invalid.' % i)
 
-        thread_pool = ThreadPool(processes=len(self.carriers))
+        # Check country white list
+        for carrier in self.carrier_list.values():
+            served = get_served_country(carrier.name, request.destination.country.alpha2, self.carrier_country)
+            if not served:
+                del self.carrier_list[carrier.name]
 
+        thread_pool = ThreadPool(processes=len(self.carrier_list))
         result = dict(thread_pool.map(
-            _task, [(carrier, request) for carrier in self.carriers.values()]))
-        thread_pool.terminate()
-        thread_pool.join()
-        return result
+            _task, [(carrier, request) for carrier in self.carrier_list.values()]))
+        self.carrier_list = self.carriers
+        if result:
+            thread_pool.terminate()
+            thread_pool.join()
+            return result
 
     def get_all_services(self):
         """
@@ -118,6 +126,7 @@ class Postal:
 
 
 def _task(arg_list):
+
     carrier, request = arg_list
     data_dict = {'services': None, 'error': None}
     try:
@@ -128,3 +137,9 @@ def _task(arg_list):
         data_dict['error'] = err
 
     return carrier, data_dict
+
+
+def get_served_country(carrier, dest_country, carrier_country):
+    if carrier in carrier_country and not dest_country in carrier_country[carrier]:
+        return False
+    return True
