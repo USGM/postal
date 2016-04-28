@@ -3,20 +3,19 @@ from sys import version_info
 
 from setuptools import setup, find_packages
 
-PY3 = version_info[0] == 3
-
-if PY3:
-    install_requires = [
-        'PyPDF2', 'Pillow>=2.2.1',
-        'requests>=2.0.1', 'pycountry>=1.2',
-        'python-dateutil>=2.1', 'python-money', 'suds==0.5.1']
-else:
-    install_requires = [
-        'suds-jurko==0.6', 'PyPDF2==1.23', 'Pillow==2.2.1',
-        'requests==2.0.1', 'python-money==0.5', 'pycountry==1.2',
-        'reportlab==3.3.0',
-        'python-dateutil==2.1'
-    ]
+def get_requirements():
+    """
+    To update the requirements, edit requirements.txt
+    """
+    with open('requirements.txt', 'r') as f:
+        req_lines = f.readlines()
+    reqs = []
+    for line in req_lines:
+        # Avoid adding comments.
+        line = line.split('#')[0].strip()
+        if line:
+            reqs.append(line)
+    return reqs
 
 
 def get_data_files():
@@ -30,22 +29,18 @@ def get_data_files():
             for f in files:
                 file_name = os.path.join(root, f)
                 file_set.append((root, [file_name]))
-    print "I ran!"
-    print file_set
     return dict(file_set)
 
 setup(
     name='Postal',
-    version='0.0.1',
-    author='Jonathan Piacenti and Nathan Everitt at US Global Mail',
+    version='0.1.0',
+    author='US Global Mail with Silicus Technologies',
     author_email='it@usglobalmail.com',
     url='http://www.usglobalmail.com/',
     download_url='https://github.com/USGM/postal',
-    description='A simple unified interface for shipping with '
-                'multiple carriers',
-    use_2to3=True,
+    description='A simple unified interface for shipping with multiple carriers',
     license='None',
-    install_requires=install_requires,
+    install_requires=get_requirements(),
     packages=find_packages(),
     zip_safe=False,
     include_package_data=True,
@@ -57,4 +52,6 @@ setup(
         'Programming Language :: Python :: 2.7',
         'License :: Other/Proprietary License',
         'Topic :: Office/Business :: Financial :: Point-Of-Sale',
-        'Topic :: Internet :: WWW/HTTP'])
+        'Topic :: Internet :: WWW/HTTP'
+    ]
+)
