@@ -7,12 +7,12 @@ PY3 = version_info[0] == 3
 
 if PY3:
     install_requires = [
-        'PyPDF2', 'Pillow>=2.2.1',
+        'PyPDF2', 'Pillow>=3.2.0',
         'requests>=2.0.1', 'pycountry>=1.2',
         'python-dateutil>=2.1', 'python-money', 'suds==0.5.1']
 else:
     install_requires = [
-        'suds-jurko==0.6', 'PyPDF2==1.23', 'Pillow==2.2.1',
+        'suds-jurko==0.6', 'PyPDF2==1.23', 'Pillow==3.2.0',
         'requests==2.0.1', 'python-money==0.5', 'pycountry==1.2',
         'reportlab==3.3.0',
         'python-dateutil==2.1'
