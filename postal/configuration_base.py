@@ -103,6 +103,7 @@ base_postal_configuration = {
         # After registering, email their team at
         # uspstechsupport@esecurecare.net And tell them you are using third
         # party software to be allowed to use real-world transactions.
+        
         'USPS': {
             'account_id': 123456,
             'passphrase': 'password',
@@ -111,7 +112,22 @@ base_postal_configuration = {
             # IPA labels.
             'ipa_convert': False,
             'requester_id': 123456,
-            'token': 123456}}}
+            'token': 123456}},
             # Like DHL, USPS uses the same credentials for both production and
             # testing.
-            #'test_mode': True}}
+            # 'test_mode': True}}
+            
+        # If account number is specified for aramex, then account pin, country code
+        # and entity fields must also be given in the request.                  
+        'Aramex' : {
+            'account_number' : '',
+            'username' : '',
+            'password' : '',
+            'account_key' : '',
+            'acountry_code' : '',
+            'version'  : 'v1.0',
+            'account_pin' : '',
+            
+        }
+    }
+            
