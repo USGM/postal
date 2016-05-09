@@ -19,7 +19,7 @@
             <Pieces>
             {pieces}
             </Pieces>
-            <PaymentAccountNumber>{account_number}</PaymentAccountNumber>
+            {account_number}
             <IsDutiable>{is_dutiable}</IsDutiable>
             {insured}
         </BkgDetails>

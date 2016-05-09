@@ -232,10 +232,7 @@ class DHLApi(Carrier):
             self.logger.debug(request)
 
         response = self.make_call(rate_request, rates=True)[0][1]
-        try:
-            response_dict = self.response_to_dict(response.findall('QtdShp'))
-        except:
-            raise
+        response_dict = self.response_to_dict(response.findall('QtdShp'))
         self.cache_results(request, response_dict)
 
         result = {
@@ -376,6 +373,10 @@ class DHLApi(Carrier):
                 request.destination.city.upper())
         else:
             destination_city = ''
+        if request.extra_params.get('retail_rate'):
+            account_number = ''
+        else:
+            account_number = '<PaymentAccountNumber>{}</PaymentAccountNumber>'.format(self.account_number)
 
         if origin.city:
             origin_city = '<City>%s</City>' % origin.city.upper()
@@ -391,9 +392,10 @@ class DHLApi(Carrier):
             'is_dutiable': is_dutiable,
             'destination_country': request.destination.country.alpha2,
             'destination_postal_code': request.destination.postal_code,
-            'tz_offset': tz_offset,
-            'account_number': self.account_number}
+            'tz_offset': tz_offset
+        }
         non_escape_variables = {
+            'account_number': account_number,
             'duties': duties,
             'pieces': pieces,
             'destination_city': destination_city,
