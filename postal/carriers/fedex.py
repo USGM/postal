@@ -596,7 +596,7 @@ class FedExApi(Carrier):
         self.set_address(api_request.Recipient, request.destination)
         self.set_saturday_delivery(request, api_request)
 
-        api_request.RateRequestTypes = 'ACCOUNT'
+        api_request.RateRequestTypes = 'LIST'
         api_request.PackageCount = len(request.packages)
         if len(request.packages) == 1:
             package = request.packages[0]
@@ -613,15 +613,18 @@ class FedExApi(Carrier):
         return api_request
 
     @staticmethod
-    def get_price_dict(info, method_details):
-        actual_type = info.ActualRateType  # May raise AttributeError
+    def get_price_dict(info, method_details, retail=False):
+        if retail:
+            fetch_types = ['PAYOR_LIST_SHIPMENT', 'PAYOR_LIST_PACKAGE']
+        else:
+            fetch_types = info.ActualRateType  # May raise AttributeError
         price = {}
         for rating in method_details:
             try:
                 rating = rating.ShipmentRateDetail
             except AttributeError:
                 pass
-            if actual_type == rating.RateType:
+            if rating.RateType in fetch_types:
                 price['total'] = Money(
                     rating.TotalNetCharge.Amount,
                     rating.TotalNetCharge.Currency)
@@ -630,19 +633,20 @@ class FedExApi(Carrier):
                     rating.TotalBaseCharge.Currency
                 )
                 price['fees'] = (price['total'] - price['base_price'])
+                break
         if not price:
             raise CarrierError("FedEx returned a nonsense price.")
         return price
 
     @staticmethod
-    def rate_response_dict(response):
+    def rate_response_dict(request, response):
         if not hasattr(response, 'RateReplyDetails'):
             return {}
         return {
             method.ServiceType: {
-                #'service': method.ServiceType,
                 'price': FedExApi.get_price_dict(
-                    method, method.RatedShipmentDetails),
+                    method, method.RatedShipmentDetails, retail=request.extra_params.get('retail_rate'),
+                ),
                 'delivery_datetime': getattr(
                     method, 'DeliveryTimestamp', None)}
             for method in response.RateReplyDetails}
@@ -652,7 +656,7 @@ class FedExApi(Carrier):
         sig = request.extra_params.get('signature_required', None)
         if not sig:
             return
-        if not sig in ['Direct', 'Adult', 'Indirect']:
+        if sig not in ['Direct', 'Adult', 'Indirect']:
             raise NotSupportedError("Signature type not supported: %s." % sig)
         special_services = item.SpecialServicesRequested
         special_services.SpecialServiceTypes = ['SIGNATURE_OPTION']
@@ -684,7 +688,7 @@ class FedExApi(Carrier):
         finally:
             self.log_transmission(self.rates_client)
 
-        result = self.rate_response_dict(response)
+        result = self.rate_response_dict(request, response)
         self.cache_results(request, result)
 
         final = {

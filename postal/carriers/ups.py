@@ -358,14 +358,6 @@ class UPSApi(Carrier):
         self.logger.error('UPS: Unknown error.')
         raise CarrierError('UPS encountered an unknown error.')
 
-    def _get_negotiated_charge(self, rated_shipment):
-        if hasattr(rated_shipment, 'NegotiatedRateCharges'):
-            return self._get_money(
-                rated_shipment.NegotiatedRateCharges)
-        else:
-            self.logger.debug('UPS: No negotiated rates given.')
-            return self._get_money(rated_shipment)
-
     @staticmethod
     def get_length_plus_girth(package):
         height, width, length = sorted(
@@ -426,9 +418,15 @@ class UPSApi(Carrier):
         if tax_identification_number is not None:
             node.TaxIdentificationNumber = tax_identification_number
 
-    @staticmethod
-    def _get_money(node):
-        total = money.Money(node.TotalCharge.MonetaryValue, node.TotalCharge.CurrencyCode)
+    def _get_price(self, node, retail=False):
+        if not retail and not hasattr(node, 'NegotiatedRateCharges'):
+            self.logger.debug('UPS: No negotiated rates given.')
+            retail = True
+        if not retail:
+            node = node.NegotiatedRateCharges
+            total = money.Money(node.TotalCharge.MonetaryValue, node.TotalCharge.CurrencyCode)
+        else:
+            total = money.Money(node.TotalCharges.MonetaryValue, node.TotalCharges.CurrencyCode)
         if hasattr(node, 'TransportationCharges'):
             base_price = money.Money(node.TransportationCharges.MonetaryValue, node.TransportationCharges.CurrencyCode)
         else:
@@ -712,8 +710,9 @@ class UPSApi(Carrier):
         finally:
             self.log_transmission(self._Ship)
 
-        negotiated_rate = self._get_money(
-            response.ShipmentResults.NegotiatedRateCharges)
+        negotiated_rate = self._get_price(
+            response.ShipmentResults
+        )
 
         if response.Response.ResponseStatus.Code != '1':
             self._on_unknown_error()
@@ -762,8 +761,8 @@ class UPSApi(Carrier):
         """
         try:
             service = self.get_service(rated_shipment.Service.Code)
-
-            info = {'price': self._get_negotiated_charge(rated_shipment),
+            retail = request.extra_params.get('retail_rate')
+            info = {'price': self._get_price(rated_shipment, retail=retail),
                     'alerts': [a.Description
                                for a in rated_shipment.RatedShipmentAlert],
                     'trackable': True}
@@ -1090,7 +1089,7 @@ class UPSApi(Carrier):
             raise CarrierError('UPS has no rates available for those '
                                'parameters.')
 
-        result = self._get_negotiated_charge(rated_shipment)
+        result = self._get_price(rated_shipment)
 
         with self.logger.lock:
             self.logger.debug_header('Response')
