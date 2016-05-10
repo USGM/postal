@@ -613,7 +613,7 @@ class FedExApi(Carrier):
         return api_request
 
     @staticmethod
-    def get_price_dict(info, method_details, retail=False, response=None):
+    def get_price_dict(info, method_details, retail=False):
         if retail:
             fetch_types = ['PAYOR_LIST_SHIPMENT', 'PAYOR_LIST_PACKAGE']
         else:
@@ -633,6 +633,7 @@ class FedExApi(Carrier):
                     rating.TotalBaseCharge.Currency
                 )
                 price['fees'] = (price['total'] - price['base_price'])
+                break
         if not price:
             raise CarrierError("FedEx returned a nonsense price.")
         return price
@@ -645,7 +646,6 @@ class FedExApi(Carrier):
             method.ServiceType: {
                 'price': FedExApi.get_price_dict(
                     method, method.RatedShipmentDetails, retail=request.extra_params.get('retail_rate'),
-                    response=response,
                 ),
                 'delivery_datetime': getattr(
                     method, 'DeliveryTimestamp', None)}

@@ -1,4 +1,8 @@
 import unittest
+
+from ddt import data, ddt, unpack
+from mock import Mock
+
 from base import _AbstractTestCarrier, test_from, test_to
 from ..carriers.fedex import FedExApi
 from ..carriers.base import Carrier
@@ -6,6 +10,7 @@ from ..data import Request, Address, Package, Declaration, Shipment
 from money import Money
 
 
+@ddt
 class TestFedEx(_AbstractTestCarrier, unittest.TestCase):
     carrier_class = FedExApi
 
@@ -104,3 +109,32 @@ class TestFedEx(_AbstractTestCarrier, unittest.TestCase):
         response = self.carrier.get_services(self.domestic_request)
         self.assertTrue(response)
         response.keys()[0].ship(self.domestic_request)
+
+    @unpack
+    @data(('NORMAL_TYPE', False), ('PAYOR_LIST_SHIPMENT', True), ('PAYOR_LIST_PACKAGE', True))
+    def test_get_price_dict(self, list_type, retail):
+        info = Mock()
+        if retail:
+            info.ActualRateType = 'Dummy'
+        else:
+            info.ActualRateType = list_type
+        spec = ('RateType', 'TotalNetCharge', 'TotalBaseCharge', 'Currency')
+        details = [
+            Mock(RateType='Dummy', spec=[]),
+            Mock(
+                RateType=list_type,
+                TotalNetCharge=Mock(Amount='3.00', Currency='USD'),
+                TotalBaseCharge=Mock(Amount='2.00', Currency='USD'),
+                spec=spec,
+            ),
+            Mock(
+                RateType=list_type,
+                TotalNetCharge=Mock(Amount='5.00', Currency='USD'),
+                TotalBaseCharge=Mock(Amount='3.00', Currency='USD'),
+                spec=spec,
+            )
+        ]
+        price_dict = FedExApi.get_price_dict(info, details, retail=True)
+        self.assertEqual(price_dict['fees'], Money('1.00', 'USD'))
+        self.assertEqual(price_dict['base_price'], Money('2.00', 'USD'))
+        self.assertEqual(price_dict['total'], Money('3.00', 'USD'))
