@@ -200,7 +200,7 @@
   </wsdl:portType>
   <wsdl:service name="Service_1_0">
     <wsdl:port name="BasicHttpBinding_Service_1_0" binding="tns:BasicHttpBinding_Service_1_0">
-      <soap:address location="https://ws.dev.aramex.net/shippingapi/ratecalculator/service_1_0.svc"/>
+      <soap:address location="http://ws.aramex.net/shippingapi/ratecalculator/service_1_0.svc"/>
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>

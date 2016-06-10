@@ -48,7 +48,7 @@ class AramexApi(Carrier):
         'DDX': (1, 2),
         'DPX' : (1, 2),
         'GDX': (1, 3),
-        'GPX': (1, 3),
+        'GPX': (1, 3)
     }
 
     _carrier_error_codes = {
@@ -321,13 +321,14 @@ class AramexApi(Carrier):
             api_request = self.shipment_request_details(request)
             requests.append(api_request)
         else:
-            flat_services = ['PDX', 'DDX', 'GDX']
+            flat_services = ['PDX', 'PLX', 'DDX', 'GDX']
             non_flat_services = ['PPX', 'DPX', 'GPX']
             api_request = self.requested_shipment_details(request)
             if request.documents_only:
                 if request.total_weight() < self._priority_letter_limit:
                     api_req = deepcopy(api_request)
-                    api_req.ShipmentDetails.ProductType = 'OND'
+                    if not request.international():
+                        api_req.ShipmentDetails.ProductType = 'OND'
                     requests.append(api_req)
                 for service in flat_services:
                     api_req = deepcopy(api_request)

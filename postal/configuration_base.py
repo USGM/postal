@@ -9,7 +9,7 @@ base_postal_configuration = {
 
     # Any carriers you don't want to include should be removed from this list.
     # Any extra carriers you create or import should be added to this list.
-    'enabled_carriers': [USPSApi, FedExApi, UPSApi, DHLApi, USPSApi, AramexApi],
+    'enabled_carriers': [AramexApi],
     # On occasion, Postal will need to tell a carrier what currency to use
     # when getting a rate or other request. Pick the standard abbreviation
     # for the currency you want used as per ISO-4217.
@@ -120,12 +120,12 @@ base_postal_configuration = {
         # If account number is specified for aramex, then account pin, country code
         # and entity fields must also be given in the request.
         'Aramex' : {
-            'account_country_code': 'GB',
-            'account_entity': 'LON',
-            'account_number': '102331',
-            'account_pin': '321321',
-            'username': 'testingapi@aramex.com',
-            'password': 'R123456789$r',
+            'account_country_code': 'US',
+            'account_entity': 'JFK',
+            'account_number': '160922834',
+            'account_pin': '216316',
+            'username': 'ashwini.kaklij@silicus.com',
+            'password': 'Aramex@123',
             'version': '1',
             'test': True
 
