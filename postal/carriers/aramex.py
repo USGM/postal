@@ -1,15 +1,19 @@
 from multiprocessing.pool import ThreadPool
 
 from suds.client import Client
-
+from io import BytesIO
+from base64 import b64decode
 from money import Money
 from postal.carriers.base import Carrier, ClearEmpty
 from postal.exceptions import CarrierError
 from datetime import datetime, date
 from postal.data import Package
 from ..exceptions import PostalError
+from PyPDF2 import PdfFileReader, PdfFileWriter
 from copy import deepcopy
 from .base import Carrier
+from ..data import Address, Shipment, Declaration
+from collections import OrderedDict
 
 class AramexApi(Carrier):
     """
@@ -150,7 +154,6 @@ class AramexApi(Carrier):
 
     def set_shipper_details(self, request):
         target = self.ship_client.factory.create('Shipment')
-
         # set shipper address
         shipper = request.origin
         target.Shipper.AccountNumber = self.account_number
@@ -292,20 +295,29 @@ class AramexApi(Carrier):
 
     def get_request_rate(self, request_info):
         request, ship, service = request_info
-        print '****************************************'
-        print request
         try:
             if ship:
-                response = self.service_call(
+                result = self.service_call(
                     self.ship_client.service.CreateShipments, request.ClientInfo, request.Transaction,
                     request.Shipments, request.LabelInfo
                 )
+                tracking_number = result.Shipments.ProcessedShipment[0].ID
+                package_details = {
+                    'tracking_number': str(tracking_number),
+                    'label': result.Shipments.ProcessedShipment[0].ShipmentLabel.LabelURL
+                }
+                shipment_dict = {
+                    'shipment': Shipment(self, tracking_number),
+                    'packages': package_details,
+                    'price': self.quote(service, request)
+                }
+                return shipment_dict
             else:
                 response = self.service_call(
                     self.rates_client.service.CalculateRate, request.ClientInfo, request.Transaction,
                     request.OriginAddress, request.DestinationAddress, request.ShipmentDetails
                 )
-            return { request.ShipmentDetails.ProductType: self.get_price_dict(response)}
+                return { request.ShipmentDetails.ProductType: self.get_price_dict(response)}
         except CarrierError as e:
             if e.code not in self._carrier_error_codes:
                 # These error codes mean that the product type is not available for this particular request
@@ -323,7 +335,7 @@ class AramexApi(Carrier):
     def get_requests(self, request, ship, service):
         requests = []
         if ship:
-            api_request = self.shipment_request_details(request)
+            api_request = self.shipment_request_details(service)
             requests.append(api_request)
         else:
             flat_services = ['PDX', 'PLX', 'DDX', 'GDX']
@@ -353,8 +365,26 @@ class AramexApi(Carrier):
 
         return requests
 
-    def quote(self, service, request):
+    def quote(self, request, service):
         data = self.get_services(request, service)
-        print '@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@'
-        print data[service]['price']
         return data[service]['price']
+
+    """
+    @staticmethod
+    def format_label(label):
+        # Some jump-around for dual compatibility with Python 2 and 3
+        if isinstance(label, bytes):
+            label = label.decode('utf-8')
+        label = b64decode(label)
+        input = PdfFileReader(BytesIO(label))
+        input.strict = False
+        output = PdfFileWriter()
+
+        page = input.getPage(0)
+        page.mediaBox.lowerLeft = (30, 325)
+        page.mediaBox.upperRight = (320, 760)
+        output.addPage(page)
+        output_stream = BytesIO()
+        output.write(output_stream)
+        return output_stream.getvalue()
+    """
