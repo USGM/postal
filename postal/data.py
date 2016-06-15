@@ -309,7 +309,7 @@ class Package(object):
 
     @staticmethod
     def to_centimeters(number):
-        return number * 2.54
+        return number * Decimal(2.54)
 
     @staticmethod
     def to_inches(number):

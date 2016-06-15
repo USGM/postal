@@ -124,7 +124,7 @@ class AramexApi(Carrier):
         target.ProductGroup = 'DOM'
         if request.international():
             target.ProductGroup = 'EXP'
-        target.ActualWeight.Unit = Package.weight_unit()
+        target.ActualWeight.Unit = 'LB'
         target.ActualWeight.Value = request.total_weight()
         target.ChargeableWeight = target.ActualWeight
         target.PaymentType = 'P'
@@ -188,13 +188,14 @@ class AramexApi(Carrier):
 
         target.ShippingDateTime = datetime.now()
         target.DueDate = datetime.now()
-
+        """
         # Attach commercial invoice
         attachment = self.ship_client.factory.create('Attachment')
         attachment.FileName = 'commercial_invoice'
         attachment.FileExtension = 'pdf'
         attachment.FileContents = self.commercial_invoice(request)
         target.Attachments = attachment
+        """
 
         for package in request.packages:
             target.Details.Dimensions.Length = Package.to_centimeters(package.length)
@@ -203,8 +204,8 @@ class AramexApi(Carrier):
             target.Details.Dimensions.Unit = 'CM'
 
         target.Details.ActualWeight.Value = request.total_weight()
-        target.Details.ActualWeight.Unit = Package.weight_unit()
-        target.Details.ChargeableWeight.Unit = Package.weight_unit()
+        target.Details.ActualWeight.Unit = 'LB'
+        target.Details.ChargeableWeight.Unit = 'LB'
         target.Details.ChargeableWeight.Value = 1
         target.Details.ProductGroup = 'EXP'
         target.Details.ProductType = 'PPX'
@@ -216,14 +217,15 @@ class AramexApi(Carrier):
         target.Details.CustomsValueAmount.CurrencyCode = 'USD'
         target.Details.CustomsValueAmount.Value = 1
 
+        items = []
         for package in request.packages:
             shipment_item = self.ship_client.factory.create('ShipmentItem')
-            shipment_item.PackageType = 'Box'
+            shipment_item.PackageType = ''
             shipment_item.Quantity = 1
-            shipment_item.Weight.Value = package.weight
-            shipment_item.Weight.Unit = Package.weight_unit()
-            shipment_item.Comments = 'Docs'
-            target.Details.Items = shipment_item
+            shipment_item.Weight = package.weight
+            shipment_item.Comments = ''
+            items.append(shipment_item)
+        target.Details.Items = items
         return target
 
     @property
@@ -258,24 +260,26 @@ class AramexApi(Carrier):
 
         return response
 
-    def get_services(self, request):
+    def get_services(self, request, service=None):
         AramexApi.carrier_error = None
-        self.process_request(request, ship=False)
+        ship = False
+        return self.process_request(request, ship, service)
 
-    def ship(self, request):
+    def ship(self, request, service=None):
         AramexApi.carrier_error = None
-        self.process_request(request, ship=True)
+        ship = True
+        self.process_request(request, ship, service)
 
-    def process_request(self, request, ship):
+    def process_request(self, request, ship, service):
         AramexApi.carrier_error = None
-        requests= self.get_requests(request, ship)
+        requests= self.get_requests(request, ship, service)
         thread_pool = ThreadPool(processes=len(requests))
-        results = thread_pool.map(self.get_request_rate, [(api_request, ship)  for api_request in requests])
+        results = thread_pool.map(self.get_request_rate, [(api_request, ship, service)  for api_request in requests])
         thread_pool.terminate()
         thread_pool.join()
-
         if AramexApi.carrier_error:
-            raise AramexApi.carrier_error
+            pass
+            #raise AramexApi.carrier_error
 
         final = {
             self.get_service(key): {
@@ -287,8 +291,9 @@ class AramexApi(Carrier):
         return final
 
     def get_request_rate(self, request_info):
-        request, ship = request_info
-
+        request, ship, service = request_info
+        print '****************************************'
+        print request
         try:
             if ship:
                 response = self.service_call(
@@ -315,7 +320,7 @@ class AramexApi(Carrier):
         price['fees'] = Money(0, info.TotalAmount.CurrencyCode)
         return price
 
-    def get_requests(self, request, ship):
+    def get_requests(self, request, ship, service):
         requests = []
         if ship:
             api_request = self.shipment_request_details(request)
@@ -324,20 +329,32 @@ class AramexApi(Carrier):
             flat_services = ['PDX', 'PLX', 'DDX', 'GDX']
             non_flat_services = ['PPX', 'DPX', 'GPX']
             api_request = self.requested_shipment_details(request)
-            if request.documents_only:
-                if request.total_weight() < self._priority_letter_limit:
-                    api_req = deepcopy(api_request)
-                    if not request.international():
-                        api_req.ShipmentDetails.ProductType = 'OND'
-                    requests.append(api_req)
-                for service in flat_services:
+            if service:
+                api_req = deepcopy(api_request)
+                api_req.ShipmentDetails.ProductType = service.service_id
+                requests.append(api_req)
+            else:
+                if request.documents_only:
+                    if request.total_weight() < self._priority_letter_limit:
+                        if not request.international():
+                            api_req = deepcopy(api_request)
+                            api_req.ShipmentDetails.ProductType = 'OND'
+                            requests.append(api_req)
+
+                    for service in flat_services:
+                        api_req = deepcopy(api_request)
+                        api_req.ShipmentDetails.ProductType = service
+                        requests.append(api_req)
+
+                for service in non_flat_services:
                     api_req = deepcopy(api_request)
                     api_req.ShipmentDetails.ProductType = service
                     requests.append(api_req)
 
-            for service in non_flat_services:
-                api_req = deepcopy(api_request)
-                api_req.ShipmentDetails.ProductType = service
-                requests.append(api_req)
-
         return requests
+
+    def quote(self, service, request):
+        data = self.get_services(request, service)
+        print '@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@'
+        print data[service]['price']
+        return data[service]['price']
