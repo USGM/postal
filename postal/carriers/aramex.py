@@ -265,15 +265,16 @@ class AramexApi(Carrier):
 
     def get_services(self, request, service=None):
         AramexApi.carrier_error = None
-        ship = False
-        return self.process_request(request, ship, service)
+        return self.process_request(request, False, service)
 
-    def ship(self, request, service=None):
+    def ship(self, service, request):
         AramexApi.carrier_error = None
-        ship = True
-        self.process_request(request, ship, service)
+        return self.process_request(request, True, service)
 
     def process_request(self, request, ship, service):
+        print 'lllllllllllllllllllllllll'
+        print service
+        print ship
         AramexApi.carrier_error = None
         requests= self.get_requests(request, ship, service)
         thread_pool = ThreadPool(processes=len(requests))
@@ -295,6 +296,7 @@ class AramexApi(Carrier):
 
     def get_request_rate(self, request_info):
         request, ship, service = request_info
+
         try:
             if ship:
                 result = self.service_call(
@@ -302,17 +304,22 @@ class AramexApi(Carrier):
                     request.Shipments, request.LabelInfo
                 )
                 tracking_number = result.Shipments.ProcessedShipment[0].ID
+                print '##################################3'
+                print tracking_number
                 package_details = {
                     'tracking_number': str(tracking_number),
                     'label': result.Shipments.ProcessedShipment[0].ShipmentLabel.LabelURL
                 }
+
                 shipment_dict = {
                     'shipment': Shipment(self, tracking_number),
                     'packages': package_details,
-                    'price': self.quote(service, request)
+                    'price': self.quote(request, service)
                 }
                 return shipment_dict
             else:
+                print '5555555555555555555555555555555555555555555555555555'
+                print service
                 response = self.service_call(
                     self.rates_client.service.CalculateRate, request.ClientInfo, request.Transaction,
                     request.OriginAddress, request.DestinationAddress, request.ShipmentDetails
@@ -335,7 +342,7 @@ class AramexApi(Carrier):
     def get_requests(self, request, ship, service):
         requests = []
         if ship:
-            api_request = self.shipment_request_details(service)
+            api_request = self.shipment_request_details(request)
             requests.append(api_request)
         else:
             flat_services = ['PDX', 'PLX', 'DDX', 'GDX']
@@ -366,7 +373,9 @@ class AramexApi(Carrier):
         return requests
 
     def quote(self, request, service):
-        data = self.get_services(request, service)
+        data = self.get_services(request, service=service)
+        print '@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@'
+        print data[service]['price']
         return data[service]['price']
 
     """
