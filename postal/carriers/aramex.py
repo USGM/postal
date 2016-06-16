@@ -1,19 +1,20 @@
 from multiprocessing.pool import ThreadPool
 
 from suds.client import Client
-from io import BytesIO
-from base64 import b64decode
 from money import Money
 from postal.carriers.base import Carrier, ClearEmpty
 from postal.exceptions import CarrierError
 from datetime import datetime, date
 from postal.data import Package
+from io import BytesIO
+from base64 import b64decode
 from ..exceptions import PostalError
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from copy import deepcopy
 from .base import Carrier
 from ..data import Address, Shipment, Declaration
 from collections import OrderedDict
+from decimal import Decimal
 
 class AramexApi(Carrier):
     """
@@ -143,16 +144,18 @@ class AramexApi(Carrier):
             shipment_item.Comments = ''
             target.append(shipment_item)
 
-    def shipment_request_details(self, request):
+    def shipment_request_details(self, request_info):
+        request, service = request_info
         api_request = self.ship_client.factory.create('ShipmentCreationRequest')
         api_request.ClientInfo = self.client_info
         api_request.LabelInfo = self.label_info()
         if not request.origin:
             request.origin = self.postal_configuration['shipper_address']
-        api_request.Shipments.Shipment = self.set_shipper_details(request)
+        api_request.Shipments.Shipment = self.set_shipper_details(request_info)
         return api_request
 
-    def set_shipper_details(self, request):
+    def set_shipper_details(self, request_info):
+        request, service = request_info
         target = self.ship_client.factory.create('Shipment')
         # set shipper address
         shipper = request.origin
@@ -191,27 +194,28 @@ class AramexApi(Carrier):
 
         target.ShippingDateTime = datetime.now()
         target.DueDate = datetime.now()
-        """
+
         # Attach commercial invoice
         attachment = self.ship_client.factory.create('Attachment')
         attachment.FileName = 'commercial_invoice'
         attachment.FileExtension = 'pdf'
         attachment.FileContents = self.commercial_invoice(request)
         target.Attachments = attachment
-        """
 
         for package in request.packages:
-            target.Details.Dimensions.Length = Package.to_centimeters(package.length)
-            target.Details.Dimensions.Width = Package.to_centimeters(package.width)
-            target.Details.Dimensions.Height = Package.to_centimeters(package.height)
+            target.Details.Dimensions.Length = Decimal(Package.to_centimeters(package.length))
+            target.Details.Dimensions.Width = Decimal(Package.to_centimeters(package.width))
+            target.Details.Dimensions.Height = Decimal(Package.to_centimeters(package.height))
             target.Details.Dimensions.Unit = 'CM'
 
         target.Details.ActualWeight.Value = request.total_weight()
         target.Details.ActualWeight.Unit = 'LB'
         target.Details.ChargeableWeight.Unit = 'LB'
         target.Details.ChargeableWeight.Value = 1
-        target.Details.ProductGroup = 'EXP'
-        target.Details.ProductType = 'PPX'
+        target.Details.ProductGroup = 'DOM'
+        if request.international():
+            target.Details.ProductGroup = 'EXP'
+        target.Details.ProductType = service.service_id
         target.Details.PaymentType = 'P'
         target.Details.NumberOfPieces = len(request.packages)
         target.Details.DescriptionOfGoods = 'Docs'
@@ -263,63 +267,64 @@ class AramexApi(Carrier):
 
         return response
 
-    def get_services(self, request, service=None):
+    def get_services(self, request, service=False):
         AramexApi.carrier_error = None
-        return self.process_request(request, False, service)
+        return self.process_request((request, False), service=service)
 
     def ship(self, service, request):
         AramexApi.carrier_error = None
-        return self.process_request(request, True, service)
+        return self.process_request((request, True), service=service)
 
-    def process_request(self, request, ship, service):
-        print 'lllllllllllllllllllllllll'
-        print service
-        print ship
+    def process_request(self, request_info, service):
         AramexApi.carrier_error = None
-        requests= self.get_requests(request, ship, service)
+        request, ship = request_info
+        requests= self.get_requests((request, ship), service=service)
         thread_pool = ThreadPool(processes=len(requests))
-        results = thread_pool.map(self.get_request_rate, [(api_request, ship, service)  for api_request in requests])
+        results = thread_pool.map(self.get_request_rate, [(api_request, ship, service)   for api_request in requests])
         thread_pool.terminate()
         thread_pool.join()
         if AramexApi.carrier_error:
             pass
-            #raise AramexApi.carrier_error
+            raise AramexApi.carrier_error
 
-        final = {
-            self.get_service(key): {
-                'price': value,
-                'delivery_datetime': None,
-                'trackable': True
-            } for response in results if response for key, value in response.items()
-        }
-        return final
+        if ship:
+            result = results[0]
+            tracking_number = str(result.Shipments.ProcessedShipment[0].ID)
+            package = request.packages[0]
+            package_details = OrderedDict()
+            print '^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^'
+            print result.Shipments.ProcessedShipment[0].ShipmentLabel.LabelURL
+            package_details[package] = {
+                'tracking_number': str(tracking_number),
+                'label': result.Shipments.ProcessedShipment[0].ShipmentLabel.LabelURL
+            }
+            shipment_dict = {
+                'shipment': Shipment(self, tracking_number),
+                'packages': package_details,
+                'price': self.quote(request, service),
+            }
+            return shipment_dict
+
+        else:
+            final = {
+                self.get_service(key): {
+                    'price': value,
+                    'delivery_datetime': None,
+                    'trackable': True
+                } for response in results if response for key, value in response.items()
+            }
+            return final
 
     def get_request_rate(self, request_info):
         request, ship, service = request_info
-
         try:
             if ship:
-                result = self.service_call(
+                return self.service_call(
                     self.ship_client.service.CreateShipments, request.ClientInfo, request.Transaction,
                     request.Shipments, request.LabelInfo
                 )
-                tracking_number = result.Shipments.ProcessedShipment[0].ID
-                print '##################################3'
-                print tracking_number
-                package_details = {
-                    'tracking_number': str(tracking_number),
-                    'label': result.Shipments.ProcessedShipment[0].ShipmentLabel.LabelURL
-                }
 
-                shipment_dict = {
-                    'shipment': Shipment(self, tracking_number),
-                    'packages': package_details,
-                    'price': self.quote(request, service)
-                }
-                return shipment_dict
             else:
-                print '5555555555555555555555555555555555555555555555555555'
-                print service
                 response = self.service_call(
                     self.rates_client.service.CalculateRate, request.ClientInfo, request.Transaction,
                     request.OriginAddress, request.DestinationAddress, request.ShipmentDetails
@@ -339,10 +344,11 @@ class AramexApi(Carrier):
         price['fees'] = Money(0, info.TotalAmount.CurrencyCode)
         return price
 
-    def get_requests(self, request, ship, service):
+    def get_requests(self, request_info, service):
+        request, ship = request_info
         requests = []
         if ship:
-            api_request = self.shipment_request_details(request)
+            api_request = self.shipment_request_details((request, service))
             requests.append(api_request)
         else:
             flat_services = ['PDX', 'PLX', 'DDX', 'GDX']
@@ -374,11 +380,8 @@ class AramexApi(Carrier):
 
     def quote(self, request, service):
         data = self.get_services(request, service=service)
-        print '@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@'
-        print data[service]['price']
         return data[service]['price']
 
-    """
     @staticmethod
     def format_label(label):
         # Some jump-around for dual compatibility with Python 2 and 3
@@ -396,4 +399,3 @@ class AramexApi(Carrier):
         output_stream = BytesIO()
         output.write(output_stream)
         return output_stream.getvalue()
-    """
