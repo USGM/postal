@@ -76,7 +76,7 @@ class AramexApi(Carrier):
     def __init__(
             self, account_country_code, account_entity,
             account_number, account_pin, username,
-            password, version, test, postal_configuration=None
+            password, test, postal_configuration=None
     ):
         super(AramexApi, self).__init__(postal_configuration)
         self.postal_configuration = postal_configuration
@@ -86,7 +86,7 @@ class AramexApi(Carrier):
         self.account_pin = account_pin
         self.username = username
         self.password = password
-        self.version = version
+        self.version = 1
         self.test = True
 
     @property
@@ -160,9 +160,13 @@ class AramexApi(Carrier):
         # set shipper address
         shipper = request.origin
         target.Shipper.AccountNumber = self.account_number
-        target.Shipper.PartyAddress.Line1 = shipper.street_lines[0]
-        target.Shipper.PartyAddress.Line2 = ''
-        target.Shipper.PartyAddress.Line3 = ''
+        lines = {
+            'Line{}'.format(num + 1) : line
+                for num, line in enumerate(shipper.street_lines)
+        }
+        for line, value in lines.items():
+            setattr(target.Shipper.PartyAddress, line, value)
+
         target.Shipper.PartyAddress.City = shipper.city
         target.Shipper.PartyAddress.PostCode = shipper.postal_code
         target.Shipper.PartyAddress.CountryCode = shipper.country.alpha2
@@ -171,25 +175,27 @@ class AramexApi(Carrier):
         target.Shipper.Contact.PhoneNumber1 = shipper.phone_number
         target.Shipper.Contact.PhoneNumber2 = ''
         target.Shipper.Contact.CellPhone = shipper.phone_number
-        target.Shipper.Contact.EmailAddress = 'support@usglobalmail.com'
+        target.Shipper.Contact.EmailAddress = request.extra_params['admin'].email
         target.Shipper.Contact.Type = 1
 
         # set consignee details
         consignee = request.destination
-        target.Consignee.PartyAddress.Line1 = 'Test line'
-        target.Consignee.PartyAddress.Line2 = ''
-        target.Consignee.PartyAddress.Line2 = ''
+        lines = {
+            'Line{}'.format(num + 1) : line
+                for num, line in enumerate(consignee.street_lines)
+        }
+        for line, value in lines.items():
+            setattr(target.Consignee.PartyAddress, line, value)
+
         target.Consignee.PartyAddress.City = ''
         target.Consignee.PartyAddress.PostCode = consignee.postal_code
         target.Consignee.PartyAddress.CountryCode = consignee.country.alpha2
-
-        target.Consignee.Contact.PersonName = 'test'
-        target.Consignee.Contact.CompanyName = 'test'
-        target.Consignee.Contact.PhoneNumber1 = '65515111'
+        target.Consignee.Contact.PersonName = consignee.contact_name
+        target.Consignee.Contact.CompanyName = 'NA'
+        target.Consignee.Contact.PhoneNumber1 = consignee.phone_number
         target.Consignee.Contact.PhoneNumber2 = ''
-        target.Consignee.Contact.CellPhone = '951753'
-        target.Consignee.Contact.PhoneNumber1Ext = '555'
-        target.Consignee.Contact.EmailAddress = 'fadiza@aramex.com'
+        target.Consignee.Contact.CellPhone = consignee.phone_number
+        target.Consignee.Contact.EmailAddress = request.extra_params['customer'].email
         target.Consignee.Contact.Type = 1
 
         target.ShippingDateTime = datetime.now()
@@ -292,11 +298,9 @@ class AramexApi(Carrier):
             tracking_number = str(result.Shipments.ProcessedShipment[0].ID)
             package = request.packages[0]
             package_details = OrderedDict()
-            print '^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^'
-            print result.Shipments.ProcessedShipment[0].ShipmentLabel.LabelURL
             package_details[package] = {
                 'tracking_number': str(tracking_number),
-                'label': result.Shipments.ProcessedShipment[0].ShipmentLabel.LabelURL
+                'label': self.format_label(result.Shipments.ProcessedShipment[0].ShipmentLabel.LabelURL)
             }
             shipment_dict = {
                 'shipment': Shipment(self, tracking_number),
@@ -384,18 +388,8 @@ class AramexApi(Carrier):
 
     @staticmethod
     def format_label(label):
-        # Some jump-around for dual compatibility with Python 2 and 3
-        if isinstance(label, bytes):
-            label = label.decode('utf-8')
-        label = b64decode(label)
-        input = PdfFileReader(BytesIO(label))
-        input.strict = False
-        output = PdfFileWriter()
+        import requests
+        r = requests.get(label, stream=True)
+        return r.content
 
-        page = input.getPage(0)
-        page.mediaBox.lowerLeft = (30, 325)
-        page.mediaBox.upperRight = (320, 760)
-        output.addPage(page)
-        output_stream = BytesIO()
-        output.write(output_stream)
-        return output_stream.getvalue()
+

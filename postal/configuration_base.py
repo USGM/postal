@@ -126,7 +126,6 @@ base_postal_configuration = {
             'account_pin': '216316',
             'username': 'ashwini.kaklij@silicus.com',
             'password': 'Aramex@123',
-            'version': '1',
             'test': True
 
         }

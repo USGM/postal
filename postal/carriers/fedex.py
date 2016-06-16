@@ -436,9 +436,6 @@ class FedExApi(Carrier):
                 transaction_detail, version_id, requested_shipment)
 
             detail = result.CompletedShipmentDetail.CompletedPackageDetails[0]
-            print '#####################################################################################'
-            print detail.Label.Parts[0].Image
-            print '############# End ###############'
             package_details[package] = {
                 'tracking_number': str(
                     detail.TrackingIds[0].TrackingNumber),
