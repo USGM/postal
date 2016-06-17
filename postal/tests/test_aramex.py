@@ -7,7 +7,7 @@ from postal.carriers.aramex import AramexApi
 from postal.carriers.base import Service
 from postal.data import PackageType
 
-from ..data import (Address, Package, Request) 
+from ..data import (Address, Package, Request)
 from .base import test_european, test_to, test_from
 from .test_configuration import config
 
@@ -27,7 +27,7 @@ class TestAramex (unittest.TestCase):
         self.international_package = Package(3, 4, 5, 6)
         self.carrier = AramexApi(postal_configuration=config,
             **config['carrier_inits']['Aramex'])
-        
+
         self.mock_response = mock.MagicMock(HasErrors=False, notifications=())
         self.mock_response.TotalAmount = mock.MagicMock(Value=34.5, CurrencyCode='USD')
         self.rate_request = self.carrier.rates_client.factory.create('RateCalculatorRequest');
@@ -53,13 +53,13 @@ class TestAramex (unittest.TestCase):
             args = calls[0]
             self.validate_arguments(args, request)
             self.validate_services(services)
-    
+
     def validate_arguments(self, args, request):
         auth = args[0]
         origin = args[2]
         dest = args[3]
         details = args[4]
-        
+
         self.assertEqual(self.carrier.client_info.UserName, auth.UserName)
         self.assertEqual(self.carrier.client_info.Password, auth.Password)
         self.assertEqual(request.origin.city, origin.City)
@@ -68,7 +68,7 @@ class TestAramex (unittest.TestCase):
         self.assertEqual(request.destination.postal_code, dest.PostCode)
         self.assertEqual(request.total_weight(), details.ActualWeight.Value)
         self.assertEqual('LB', details.ActualWeight.Unit)
-        
+
     def validate_services(self, services):
         self.assertTrue(services)
         for service, info in services.items():

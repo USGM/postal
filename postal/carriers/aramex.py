@@ -16,6 +16,7 @@ from ..data import Address, Shipment, Declaration
 from collections import OrderedDict
 from decimal import Decimal
 
+TWOPLACES = Decimal('0.01')
 class AramexApi(Carrier):
     """
     Implements calls to the aramex api.
@@ -65,6 +66,7 @@ class AramexApi(Carrier):
     _priority_letter_limit = 1.10231
     carrier_error = None
     _ship_client = None
+
 
     def create_client(self, wsdl_name):
         client = Client(
@@ -208,11 +210,27 @@ class AramexApi(Carrier):
         attachment.FileContents = self.commercial_invoice(request)
         target.Attachments = attachment
 
+        description = ''
+        items = []
         for package in request.packages:
-            target.Details.Dimensions.Length = Decimal(Package.to_centimeters(package.length))
-            target.Details.Dimensions.Width = Decimal(Package.to_centimeters(package.width))
-            target.Details.Dimensions.Height = Decimal(Package.to_centimeters(package.height))
+            target.Details.Dimensions.Length = Decimal(Package.to_centimeters(package.length)).quantize(TWOPLACES)
+            target.Details.Dimensions.Width = Decimal(Package.to_centimeters(package.width)).quantize(TWOPLACES)
+            target.Details.Dimensions.Height = Decimal(Package.to_centimeters(package.height)).quantize(TWOPLACES)
             target.Details.Dimensions.Unit = 'CM'
+
+            shipment_item = self.ship_client.factory.create('ShipmentItem')
+            shipment_item.PackageType = ''
+            shipment_item.Quantity = 1
+            shipment_item.Weight = package.weight
+            shipment_item.Comments = ''
+            items.append(shipment_item)
+
+            declarations = package.declarations[:]
+            for declaration in declarations:
+                description += declaration.description + ', '
+
+        target.Details.DescriptionOfGoods = description
+        target.Details.Items = items
 
         target.Details.ActualWeight.Value = request.total_weight()
         target.Details.ActualWeight.Unit = 'LB'
@@ -224,21 +242,10 @@ class AramexApi(Carrier):
         target.Details.ProductType = service.service_id
         target.Details.PaymentType = 'P'
         target.Details.NumberOfPieces = len(request.packages)
-        target.Details.DescriptionOfGoods = 'Docs'
         target.Details.GoodsOriginCountry = shipper.country.alpha2
         target.Details.PaymentOptions = ''
         target.Details.CustomsValueAmount.CurrencyCode = 'USD'
         target.Details.CustomsValueAmount.Value = 1
-
-        items = []
-        for package in request.packages:
-            shipment_item = self.ship_client.factory.create('ShipmentItem')
-            shipment_item.PackageType = ''
-            shipment_item.Quantity = 1
-            shipment_item.Weight = package.weight
-            shipment_item.Comments = ''
-            items.append(shipment_item)
-        target.Details.Items = items
         return target
 
     @property
@@ -290,7 +297,6 @@ class AramexApi(Carrier):
         thread_pool.terminate()
         thread_pool.join()
         if AramexApi.carrier_error:
-            pass
             raise AramexApi.carrier_error
 
         if ship:
