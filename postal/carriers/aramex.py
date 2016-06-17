@@ -30,7 +30,8 @@ class AramexApi(Carrier):
         'DDX': 'Deferred document express',
         'DPX' : 'Deferred parcel express',
         'GDX': 'Ground document express',
-        'GPX': 'Ground parcel express'
+        'GPX': 'Ground parcel express',
+        'OND': 'OND'
     }
 
     _product_group_to_description = {
