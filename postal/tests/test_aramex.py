@@ -92,5 +92,7 @@ class TestAramex (unittest.TestCase):
     @mock.patch('postal.carriers.aramex.AramexApi.format_label')
     @mock.patch('postal.carriers.aramex.AramexApi.quote')
     def test_shipping_international(self, mock_ship_client, mock_format_label, mock_quote):
+        mock_ship_client.service = mock.MagicMock()
+        mock_ship_client.service.CreateShipments.return_value = self.mock_response
         request = Request(self.test_from, self.european_address, [self.international_package])
         self.carrier.get_service('OND').ship(request)

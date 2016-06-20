@@ -63,7 +63,7 @@ class Address(object):
     def __init__(
             self, contact_name=None, phone_number=None,
             street_lines=None, city=None, subdivision=None,
-            postal_code=None, country=None, residential=False):
+            postal_code=None, country=None, residential=False, email=None):
         """
         contact_name:string
         phone_number:string
@@ -89,6 +89,7 @@ class Address(object):
 
         self.contact_name = contact_name
         self.phone_number = phone_number
+        self.email = email
 
         self.street_lines = list(street_lines)  # Calling list() to raise
         # exception immediately if parameter is not iterable.

@@ -178,7 +178,11 @@ class AramexApi(Carrier):
         target.Shipper.Contact.PhoneNumber1 = shipper.phone_number
         target.Shipper.Contact.PhoneNumber2 = ''
         target.Shipper.Contact.CellPhone = shipper.phone_number
-        target.Shipper.Contact.EmailAddress = 'admin@usglobalmail.com' # request.extra_params['admin'].email
+        shipper_email = 'support@usglobalmail.com'
+        if shipper.email:
+            shipper_email = shipper.email
+        target.Shipper.Contact.EmailAddress = shipper_email
+
         target.Shipper.Contact.Type = 1
 
         # set consignee details
@@ -198,9 +202,13 @@ class AramexApi(Carrier):
         target.Consignee.Contact.PhoneNumber1 = consignee.phone_number
         target.Consignee.Contact.PhoneNumber2 = ''
         target.Consignee.Contact.CellPhone = consignee.phone_number
-        target.Consignee.Contact.EmailAddress = 'customer@usglobalmail.com'  #request.extra_params['customer'].email
-        target.Consignee.Contact.Type = 1
 
+        # Consignee email address is mandatory, any string can be set
+        consignee_email = consignee.contact_name
+        if consignee.email:
+            consignee_email = consignee.email
+        target.Consignee.Contact.EmailAddress = consignee_email
+        target.Consignee.Contact.Type = 1
         target.ShippingDateTime = datetime.now()
         target.DueDate = datetime.now()
 
@@ -228,7 +236,7 @@ class AramexApi(Carrier):
             if package.declarations or package.documents_only:
                 declarations = package.declarations[:]
                 for declaration in declarations:
-                    description += declaration.description + ', '
+                    description += declaration.description + ' x' + str(declaration.units) + ', ' + str(declaration.value) + ' each '
                 value = package.get_total_insured_value()
                 if value > 0:
                     insurance_amount = insurance_amount+value.amount
