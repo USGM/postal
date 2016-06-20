@@ -80,3 +80,17 @@ class TestAramex (unittest.TestCase):
             self.assertEqual(info['price']['total'], (info['price']['base_price'] + info['price']['fees']))
             if info['delivery_datetime'] is not None:
                 self.assertIsInstance(info['delivery_datetime'], datetime)
+
+    @mock.patch('postal.carriers.aramex.AramexApi.ship_client')
+    @mock.patch('postal.carriers.aramex.AramexApi.format_label')
+    @mock.patch('postal.carriers.aramex.AramexApi.quote')
+    def test_shipping_domestic(self, mock_ship_client, mock_format_label, mock_quote):
+        request = Request(self.test_from, self.test_to, [self.domestic_package])
+        self.carrier.get_service('OND').ship(request)
+
+    @mock.patch('postal.carriers.aramex.AramexApi.ship_client')
+    @mock.patch('postal.carriers.aramex.AramexApi.format_label')
+    @mock.patch('postal.carriers.aramex.AramexApi.quote')
+    def test_shipping_international(self, mock_ship_client, mock_format_label, mock_quote):
+        request = Request(self.test_from, self.european_address, [self.international_package])
+        self.carrier.get_service('OND').ship(request)

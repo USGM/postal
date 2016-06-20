@@ -178,7 +178,7 @@ class AramexApi(Carrier):
         target.Shipper.Contact.PhoneNumber1 = shipper.phone_number
         target.Shipper.Contact.PhoneNumber2 = ''
         target.Shipper.Contact.CellPhone = shipper.phone_number
-        target.Shipper.Contact.EmailAddress = request.extra_params['admin'].email
+        target.Shipper.Contact.EmailAddress = 'admin@usglobalmail.com' # request.extra_params['admin'].email
         target.Shipper.Contact.Type = 1
 
         # set consignee details
@@ -198,7 +198,7 @@ class AramexApi(Carrier):
         target.Consignee.Contact.PhoneNumber1 = consignee.phone_number
         target.Consignee.Contact.PhoneNumber2 = ''
         target.Consignee.Contact.CellPhone = consignee.phone_number
-        target.Consignee.Contact.EmailAddress = request.extra_params['customer'].email
+        target.Consignee.Contact.EmailAddress = 'customer@usglobalmail.com'  #request.extra_params['customer'].email
         target.Consignee.Contact.Type = 1
 
         target.ShippingDateTime = datetime.now()
@@ -213,24 +213,30 @@ class AramexApi(Carrier):
 
         description = ''
         items = []
+        insurance_amount = 0
         for package in request.packages:
             target.Details.Dimensions.Length = Decimal(Package.to_centimeters(package.length)).quantize(TWOPLACES)
             target.Details.Dimensions.Width = Decimal(Package.to_centimeters(package.width)).quantize(TWOPLACES)
             target.Details.Dimensions.Height = Decimal(Package.to_centimeters(package.height)).quantize(TWOPLACES)
             target.Details.Dimensions.Unit = 'CM'
-
             shipment_item = self.ship_client.factory.create('ShipmentItem')
             shipment_item.PackageType = ''
             shipment_item.Quantity = 1
             shipment_item.Weight = package.weight
             shipment_item.Comments = ''
             items.append(shipment_item)
+            if package.declarations or package.documents_only:
+                declarations = package.declarations[:]
+                for declaration in declarations:
+                    description += declaration.description + ', '
+                value = package.get_total_insured_value()
+                if value > 0:
+                    insurance_amount = insurance_amount+value.amount
 
-            declarations = package.declarations[:]
-            for declaration in declarations:
-                description += declaration.description + ', '
-
-        target.Details.DescriptionOfGoods = description
+        if insurance_amount > 0:
+            target.Details.InsuranceAmount.CurrencyCode = self.postal_configuration['default_currency']
+            target.Details.InsuranceAmount.Value = insurance_amount
+        target.Details.DescriptionOfGoods = 'Declarations: ' + description
         target.Details.Items = items
 
         target.Details.ActualWeight.Value = request.total_weight()
@@ -238,6 +244,7 @@ class AramexApi(Carrier):
         target.Details.ChargeableWeight.Unit = 'LB'
         target.Details.ChargeableWeight.Value = 1
         target.Details.ProductGroup = 'DOM'
+
         if request.international():
             target.Details.ProductGroup = 'EXP'
         target.Details.ProductType = service.service_id
@@ -245,7 +252,7 @@ class AramexApi(Carrier):
         target.Details.NumberOfPieces = len(request.packages)
         target.Details.GoodsOriginCountry = shipper.country.alpha2
         target.Details.PaymentOptions = ''
-        target.Details.CustomsValueAmount.CurrencyCode = 'USD'
+        target.Details.CustomsValueAmount.CurrencyCode = self.postal_configuration['default_currency']
         target.Details.CustomsValueAmount.Value = 1
         return target
 
@@ -398,5 +405,4 @@ class AramexApi(Carrier):
         import requests
         r = requests.get(label, stream=True)
         return r.content
-
 
