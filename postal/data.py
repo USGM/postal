@@ -310,7 +310,7 @@ class Package(object):
 
     @staticmethod
     def to_centimeters(number):
-        return number * Decimal(2.54)
+        return number * Decimal('2.54')
 
     @staticmethod
     def to_inches(number):
@@ -319,10 +319,6 @@ class Package(object):
     @staticmethod
     def to_kilograms(number):
         return number * 0.453592
-
-    @staticmethod
-    def weight_unit():
-        return 'LB'
 
     @staticmethod
     def to_pounds(number):

@@ -312,7 +312,8 @@ class AramexApi(Carrier):
         thread_pool.terminate()
         thread_pool.join()
         if AramexApi.carrier_error:
-            raise AramexApi.carrier_error
+            if ship:
+                raise AramexApi.carrier_error
 
         if ship:
             result = results[0]
@@ -375,32 +376,28 @@ class AramexApi(Carrier):
         if ship:
             api_request = self.shipment_request_details((request, service))
             requests.append(api_request)
-        else:
-            flat_services = ['PDX', 'PLX', 'DDX', 'GDX']
-            non_flat_services = ['PPX', 'DPX', 'GPX']
-            api_request = self.requested_shipment_details(request)
-            if service:
+            return requests
+        flat_services = ['PDX', 'PLX', 'DDX', 'GDX']
+        non_flat_services = ['PPX', 'DPX', 'GPX']
+        api_request = self.requested_shipment_details(request)
+        if service:
+            api_req = deepcopy(api_request)
+            api_req.ShipmentDetails.ProductType = service.service_id
+            requests.append(api_req)
+            return requests
+        if request.documents_only:
+            if request.total_weight() < self._priority_letter_limit and not request.international():
                 api_req = deepcopy(api_request)
-                api_req.ShipmentDetails.ProductType = service.service_id
+                api_req.ShipmentDetails.ProductType = 'OND'
                 requests.append(api_req)
-            else:
-                if request.documents_only:
-                    if request.total_weight() < self._priority_letter_limit:
-                        if not request.international():
-                            api_req = deepcopy(api_request)
-                            api_req.ShipmentDetails.ProductType = 'OND'
-                            requests.append(api_req)
-
-                    for service in flat_services:
-                        api_req = deepcopy(api_request)
-                        api_req.ShipmentDetails.ProductType = service
-                        requests.append(api_req)
-
-                for service in non_flat_services:
-                    api_req = deepcopy(api_request)
-                    api_req.ShipmentDetails.ProductType = service
-                    requests.append(api_req)
-
+            for service in flat_services:
+                api_req = deepcopy(api_request)
+                api_req.ShipmentDetails.ProductType = service
+                requests.append(api_req)
+        for service in non_flat_services:
+            api_req = deepcopy(api_request)
+            api_req.ShipmentDetails.ProductType = service
+            requests.append(api_req)
         return requests
 
     def quote(self, request, service):
