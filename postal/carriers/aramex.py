@@ -194,7 +194,7 @@ class AramexApi(Carrier):
         for line, value in lines.items():
             setattr(target.Consignee.PartyAddress, line, value)
 
-        target.Consignee.PartyAddress.City = ''
+        target.Consignee.PartyAddress.City = consignee.city
         target.Consignee.PartyAddress.PostCode = consignee.postal_code
         target.Consignee.PartyAddress.CountryCode = consignee.country.alpha2
         target.Consignee.Contact.PersonName = consignee.contact_name
@@ -252,7 +252,6 @@ class AramexApi(Carrier):
         target.Details.ChargeableWeight.Unit = 'LB'
         target.Details.ChargeableWeight.Value = 1
         target.Details.ProductGroup = 'DOM'
-
         if request.international():
             target.Details.ProductGroup = 'EXP'
         target.Details.ProductType = service.service_id

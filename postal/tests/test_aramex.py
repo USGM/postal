@@ -10,8 +10,9 @@ from postal.data import PackageType
 from ..data import (Address, Package, Request)
 from .base import test_european, test_to, test_from
 from .test_configuration import config
+from decimal import Decimal
 
-
+TWOPLACES = Decimal('0.01')
 class TestAramex (unittest.TestCase):   
     
     def setUp(self):
@@ -32,6 +33,10 @@ class TestAramex (unittest.TestCase):
         self.mock_response.TotalAmount = mock.MagicMock(Value=34.5, CurrencyCode='USD')
         self.rate_request = self.carrier.rates_client.factory.create('RateCalculatorRequest');
         self.rate_request.ClientInfo = self.carrier.client_info
+
+        self.mock_ship_response = mock.MagicMock(HasErrors=False, notifications=())
+        self.mock_ship_response.Shipments.ProcessedShipment = mock.MagicMock(ID=30511433772, HasErrors=False)
+        self.ship_request = self.carrier.ship_client.factory.create('ShipmentCreationRequest');
 
     def test_rates_domestic(self):
         with mock.patch('postal.carriers.aramex.AramexApi.rates_client', new_callable=mock.Mock) as mock_rates_client:
@@ -81,18 +86,61 @@ class TestAramex (unittest.TestCase):
             if info['delivery_datetime'] is not None:
                 self.assertIsInstance(info['delivery_datetime'], datetime)
 
-    @mock.patch('postal.carriers.aramex.AramexApi.ship_client')
+    @mock.patch('postal.carriers.aramex.AramexApi.ship_client', new_callable=mock.Mock)
     @mock.patch('postal.carriers.aramex.AramexApi.format_label')
     @mock.patch('postal.carriers.aramex.AramexApi.quote')
-    def test_shipping_domestic(self, mock_ship_client, mock_format_label, mock_quote):
-        request = Request(self.test_from, self.test_to, [self.domestic_package])
-        self.carrier.get_service('OND').ship(request)
-
-    @mock.patch('postal.carriers.aramex.AramexApi.ship_client')
-    @mock.patch('postal.carriers.aramex.AramexApi.format_label')
-    @mock.patch('postal.carriers.aramex.AramexApi.quote')
-    def test_shipping_international(self, mock_ship_client, mock_format_label, mock_quote):
+    def test_shipping_domestic(self, mock_quote, mock_format_label, mock_ship_client):
         mock_ship_client.service = mock.MagicMock()
-        mock_ship_client.service.CreateShipments.return_value = self.mock_response
+        mock_ship_client.service.CreateShipments.return_value = self.mock_ship_response;
+        request = Request(self.test_from, self.test_to, [self.domestic_package])
+        service = self.carrier.get_service('OND').ship(request)
+        calls = mock_ship_client.service.CreateShipments.call_args
+        args = calls[0]
+        self.validate_ship_arguments(args, request)
+        self.validate_ship_service(service)
+        shipments = args[2]
+        self.assertEqual(shipments.Shipment.Details.ProductGroup,'DOM') # For domestic shipments - Product group should be DOM
+
+    @mock.patch('postal.carriers.aramex.AramexApi.ship_client', new_callable=mock.Mock)
+    @mock.patch('postal.carriers.aramex.AramexApi.format_label')
+    @mock.patch('postal.carriers.aramex.AramexApi.quote')
+    def test_shipping_international(self, mock_quote, mock_format_label, mock_ship_client):
+        mock_ship_client.service = mock.MagicMock()
+        mock_ship_client.service.CreateShipments.return_value = self.mock_ship_response;
         request = Request(self.test_from, self.european_address, [self.international_package])
-        self.carrier.get_service('OND').ship(request)
+        service = self.carrier.get_service('PDX').ship(request)
+        calls = mock_ship_client.service.CreateShipments.call_args
+        args = calls[0]
+        self.validate_ship_arguments(args, request)
+        self.validate_ship_service(service)
+        shipments = args[2]
+        self.assertEqual(shipments.Shipment.Details.ProductGroup,'EXP') # For international shipments - Product group should be DOM
+
+    def validate_ship_arguments(self, args, request):
+        auth = args[0]
+        shipments = args[2]
+        origin = shipments.Shipment.Shipper.PartyAddress
+        dest = shipments.Shipment.Consignee.PartyAddress
+        shipment_details = shipments.Shipment.Details
+
+        self.assertEqual(self.carrier.client_info.UserName, auth.UserName)
+        self.assertEqual(self.carrier.client_info.Password, auth.Password)
+        self.assertEqual(request.origin.city, origin.City)
+        self.assertEqual(request.destination.city, dest.City)
+        self.assertEqual(request.origin.postal_code, origin.PostCode)
+        self.assertEqual(request.destination.postal_code, dest.PostCode)
+        self.assertEqual(request.total_weight(), shipment_details.ActualWeight.Value)
+        self.assertEqual('LB', shipment_details.ActualWeight.Unit)
+        i = 0
+        for package in shipments.Shipment.Details.Items:
+            self.assertEqual(request.packages[i].weight, package.Weight)
+            self.assertEqual(Decimal(Package.to_centimeters(request.packages[i].length)).quantize(TWOPLACES), shipment_details.Dimensions.Length)
+            self.assertEqual(Decimal(Package.to_centimeters(request.packages[i].width)).quantize(TWOPLACES), shipment_details.Dimensions.Width)
+            self.assertEqual(Decimal(Package.to_centimeters(request.packages[i].height)).quantize(TWOPLACES), shipment_details.Dimensions.Height)
+            i+=1
+        self.assertEqual(shipment_details.NumberOfPieces, len(request.packages))
+
+    def validate_ship_service(self, service):
+        self.assertTrue(service['shipment'])
+        self.assertTrue(service['packages'])
+        self.assertTrue(service['price'])
