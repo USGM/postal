@@ -6,17 +6,15 @@ from postal.carriers.base import Carrier, ClearEmpty
 from postal.exceptions import CarrierError
 from datetime import datetime, date
 from postal.data import Package
-from io import BytesIO
-from base64 import b64decode
-from ..exceptions import PostalError
-from PyPDF2 import PdfFileReader, PdfFileWriter
 from copy import deepcopy
-from .base import Carrier
-from ..data import Address, Shipment, Declaration
+from ..data import Shipment
 from collections import OrderedDict
 from decimal import Decimal
 
+
 TWOPLACES = Decimal('0.01')
+
+
 class AramexApi(Carrier):
     """
     Implements calls to the aramex api.
@@ -24,50 +22,49 @@ class AramexApi(Carrier):
     name = 'Aramex'
 
     _code_to_description = {
-        'PDX' : 'Priority document express',
+        'PDX': 'Priority document express',
         'PPX': 'Priority parcel express',
         'PLX': 'Priority letter express',
         'DDX': 'Deferred document express',
-        'DPX' : 'Deferred parcel express',
+        'DPX': 'Deferred parcel express',
         'GDX': 'Ground document express',
         'GPX': 'Ground parcel express',
         'OND': 'OND'
     }
 
     _product_group_to_description = {
-        'EXP' : 'International shipment',
-        'DOM' : 'Domestic shipment'
+        'EXP': 'International shipment',
+        'DOM': 'Domestic shipment'
     }
 
     _service_code_to_description = {
-        'COD' : 'Cash on delivery',
-        'FIRST' : 'First delivery',
-        'FRDOM' : 'Free domicile',
-        'HFPU' : 'Hold for pickup',
+        'COD': 'Cash on delivery',
+        'FIRST': 'First delivery',
+        'FRDOM': 'Free domicile',
+        'HFPU': 'Hold for pickup',
         'NOON': 'Noon delivery',
-        'SIG' : 'Signature required'
+        'SIG': 'Signature required'
     }
 
     _min_max_estimates = {
-        'PDX' : (1, 2),
+        'PDX': (1, 2),
         'PPX': (1, 2),
         'PLX': (1, 2),
         'DDX': (1, 2),
-        'DPX' : (1, 2),
+        'DPX': (1, 2),
         'GDX': (1, 3),
         'GPX': (1, 3)
     }
 
     _carrier_error_codes = {
-         'ERR61' : 'Failed to get rates',
-         'ERR52' : 'Service not available'
+         'ERR61': 'Failed to get rates',
+         'ERR52': 'Service not available'
     }
 
     _rate_client = None
     _priority_letter_limit = 1.10231
     carrier_error = None
     _ship_client = None
-
 
     def create_client(self, wsdl_name):
         client = Client(
@@ -163,10 +160,7 @@ class AramexApi(Carrier):
         # set shipper address
         shipper = request.origin
         target.Shipper.AccountNumber = self.account_number
-        lines = {
-            'Line{}'.format(num + 1) : line
-                for num, line in enumerate(shipper.street_lines)
-        }
+        lines = self.break_line(shipper.street_lines)
         for line, value in lines.items():
             setattr(target.Shipper.PartyAddress, line, value)
 
@@ -187,10 +181,8 @@ class AramexApi(Carrier):
 
         # set consignee details
         consignee = request.destination
-        lines = {
-            'Line{}'.format(num + 1) : line
-                for num, line in enumerate(consignee.street_lines)
-        }
+        lines = self.break_line(consignee.street_lines)
+
         for line, value in lines.items():
             setattr(target.Consignee.PartyAddress, line, value)
 
@@ -236,10 +228,12 @@ class AramexApi(Carrier):
             if package.declarations or package.documents_only:
                 declarations = package.declarations[:]
                 for declaration in declarations:
-                    description += declaration.description + ' x' + str(declaration.units) + ', ' + str(declaration.value) + ' each '
+                    description += "{description} x{units} at {value} each".format(
+                        description=declaration.description, units=declaration.units, value=declaration.value
+                    )
                 value = package.get_total_insured_value()
                 if value > 0:
-                    insurance_amount = insurance_amount+value.amount
+                    insurance_amount = insurance_amount + value.amount
 
         if insurance_amount > 0:
             target.Details.InsuranceAmount.CurrencyCode = self.postal_configuration['default_currency']
@@ -262,6 +256,12 @@ class AramexApi(Carrier):
         target.Details.CustomsValueAmount.CurrencyCode = self.postal_configuration['default_currency']
         target.Details.CustomsValueAmount.Value = 1
         return target
+
+    def break_line(self, street_lines):
+        return {
+            'Line{}'.format(num + 1): line
+            for num, line in enumerate(street_lines)
+        }
 
     @property
     def client_info(self,ship=False):
@@ -308,7 +308,7 @@ class AramexApi(Carrier):
         request, ship = request_info
         requests= self.get_requests((request, ship), service=service)
         thread_pool = ThreadPool(processes=len(requests))
-        results = thread_pool.map(self.get_request_rate, [(api_request, ship, service)   for api_request in requests])
+        results = thread_pool.map(self.get_request_rate, [(api_request, ship, service) for api_request in requests])
         thread_pool.terminate()
         thread_pool.join()
         if AramexApi.carrier_error:

@@ -131,13 +131,12 @@ class TestAramex (unittest.TestCase):
         self.assertEqual(request.destination.postal_code, dest.PostCode)
         self.assertEqual(request.total_weight(), shipment_details.ActualWeight.Value)
         self.assertEqual('LB', shipment_details.ActualWeight.Unit)
-        i = 0
-        for package in shipments.Shipment.Details.Items:
+
+        for i, package in enumerate(shipments.Shipment.Details.Items):
             self.assertEqual(request.packages[i].weight, package.Weight)
             self.assertEqual(Decimal(Package.to_centimeters(request.packages[i].length)).quantize(TWOPLACES), shipment_details.Dimensions.Length)
             self.assertEqual(Decimal(Package.to_centimeters(request.packages[i].width)).quantize(TWOPLACES), shipment_details.Dimensions.Width)
             self.assertEqual(Decimal(Package.to_centimeters(request.packages[i].height)).quantize(TWOPLACES), shipment_details.Dimensions.Height)
-            i+=1
         self.assertEqual(shipment_details.NumberOfPieces, len(request.packages))
 
     def validate_ship_service(self, service):
