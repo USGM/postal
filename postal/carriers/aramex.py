@@ -333,7 +333,7 @@ class AramexApi(Carrier):
                     'price': value,
                     'delivery_datetime': None,
                     'trackable': True
-                } for response in results if response for key, value in response.items()
+                } for response in results if response and not response['error'] for key, value in response['service'].items()
             }
             with logger.lock:
                 logger.debug_header('Response')
@@ -348,18 +348,18 @@ class AramexApi(Carrier):
                     self.ship_client.service.CreateShipments, request.ClientInfo, request.Transaction,
                     request.Shipments, request.LabelInfo
                 )
-
             else:
                 response = self.service_call(
                     self.rates_client.service.CalculateRate, request.ClientInfo, request.Transaction,
                     request.OriginAddress, request.DestinationAddress, request.ShipmentDetails
                 )
-                return { request.ShipmentDetails.ProductType: self.get_price_dict(response)}
+                return {'service': {request.ShipmentDetails.ProductType: self.get_price_dict(response)}, 'error': None}
         except CarrierError as e:
             if e.code not in self._carrier_error_codes:
                 # These error codes mean that the product type is not available for this particular request
                 # so we just ignore it.
-                AramexApi.carrier_error = e
+                # AramexApi.carrier_error = e
+                return {'service': {request.ShipmentDetails.ProductType:{}}, 'error': e}
             return None
 
     def get_price_dict(self, info):
