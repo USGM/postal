@@ -16,6 +16,7 @@ from pprint import pformat
 TWOPLACES = Decimal('0.01')
 logger = PostalLogger(carrier_name='Aramex')
 
+
 class AramexApi(Carrier):
     """
     Implements calls to the aramex api.
@@ -112,15 +113,12 @@ class AramexApi(Carrier):
         self.set_shipment_details(api_request.ShipmentDetails, request)
         return api_request
 
-    @staticmethod
-    def set_address(target, postal_address):
+    @classmethod
+    def set_address(self, target, postal_address):
         target.City = postal_address.city
         target.CountryCode = postal_address.country.alpha2
         target.PostCode = postal_address.postal_code
-        lines = {
-            'Line{}'.format(num + 1) : line
-                for num, line in enumerate(postal_address.street_lines)
-        }
+        lines = self.break_line(postal_address.street_lines)
         target.StateOrProvinceCode = postal_address.subdivision
         for line, value in lines.items():
             setattr(target, line, value)
@@ -249,7 +247,8 @@ class AramexApi(Carrier):
         target.Details.CustomsValueAmount.Value = 1
         return target
 
-    def break_line(self, street_lines):
+    @staticmethod
+    def break_line(street_lines):
         return {
             'Line{}'.format(num + 1): line
             for num, line in enumerate(street_lines)
@@ -327,18 +326,18 @@ class AramexApi(Carrier):
                 logger.shipment_response(shipment_dict)
             return shipment_dict
 
-        else:
-            final = {
-                self.get_service(key): {
-                    'price': value,
-                    'delivery_datetime': None,
-                    'trackable': True
-                } for response in results if response and not response['error'] for key, value in response['service'].items()
-            }
-            with logger.lock:
-                logger.debug_header('Response')
-                logger.debug(pformat(final, width=1))
-            return final
+        final = {
+            self.get_service(key): {
+                'price': value,
+                'delivery_datetime': None,
+                'trackable': True
+            } for response in results if response and not response['error'] for key, value in response['service'].items()
+        }
+
+        with logger.lock:
+            logger.debug_header('Response')
+            logger.debug(pformat(final, width=1))
+        return final
 
     def get_request_rate(self, request_info):
         request, ship, service = request_info
@@ -355,7 +354,11 @@ class AramexApi(Carrier):
                 )
                 return {'service': {request.ShipmentDetails.ProductType: self.get_price_dict(response)}, 'error': None}
         except CarrierError as e:
-            return {'service': {request.ShipmentDetails.ProductType:{}}, 'error': e}
+            if e.code not in self._carrier_error_codes:
+                # These error codes mean that the product type is not available for this particular request
+                # so we just ignore it.
+                return {'service': {request.ShipmentDetails.ProductType:{}}, 'error': e}
+            return None
 
     def get_price_dict(self, info):
         price = {}
