@@ -2,7 +2,7 @@ from multiprocessing.pool import ThreadPool
 
 from suds.client import Client
 from money import Money
-from postal.carriers.base import Carrier, ClearEmpty
+from postal.carriers.base import Carrier, ClearEmpty, PostalLogger
 from postal.exceptions import CarrierError
 from datetime import datetime, date
 from postal.data import Package
@@ -10,10 +10,11 @@ from copy import deepcopy
 from ..data import Shipment
 from collections import OrderedDict
 from decimal import Decimal
+from pprint import pformat
 
 
 TWOPLACES = Decimal('0.01')
-
+logger = PostalLogger(carrier_name='Aramex')
 
 class AramexApi(Carrier):
     """
@@ -134,15 +135,6 @@ class AramexApi(Carrier):
         target.ChargeableWeight = target.ActualWeight
         target.PaymentType = 'P'
         target.NumberOfPieces = len(request.packages)
-
-    def set_shipment_items (self, target, request):
-        for package in request.packages:
-            shipment_item = self.rates_client.factory.create('ShipmentItem')
-            shipment_item.PackageType = 'DDX'
-            shipment_item.Quantity = 1
-            shipment_item.Weight = package.weight
-            shipment_item.Comments = ''
-            target.append(shipment_item)
 
     def shipment_request_details(self, request_info):
         request, service = request_info
@@ -291,8 +283,9 @@ class AramexApi(Carrier):
             msg = ''
             for notification in response.Notifications.Notification:
                 msg += '{} '.format(notification['Code']) + str(notification['Message']) + '.'
-                raise CarrierError(msg, code=notification['Code'])
-
+                raise CarrierError(
+                    msg, code=notification['Code']
+                )
         return response
 
     def get_services(self, request, service=False):
@@ -329,6 +322,9 @@ class AramexApi(Carrier):
                 'packages': package_details,
                 'price': self.quote(request, service),
             }
+            with logger.lock:
+                logger.debug_header('Response')
+                logger.shipment_response(shipment_dict)
             return shipment_dict
 
         else:
@@ -339,6 +335,9 @@ class AramexApi(Carrier):
                     'trackable': True
                 } for response in results if response for key, value in response.items()
             }
+            with logger.lock:
+                logger.debug_header('Response')
+                logger.debug(pformat(final, width=1))
             return final
 
     def get_request_rate(self, request_info):
