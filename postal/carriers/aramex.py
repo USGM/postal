@@ -114,11 +114,11 @@ class AramexApi(Carrier):
         return api_request
 
     @classmethod
-    def set_address(self, target, postal_address):
+    def set_address(cls, target, postal_address):
         target.City = postal_address.city
         target.CountryCode = postal_address.country.alpha2
         target.PostCode = postal_address.postal_code
-        lines = self.break_line(postal_address.street_lines)
+        lines = cls.break_line(postal_address.street_lines)
         target.StateOrProvinceCode = postal_address.subdivision
         for line, value in lines.items():
             setattr(target, line, value)
@@ -306,7 +306,6 @@ class AramexApi(Carrier):
         if AramexApi.carrier_error:
             if ship:
                 raise AramexApi.carrier_error
-
         if ship:
             result = results[0]
             tracking_number = str(result.Shipments.ProcessedShipment[0].ID)
@@ -333,11 +332,16 @@ class AramexApi(Carrier):
                 'trackable': True
             } for response in results if response and not response['error'] for key, value in response['service'].items()
         }
-
         with logger.lock:
             logger.debug_header('Response')
             logger.debug(pformat(final, width=1))
-        return final
+
+        if final:
+            return final
+        codes = [response['error'] for response in results if response['error'].code not in self._carrier_error_codes]
+        if codes:
+            raise codes[0]
+        return {}
 
     def get_request_rate(self, request_info):
         request, ship, service = request_info
@@ -354,11 +358,7 @@ class AramexApi(Carrier):
                 )
                 return {'service': {request.ShipmentDetails.ProductType: self.get_price_dict(response)}, 'error': None}
         except CarrierError as e:
-            if e.code not in self._carrier_error_codes:
-                # These error codes mean that the product type is not available for this particular request
-                # so we just ignore it.
-                return {'service': {request.ShipmentDetails.ProductType:{}}, 'error': e}
-            return None
+            return {'service': {request.ShipmentDetails.ProductType:{}}, 'error': e}
 
     def get_price_dict(self, info):
         price = {}
