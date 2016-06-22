@@ -355,12 +355,7 @@ class AramexApi(Carrier):
                 )
                 return {'service': {request.ShipmentDetails.ProductType: self.get_price_dict(response)}, 'error': None}
         except CarrierError as e:
-            if e.code not in self._carrier_error_codes:
-                # These error codes mean that the product type is not available for this particular request
-                # so we just ignore it.
-                # AramexApi.carrier_error = e
-                return {'service': {request.ShipmentDetails.ProductType:{}}, 'error': e}
-            return None
+            return {'service': {request.ShipmentDetails.ProductType:{}}, 'error': e}
 
     def get_price_dict(self, info):
         price = {}
