@@ -90,7 +90,7 @@ base_postal_configuration = {
             # Your account number with UPS. You should be able to find this by
             # logging into their website.
             'shipper_number': '',
-
+            'test': True,
             # (Optional) Whether UPS makes a separate web request for delivery
             # datetimes when getting rates via Postal.options() or
             # UPSApi.get_services(). Does not affect calling delivery_datetime
