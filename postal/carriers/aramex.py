@@ -295,8 +295,6 @@ class AramexApi(Carrier):
         return response
 
     def get_services(self, request, service=False):
-        print '********************'
-        print service
         AramexApi.carrier_error = None
         return self.process_request((request, False), service=service)
 
@@ -344,7 +342,7 @@ class AramexApi(Carrier):
         with logger.lock:
             logger.debug_header('Response')
             logger.debug(pformat(final, width=1))
-        
+
         if final:
             return final
         codes = [response['error'] for response in results if response['error'].code not in self._carrier_error_codes]
