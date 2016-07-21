@@ -204,23 +204,30 @@ class AramexApi(Carrier):
         description = ''
         items = []
         insurance_amount = 0
+        container_number = 0
         for package in request.packages:
+            container_number = +1
             target.Details.Dimensions.Length = Decimal(Package.to_centimeters(package.length)).quantize(TWOPLACES)
             target.Details.Dimensions.Width = Decimal(Package.to_centimeters(package.width)).quantize(TWOPLACES)
             target.Details.Dimensions.Height = Decimal(Package.to_centimeters(package.height)).quantize(TWOPLACES)
             target.Details.Dimensions.Unit = 'CM'
-            shipment_item = self.ship_client.factory.create('ShipmentItem')
-            shipment_item.PackageType = ''
-            shipment_item.Quantity = 1
-            shipment_item.Weight = package.weight
-            shipment_item.Comments = ''
-            items.append(shipment_item)
+
             if package.declarations or package.documents_only:
                 declarations = package.declarations[:]
                 for declaration in declarations:
                     description += "{description} x{units} at {value} each".format(
                         description=declaration.description, units=declaration.units, value=declaration.value
                     )
+                    shipment_item = self.ship_client.factory.create('ShipmentItem')
+                    shipment_item.PackageType = ''
+                    shipment_item.Quantity = declaration.units
+                    shipment_item.Weight = package.weight
+                    shipment_item.ContainerNumber = ''
+                    shipment_item.GoodsDescription = declaration.description
+                    shipment_item.CustomsValue.CurrencyCode = self.postal_configuration['default_currency']
+                    shipment_item.CustomsValue.Value = declaration.value
+                    shipment_item.ContainerNumber = container_number
+                    items.append(shipment_item)
                 value = package.get_total_insured_value()
                 if value > 0:
                     insurance_amount = insurance_amount + value.amount
@@ -288,6 +295,8 @@ class AramexApi(Carrier):
         return response
 
     def get_services(self, request, service=False):
+        print '********************'
+        print service
         AramexApi.carrier_error = None
         return self.process_request((request, False), service=service)
 
@@ -335,7 +344,7 @@ class AramexApi(Carrier):
         with logger.lock:
             logger.debug_header('Response')
             logger.debug(pformat(final, width=1))
-
+        
         if final:
             return final
         codes = [response['error'] for response in results if response['error'].code not in self._carrier_error_codes]
@@ -397,7 +406,7 @@ class AramexApi(Carrier):
             requests.append(api_req)
         return requests
 
-    def quote(self, request, service):
+    def quote(self, service, request):
         data = self.get_services(request, service=service)
         return data[service]['price']
 
