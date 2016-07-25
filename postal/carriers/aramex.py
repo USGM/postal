@@ -231,7 +231,6 @@ class AramexApi(Carrier):
                 value = package.get_total_insured_value()
                 if value > 0:
                     insurance_amount = insurance_amount + value.amount
-
         if insurance_amount > 0:
             target.Details.InsuranceAmount.CurrencyCode = self.postal_configuration['default_currency']
             target.Details.InsuranceAmount.Value = insurance_amount
@@ -325,7 +324,7 @@ class AramexApi(Carrier):
             shipment_dict = {
                 'shipment': Shipment(self, tracking_number),
                 'packages': package_details,
-                'price': self.quote(request, service),
+                'price': self.quote(service, request),
             }
             with logger.lock:
                 logger.debug_header('Response')
@@ -404,7 +403,7 @@ class AramexApi(Carrier):
             requests.append(api_req)
         return requests
 
-    def quote(self, request, service):
+    def quote(self, service, request):
         data = self.get_services(request, service=service)
         return data[service]['price']
 
