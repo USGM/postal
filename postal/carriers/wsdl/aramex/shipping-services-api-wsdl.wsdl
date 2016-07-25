@@ -155,13 +155,26 @@
       <xsd:element type="tns:ArrayOfShipmentItem" name="ArrayOfShipmentItem" nillable="true"/>
       <xsd:complexType name="ShipmentItem">
         <xsd:sequence>
-          <xsd:element type="xsd:string" name="PackageType" nillable="true"/>
-          <xsd:element type="xsd:int" name="Quantity"/>
-          <xsd:element type="tns:Weight" name="Weight" nillable="true"/>
-          <xsd:element type="xsd:string" name="Comments" nillable="true" minOccurs="0"/>
-          <xsd:element type="xsd:string" name="Reference" nillable="true" minOccurs="0"/>
+            <xsd:element name="PackageType" nillable="true" type="xsd:string" />
+            <xsd:element name="Quantity" type="xsd:int" />
+            <xsd:element name="Weight" nillable="true" type="q37:Weight" xmlns:q37="http://ws.aramex.net/ShippingAPI/v1/" />
+            <xsd:element minOccurs="0" name="Comments" nillable="true" type="xsd:string" />
+            <xsd:element minOccurs="0" name="Reference" nillable="true" type="xsd:string" />
+            <xsd:element minOccurs="0" name="PiecesDimensions" nillable="true" type="tns:ArrayOfDimensions"/>
+            <xsd:element minOccurs="0" name="CommodityCode" nillable="true" type="xsd:string" />
+            <xsd:element minOccurs="0" name="GoodsDescription" nillable="true" type="xsd:string" />
+            <xsd:element minOccurs="0" name="CountryOfOrigin" nillable="true" type="xsd:string" />
+            <xsd:element minOccurs="0" name="CustomsValue" nillable="true" type="q39:Money" xmlns:q39="http://ws.aramex.net/ShippingAPI/v1/" />
+            <xsd:element minOccurs="0" name="ContainerNumber" nillable="true" type="xsd:string" />
         </xsd:sequence>
       </xsd:complexType>
+      <xsd:element type="tns:ShipmentItem" name="ShipmentItem" nillable="true"/>
+        <xsd:complexType name="ArrayOfDimensions">
+            <xsd:sequence>
+                <xsd:element minOccurs="0" maxOccurs="unbounded" name="Dimensions" nillable="true" type="q41:Dimensions" xmlns:q41="http://ws.aramex.net/ShippingAPI/v1/" />
+            </xsd:sequence>
+        </xsd:complexType>
+        <xsd:element name="ArrayOfDimensions" nillable="true" type="tns:ArrayOfDimensions"  />
       <xsd:element type="tns:ShipmentItem" name="ShipmentItem" nillable="true"/>
       <xsd:complexType name="ArrayOfAttachment">
         <xsd:sequence>

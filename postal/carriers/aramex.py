@@ -404,7 +404,7 @@ class AramexApi(Carrier):
             requests.append(api_req)
         return requests
 
-    def quote(self, service, request):
+    def quote(self, request, service):
         data = self.get_services(request, service=service)
         return data[service]['price']
 
