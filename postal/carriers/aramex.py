@@ -204,17 +204,15 @@ class AramexApi(Carrier):
         description = ''
         items = []
         insurance_amount = 0
-        container_number = 0
         for package in request.packages:
-            container_number = +1
             target.Details.Dimensions.Length = Decimal(Package.to_centimeters(package.length)).quantize(TWOPLACES)
             target.Details.Dimensions.Width = Decimal(Package.to_centimeters(package.width)).quantize(TWOPLACES)
             target.Details.Dimensions.Height = Decimal(Package.to_centimeters(package.height)).quantize(TWOPLACES)
             target.Details.Dimensions.Unit = 'CM'
-
-            if package.declarations or package.documents_only:
+            if package.declarations:
                 declarations = package.declarations[:]
                 for declaration in declarations:
+                    container_number = +1
                     description += "{description} x{units} at {value} each".format(
                         description=declaration.description, units=declaration.units, value=declaration.value
                     )
@@ -222,7 +220,6 @@ class AramexApi(Carrier):
                     shipment_item.PackageType = ''
                     shipment_item.Quantity = declaration.units
                     shipment_item.Weight = package.weight
-                    shipment_item.ContainerNumber = ''
                     shipment_item.GoodsDescription = declaration.description
                     shipment_item.CustomsValue.CurrencyCode = self.postal_configuration['default_currency']
                     shipment_item.CustomsValue.Value = declaration.value
@@ -231,6 +228,14 @@ class AramexApi(Carrier):
                 value = package.get_total_insured_value()
                 if value > 0:
                     insurance_amount = insurance_amount + value.amount
+            else:
+                shipment_item = self.ship_client.factory.create('ShipmentItem')
+                shipment_item.PackageType = ''
+                shipment_item.Quantity = 1
+                shipment_item.Weight = package.weight
+                shipment_item.Comments = ''
+                items.append(shipment_item)
+
         if insurance_amount > 0:
             target.Details.InsuranceAmount.CurrencyCode = self.postal_configuration['default_currency']
             target.Details.InsuranceAmount.Value = insurance_amount

@@ -121,11 +121,11 @@ base_postal_configuration = {
         # and entity fields must also be given in the request.
         'Aramex' : {
             'account_country_code': 'US',
-            'account_entity': 'JFK',
-            'account_number': '160922834',
-            'account_pin': '216316',
-            'username': 'ashwini.kaklij@silicus.com',
-            'password': 'Aramex@123',
+            'account_entity': 'TES',
+            'account_number': '123456789',
+            'account_pin': '123456',
+            'username': 'test@usglobalmail.com',
+            'password': 'testPassword',
             'test': True
 
         }
