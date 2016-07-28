@@ -7,7 +7,7 @@ from postal.carriers.aramex import AramexApi
 from postal.carriers.base import Service
 from postal.data import PackageType
 
-from ..data import (Address, Package, Request)
+from ..data import (Address, Package, Request, Declaration)
 from .base import test_european, test_to, test_from
 from .test_configuration import config
 from decimal import Decimal
@@ -19,7 +19,11 @@ class TestAramex (unittest.TestCase):
         self.test_from = Address(**test_from)
         self.test_to = Address(**test_to)
         self.european_address = Address(**test_european)
-        self.domestic_package = Package(2, 3, 4, .3)
+
+        declarations = [
+            Declaration('Snaps', Money('3.95', 'USD'), 'US', 1, insure=False),
+            Declaration('SIM Card', Money(45, 'USD'), 'US', 1, insure=True)]
+        self.domestic_package = Package(2, 3, 4, .3, declarations=declarations)
         self.documents = Package(
             9, 12, .1, .2,
             PackageType(None, 'package', 'Package'),
@@ -132,11 +136,11 @@ class TestAramex (unittest.TestCase):
         self.assertEqual(request.total_weight(), shipment_details.ActualWeight.Value)
         self.assertEqual('LB', shipment_details.ActualWeight.Unit)
 
-        for i, package in enumerate(shipments.Shipment.Details.Items):
-            self.assertEqual(request.packages[i].weight, package.Weight)
-            self.assertEqual(Decimal(Package.to_centimeters(request.packages[i].length)).quantize(TWOPLACES), shipment_details.Dimensions.Length)
-            self.assertEqual(Decimal(Package.to_centimeters(request.packages[i].width)).quantize(TWOPLACES), shipment_details.Dimensions.Width)
-            self.assertEqual(Decimal(Package.to_centimeters(request.packages[i].height)).quantize(TWOPLACES), shipment_details.Dimensions.Height)
+        # Check declarations are set or not
+        for i, package in enumerate(shipment_details.Items):
+            self.assertEqual(package.Quantity, request.packages[0].declarations[i].units)
+            self.assertEqual(package.GoodsDescription, request.packages[0].declarations[i].description)
+            self.assertEqual(package.CustomsValue.Value, request.packages[0].declarations[i].value.amount)
         self.assertEqual(shipment_details.NumberOfPieces, len(request.packages))
 
     def validate_ship_service(self, service):

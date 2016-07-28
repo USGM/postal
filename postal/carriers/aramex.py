@@ -1,5 +1,6 @@
 from multiprocessing.pool import ThreadPool
 
+from base64 import b64decode
 from suds.client import Client
 from money import Money
 from postal.carriers.base import Carrier, ClearEmpty, PostalLogger
@@ -11,10 +12,15 @@ from ..data import Shipment
 from collections import OrderedDict
 from decimal import Decimal
 from pprint import pformat
+import warnings
+from io import BytesIO
+from PyPDF2 import PdfFileReader, PdfFileWriter
+from PyPDF2.utils import PdfReadWarning
 
 
 TWOPLACES = Decimal('0.01')
 logger = PostalLogger(carrier_name='Aramex')
+warnings.filterwarnings("ignore", category=PdfReadWarning)
 
 
 class AramexApi(Carrier):
@@ -203,8 +209,11 @@ class AramexApi(Carrier):
 
         description = ''
         items = []
+        dict = {}
         insurance_amount = 0
+        container_number = 1
         for package in request.packages:
+            container_number += 1
             target.Details.Dimensions.Length = Decimal(Package.to_centimeters(package.length)).quantize(TWOPLACES)
             target.Details.Dimensions.Width = Decimal(Package.to_centimeters(package.width)).quantize(TWOPLACES)
             target.Details.Dimensions.Height = Decimal(Package.to_centimeters(package.height)).quantize(TWOPLACES)
@@ -212,30 +221,23 @@ class AramexApi(Carrier):
             if package.declarations:
                 declarations = package.declarations[:]
                 for declaration in declarations:
-                    container_number = +1
                     description += "{description} x{units} at {value} each".format(
                         description=declaration.description, units=declaration.units, value=declaration.value
                     )
+
                     shipment_item = self.ship_client.factory.create('ShipmentItem')
                     shipment_item.PackageType = ''
                     shipment_item.Quantity = declaration.units
                     shipment_item.Weight = package.weight
                     shipment_item.GoodsDescription = declaration.description
-                    shipment_item.CustomsValue.CurrencyCode = self.postal_configuration['default_currency']
-                    shipment_item.CustomsValue.Value = declaration.value
+                    shipment_item.CustomsValue.CurrencyCode = declaration.value.currency
+                    shipment_item.CustomsValue.Value = declaration.value.amount
                     shipment_item.ContainerNumber = container_number
-                    items.append(shipment_item)
+                    shipment_items_copy = deepcopy(shipment_item)
+                    items.append(shipment_items_copy)
                 value = package.get_total_insured_value()
                 if value > 0:
                     insurance_amount = insurance_amount + value.amount
-            else:
-                shipment_item = self.ship_client.factory.create('ShipmentItem')
-                shipment_item.PackageType = ''
-                shipment_item.Quantity = 1
-                shipment_item.Weight = package.weight
-                shipment_item.Comments = ''
-                items.append(shipment_item)
-
         if insurance_amount > 0:
             target.Details.InsuranceAmount.CurrencyCode = self.postal_configuration['default_currency']
             target.Details.InsuranceAmount.Value = insurance_amount
@@ -284,7 +286,7 @@ class AramexApi(Carrier):
     def label_info(self):
         label = self.ship_client.factory.create('LabelInfo')
         label.ReportID = '9201'
-        label.ReportType = 'URL'
+        label.ReportType = 'RPT'
         return label
 
     def service_call(self, func, *args, **kwargs):
@@ -324,7 +326,7 @@ class AramexApi(Carrier):
             package_details = OrderedDict()
             package_details[package] = {
                 'tracking_number': str(tracking_number),
-                'label': self.format_label(result.Shipments.ProcessedShipment[0].ShipmentLabel.LabelURL)
+                'label': self.format_label(result.Shipments.ProcessedShipment[0].ShipmentLabel.LabelFileContents)
             }
             shipment_dict = {
                 'shipment': Shipment(self, tracking_number),
@@ -413,8 +415,22 @@ class AramexApi(Carrier):
         return data[service]['price']
 
     @staticmethod
-    def format_label(label):
+    def format_label_old(label):
         import requests
         r = requests.get(label, stream=True)
         return r.content
 
+    @staticmethod
+    def format_label(label):
+        # Some jump-around for dual compatibility with Python 2 and 3
+        if isinstance(label, bytes):
+            label = label.decode('utf-8')
+        label = b64decode(label)
+        input = PdfFileReader(BytesIO(label))
+        input.strict = False
+        output = PdfFileWriter()
+        page = input.getPage(0)
+        output.addPage(page)
+        output_stream = BytesIO()
+        output.write(output_stream)
+        return output_stream.getvalue()
