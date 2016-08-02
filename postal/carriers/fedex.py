@@ -255,7 +255,7 @@ class FedExApi(Carrier):
         version = self.upload_client.factory.create('VersionId')
         version.ServiceId = 'cdus'
         version.Major = 1
-        version.Intermediate = 2
+        version.Intermediate = 1
         version.Minor = 0
         return version
 
