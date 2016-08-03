@@ -66,14 +66,13 @@ class Postal:
                 raise NotSupportedError('The dimensions of package #%s are '
                                         'invalid.' % i)
 
-        thread_pool = ThreadPool(processes=len(self.carriers))
-
         # Check country white list
         for carrier in self.carriers.values():
             served = get_served_country(carrier.name, request.destination.country.alpha2)
             if not served:
                 del self.carriers[carrier.name]
 
+        thread_pool = ThreadPool(processes=len(self.carriers))
         result = dict(thread_pool.map(
             _task, [(carrier, request) for carrier in self.carriers.values()]))
         if result:

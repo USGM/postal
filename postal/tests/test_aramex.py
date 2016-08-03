@@ -6,6 +6,8 @@ from money import Money
 from postal.carriers.aramex import AramexApi
 from postal.carriers.base import Service
 from postal.data import PackageType
+from postal.postal import Postal
+from postal.configuration_base import base_postal_configuration
 
 from ..data import (Address, Package, Request, Declaration)
 from .base import test_european, test_to, test_from
@@ -13,7 +15,9 @@ from .test_configuration import config
 from decimal import Decimal
 
 TWOPLACES = Decimal('0.01')
-class TestAramex (unittest.TestCase):   
+
+
+class TestAramex (unittest.TestCase):
     
     def setUp(self):
         self.test_from = Address(**test_from)
@@ -62,6 +66,15 @@ class TestAramex (unittest.TestCase):
             args = calls[0]
             self.validate_arguments(args, request)
             self.validate_services(services)
+
+    def test_serviced_country(self):
+        with mock.patch('postal.carriers.aramex.AramexApi.rates_client', new_callable=mock.Mock) as mock_rates_client:
+            mock_rates_client.service = mock.MagicMock()
+            mock_rates_client.service.CalculateRate.return_value = self.mock_response
+            request = Request(self.test_from, self.test_to, [self.international_package])
+            self.postal = Postal(base_postal_configuration)
+            self.postal.options(request)
+            self.assertEqual(self.postal.carriers.has_key(AramexApi.name), False)
 
     def validate_arguments(self, args, request):
         auth = args[0]
