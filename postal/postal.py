@@ -6,6 +6,7 @@ from multiprocessing.pool import ThreadPool
 import sys
 from .exceptions import PostalError, NotSupportedError
 from carriers import Carrier
+from configuration_base import base_postal_configuration
 
 
 class Postal:
@@ -65,13 +66,19 @@ class Postal:
                 raise NotSupportedError('The dimensions of package #%s are '
                                         'invalid.' % i)
 
-        thread_pool = ThreadPool(processes=len(self.carriers))
+        # Check country white list
+        for carrier in self.carriers.values():
+            served = get_served_country(carrier.name, request.destination.country.alpha2)
+            if not served:
+                del self.carriers[carrier.name]
 
+        thread_pool = ThreadPool(processes=len(self.carriers))
         result = dict(thread_pool.map(
             _task, [(carrier, request) for carrier in self.carriers.values()]))
-        thread_pool.terminate()
-        thread_pool.join()
-        return result
+        if result:
+            thread_pool.terminate()
+            thread_pool.join()
+            return result
 
     def get_all_services(self):
         """
@@ -118,6 +125,7 @@ class Postal:
 
 
 def _task(arg_list):
+
     carrier, request = arg_list
     data_dict = {'services': None, 'error': None}
     try:
@@ -128,3 +136,10 @@ def _task(arg_list):
         data_dict['error'] = err
 
     return carrier, data_dict
+
+
+def get_served_country(carrier, dest_country):
+    whitelist = {'Aramex': ['BH', 'CY', 'EG', 'IR', 'IQ', 'IL', 'JO', 'KW', 'LB', 'OM', 'QA', 'SA', 'SY', 'TR', 'AE', 'YE', 'DZ', 'AO', 'BJ', 'BW', 'BF', 'BI', 'CM', 'CF', 'TD', 'KM', 'CG', 'CD', 'CI', 'DJ', 'GQ', 'ER', 'ET', 'GA', 'GM', 'GH', 'GN', 'GW', 'CV', 'KE', 'LS', 'LR', 'LY', 'MG', 'MW', 'ML', 'MR', 'MU', 'MA', 'MZ', 'NA', 'NE', 'NG', 'RW', 'ST', 'SN', 'SC', 'SL', 'SO', 'ZA', 'SS', 'SD', 'SZ', 'TZ', 'TG', 'TN', 'UG', 'ZM', 'ZW']}
+    if carrier in whitelist and not dest_country in whitelist[carrier]:
+        return False
+    return True
