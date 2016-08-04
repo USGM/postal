@@ -396,7 +396,7 @@ class AramexApi(Carrier):
             api_req.ShipmentDetails.ProductType = service.service_id
             requests.append(api_req)
             return requests
-        if request.documents_only:
+        if request.documents_only():
             if request.total_weight() < self._priority_letter_limit and not request.international():
                 api_req = deepcopy(api_request)
                 api_req.ShipmentDetails.ProductType = 'OND'
