@@ -73,8 +73,7 @@ class TestAramex (unittest.TestCase):
             mock_rates_client.service.CalculateRate.return_value = self.mock_response
             request = Request(self.test_from, self.test_to, [self.international_package])
             self.postal = Postal(base_postal_configuration)
-            self.postal.options(request)
-            self.assertEqual(self.postal.carriers.has_key(AramexApi.name), False)
+            self.assertNotIn(AramexApi.name, self.postal.request_carrier_options(request))
 
     def validate_arguments(self, args, request):
         auth = args[0]

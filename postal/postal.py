@@ -34,7 +34,6 @@ class Postal:
                 self.carriers[name] = carrier(
                     postal_configuration=configuration_dict,
                     **carrier_configs[name])
-                self.carrier_list = self.carriers
             except:
                 print 'Error while constructing carrier ' + str(name)
                 print 'with these args: ' + str(carrier_configs[name])
@@ -66,16 +65,11 @@ class Postal:
                 raise NotSupportedError('The dimensions of package #%s are '
                                         'invalid.' % i)
 
-        # Check country white list
-        for carrier in self.carrier_list.values():
-            served = get_served_country(carrier.name, request.destination.country.alpha2, self.carrier_country)
-            if not served:
-                del self.carrier_list[carrier.name]
+        carriers = self.request_carrier_options(request)
 
-        thread_pool = ThreadPool(processes=len(self.carrier_list))
+        thread_pool = ThreadPool(processes=len(carriers))
         result = dict(thread_pool.map(
-            _task, [(carrier, request) for carrier in self.carrier_list.values()]))
-        self.carrier_list = self.carriers
+            _task, [(carrier, request) for carrier in carriers.values()]))
         if result:
             thread_pool.terminate()
             thread_pool.join()
@@ -110,6 +104,15 @@ class Postal:
         for carrier in self.carriers.values():
             for package_type in carrier.get_all_package_types(generics=False):
                 yield package_type
+
+    def request_carrier_options(self, request):
+        # Check country white list
+        carriers = dict(self.carriers)
+        for carrier in carriers.values():
+            served = get_served_country(carrier.name, request.destination.country.alpha2, self.carrier_country)
+            if not served:
+                del carriers[carrier.name]
+        return carriers
 
     def without(self, *args):
         """
