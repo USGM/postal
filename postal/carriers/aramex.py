@@ -5,7 +5,7 @@ from suds.client import Client
 from money import Money
 from postal.carriers.base import Carrier, ClearEmpty, PostalLogger
 from postal.exceptions import CarrierError
-from datetime import datetime, date
+from datetime import datetime
 from postal.data import Package
 from copy import deepcopy
 from ..data import Shipment
@@ -208,9 +208,7 @@ class AramexApi(Carrier):
         attachment.FileContents = self.commercial_invoice(request)
         target.Attachments = attachment
 
-        description = ''
         items = []
-        dict = {}
         insurance_amount = 0
         container_number = 1
         for package in request.packages:
@@ -222,10 +220,6 @@ class AramexApi(Carrier):
             if package.declarations:
                 declarations = package.declarations[:]
                 for declaration in declarations:
-                    description += "{description} x{units} at {value} each".format(
-                        description=declaration.description, units=declaration.units, value=declaration.value
-                    )
-
                     shipment_item = self.ship_client.factory.create('ShipmentItem')
                     shipment_item.PackageType = ''
                     shipment_item.Quantity = declaration.units
@@ -242,7 +236,6 @@ class AramexApi(Carrier):
         if insurance_amount > 0:
             target.Details.InsuranceAmount.CurrencyCode = self.postal_configuration['default_currency']
             target.Details.InsuranceAmount.Value = insurance_amount
-        target.Details.DescriptionOfGoods = 'Declarations: ' + description
         target.Details.Items = items
 
         target.Details.ActualWeight.Value = request.total_weight()
@@ -269,7 +262,7 @@ class AramexApi(Carrier):
         }
 
     @property
-    def client_info(self,ship=False):
+    def client_info(self, ship=False):
         if ship:
             client = self.ship_client.factory.create('ClientInfo')
         else:
