@@ -3,9 +3,11 @@ import unittest
 
 import mock
 from money import Money
+
 from postal.carriers.aramex import AramexApi
 from postal.carriers.base import Service
 from postal.data import PackageType
+from postal.exceptions import AddressError
 from postal.postal import Postal
 from postal.configuration_base import base_postal_configuration
 
@@ -15,6 +17,12 @@ from .test_configuration import config
 from decimal import Decimal
 
 TWOPLACES = Decimal('0.01')
+
+
+class AttrDict(dict):
+    def __init__(self, *args, **kwargs):
+        dict.__init__(self, *args, **kwargs)
+        self.__dict__ = self
 
 
 class TestAramex (unittest.TestCase):
@@ -39,16 +47,16 @@ class TestAramex (unittest.TestCase):
 
         self.mock_response = mock.MagicMock(HasErrors=False, notifications=())
         self.mock_response.TotalAmount = mock.MagicMock(Value=34.5, CurrencyCode='USD')
-        self.rate_request = self.carrier.rates_client.factory.create('RateCalculatorRequest');
+        self.rate_request = self.carrier.rates_client.factory.create('RateCalculatorRequest')
         self.rate_request.ClientInfo = self.carrier.client_info
 
         self.mock_ship_response = mock.MagicMock(HasErrors=False, notifications=())
         self.mock_ship_response.Shipments.ProcessedShipment = mock.MagicMock(ID=30511433772, HasErrors=False)
-        self.ship_request = self.carrier.ship_client.factory.create('ShipmentCreationRequest');
+        self.ship_request = self.carrier.ship_client.factory.create('ShipmentCreationRequest')
 
     def test_rates_domestic(self):
         with mock.patch('postal.carriers.aramex.AramexApi.rates_client', new_callable=mock.Mock) as mock_rates_client:
-            mock_rates_client.service.CalculateRate.return_value = self.mock_response;
+            mock_rates_client.service.CalculateRate.return_value = self.mock_response
             request = Request(self.test_from, self.test_to, [self.domestic_package])
             services = self.carrier.get_services(request)
             calls = mock_rates_client.service.CalculateRate.call_args
@@ -159,3 +167,15 @@ class TestAramex (unittest.TestCase):
         self.assertTrue(service['shipment'])
         self.assertTrue(service['packages'])
         self.assertTrue(service['price'])
+
+    def test_error_translation(self):
+        request = Request(self.test_from, self.european_address, [self.international_package])
+        with mock.patch('postal.carriers.base.Carrier.service_call') as mock_service_call:
+            mock_service_call.return_value = AttrDict({
+                'Notifications': AttrDict({
+                    'Notification': [
+                        AttrDict({'Code': 'ERR52', 'Message': 'DestinationAddress - City name is invalid (Cape Town)'})]
+                }),
+                'HasErrors': True,
+            })
+            self.assertRaises(AddressError, self.carrier.quote, self.carrier.get_service('PPX'), request)

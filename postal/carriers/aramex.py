@@ -4,7 +4,7 @@ from base64 import b64decode
 from suds.client import Client
 from money import Money
 from postal.carriers.base import Carrier, ClearEmpty, PostalLogger
-from postal.exceptions import CarrierError
+from postal.exceptions import CarrierError, AddressError
 from datetime import datetime
 from postal.data import Package
 from copy import deepcopy
@@ -68,6 +68,22 @@ class AramexApi(Carrier):
     _carrier_error_codes = {
          'ERR61': 'Failed to get rates',
          'ERR52': 'Service not available'
+    }
+
+    _translatable_errors = {
+        'ERR06': (
+            AddressError, 'Please double-check the postal code.',
+            {'fields': {'postal_code': 'Please double-check the postal code.'}}
+        ),
+        'ERR52-b': (
+            AddressError,
+            'Please double-check the city name to get rates for Aramex.',
+            {'fields': {'city': 'Please double-check the city.'}}
+        )
+    }
+
+    _switchable_messages = {
+        'City name is invalid': 'ERR52-b'
     }
 
     _rate_client = None
@@ -288,9 +304,20 @@ class AramexApi(Carrier):
         if response.HasErrors:
             msg = ''
             for notification in response.Notifications.Notification:
-                msg += '{} '.format(notification['Code']) + str(notification['Message']) + '.'
+                code = notification['Code']
+                message = notification['Message']
+                # Handle the nightmare that is Aramex error handling.
+                # They use the same code for multiple things.
+                for key in self._switchable_messages:
+                    if key in message:
+                        code = self._switchable_messages[key]
+                        break
+                if code in self._translatable_errors:
+                    cls, msg, kwargs = self._translatable_errors[code]
+                    raise cls(msg, code=code, **kwargs)
+                msg += '{} {}.'.format(code, message)
                 raise CarrierError(
-                    msg, code=notification['Code']
+                    msg, code=code
                 )
         return response
 
@@ -305,7 +332,7 @@ class AramexApi(Carrier):
     def process_request(self, request_info, service):
         AramexApi.carrier_error = None
         request, ship = request_info
-        requests= self.get_requests((request, ship), service=service)
+        requests = self.get_requests((request, ship), service=service)
         thread_pool = ThreadPool(processes=len(requests))
         results = thread_pool.map(self.get_request_rate, [(api_request, ship, service) for api_request in requests])
         thread_pool.terminate()
