@@ -56,13 +56,13 @@ class AramexApi(Carrier):
     }
 
     _min_max_estimates = {
-        'PDX': (1, 2),
-        'PPX': (1, 2),
-        'PLX': (1, 2),
-        'DDX': (1, 2),
-        'DPX': (1, 2),
-        'GDX': (1, 3),
-        'GPX': (1, 3)
+        'PDX': (7, 10),
+        'PPX': (7, 10),
+        'PLX': (7, 10),
+        'DDX': (7, 10),
+        'DPX': (7, 10),
+        'GDX': (7, 10),
+        'GPX': (7, 10)
     }
 
     _carrier_error_codes = {
