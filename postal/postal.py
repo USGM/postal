@@ -89,6 +89,12 @@ class Postal:
                 "A carrier named '%s' does not exist." % carrier_name)
         return self.carriers[carrier_name].get_service(service_id)
 
+    def track(self, carrier_name, tracking_number):
+        if carrier_name not in self.carriers:
+            raise PostalError(
+                "A carrier named '%s' does not exist." % carrier_name)
+        return self.carriers[carrier_name].track(tracking_number)
+
     def get_package_type(self, carrier_name, code):
         if carrier_name:
             return self.carriers[carrier_name].get_package_type(code)

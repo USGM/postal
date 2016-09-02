@@ -1,5 +1,4 @@
 import os
-from sys import version_info
 
 from setuptools import setup, find_packages
 
@@ -33,7 +32,7 @@ def get_data_files():
 
 setup(
     name='Postal',
-    version='0.2.2',
+    version='0.3.0',
     author='US Global Mail with Silicus Technologies',
     author_email='it@usglobalmail.com',
     url='http://www.usglobalmail.com/',

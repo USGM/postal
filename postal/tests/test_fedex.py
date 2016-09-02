@@ -138,3 +138,13 @@ class TestFedEx(_AbstractTestCarrier, unittest.TestCase):
         self.assertEqual(price_dict['fees'], Money('1.00', 'USD'))
         self.assertEqual(price_dict['base_price'], Money('2.00', 'USD'))
         self.assertEqual(price_dict['total'], Money('3.00', 'USD'))
+
+    def test_tracking(self):
+        result = self.carrier.track('076288115212522')
+        self.assertEqual(result['delivered'], False)
+        self.assertEqual(result['location'].street_lines, [' '])
+        self.assertEqual(result['location'].city, u'Tampa')
+        self.assertEqual(result['location'].subdivision, u'FL')
+        self.assertEqual(result['description'], u'Delivery exception')
+        self.assertEqual(result['finalized'], True)
+        self.assertEqual(result['status_code'], u'DE')

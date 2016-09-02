@@ -131,6 +131,8 @@ class FedExApi(Carrier):
 
         self.upload_client = self.create_client('UploadDocumentService_v1.wsdl')
 
+        self.tracking_client = self.create_client('TrackService_v12.wsdl')
+
         self.contact_type = (
             self.rates_client.factory.create('Party').__class__)
 
@@ -256,6 +258,14 @@ class FedExApi(Carrier):
         version.ServiceId = 'cdus'
         version.Major = 1
         version.Intermediate = 1
+        version.Minor = 0
+        return version
+
+    def tracking_version_id(self):
+        version = self.tracking_client.factory.create('VersionId')
+        version.ServiceId = 'trck'
+        version.Major = 12
+        version.Intermediate = 0
         version.Minor = 0
         return version
 
@@ -704,6 +714,41 @@ class FedExApi(Carrier):
 
         return final
 
+    def track(self, identifier):
+        auth = self.authentication(self.tracking_client)
+        client = self.user_client(self.tracking_client)
+        transaction_detail = self.transaction_detail(self.tracking_client)
+        version = self.tracking_version_id()
+        selection_details = self.tracking_client.factory.create('TrackSelectionDetail')
+        selection_details.PackageIdentifier.Type = 'TRACKING_NUMBER_OR_DOORTAG'
+        selection_details.PackageIdentifier.Value = identifier
+
+        with self.logger.lock:
+            self.logger.debug_header('Track number: %s' % identifier)
+
+        try:
+            response = self.service_call(
+                self.tracking_client.service.track,
+                auth, client, transaction_detail, version, selection_details
+            )
+        finally:
+            self.log_transmission(self.rates_client)
+
+        result = {}
+        details = response.CompletedTrackDetails[0].TrackDetails[0].StatusDetail
+        result['delivered'] = details.Code == 'DL'
+        result['finalized'] = details.Code in ['DL', 'CA', 'DE']
+        result['status_code'] = u'{}'.format(details.Code)
+        result['description'] = u'{}'.format(details.Description)
+        street = [' ']
+        result['location'] = Address(
+            street_lines=street,
+            city=u'{}'.format(details.Location.City),
+            subdivision=u'{}'.format(details.Location.StateOrProvinceCode),
+            country=u'{}'.format(details.Location.CountryCode),
+        )
+        return result
+
     def delivery_datetime(self, service, request):
         self._ensure_supported(request)
         if not self.cache_key(request) in self.cache:
@@ -713,7 +758,8 @@ class FedExApi(Carrier):
         if not data:
             raise NotSupportedError(
                 "FedEx does not support shipment of that package on "
-                "this service.")
+                "this service."
+            )
         return data['delivery_datetime']
 
     def quote(self, service, request):

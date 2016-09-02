@@ -324,6 +324,12 @@ class Carrier(object):
                 "No packaging code '%s' for %s." % (code, self.name))
         return PackageType(self, code, name)
 
+    def track(self, identifier):
+        """
+        Returns tracking information about a shipment, based on tracking number.
+        """
+        raise NotImplementedError
+
     def get_all_package_types(self, generics=True):
         """
         Returns all package types supported by this carrier.
