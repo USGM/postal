@@ -66,3 +66,16 @@ class TestUPS(_AbstractTestCarrier, unittest.TestCase):
         self.assertEqual(price_dict['total'], Money('2.00', 'USD'))
         self.assertEqual(price_dict['fees'], Money('0.00', 'USD'))
         self.assertEqual(price_dict['base_price'], Money('2.00', 'USD'))
+
+    def test_tracking(self):
+        result = self.carrier.track('1Z12345E6205277936')
+        self.assertEqual(result['delivered'], False)
+        self.assertEqual(result['location'].street_lines, [' '])
+        self.assertEqual(result['location'].city, u'ANYTOWN')
+        self.assertEqual(result['location'].subdivision, u'GA')
+        self.assertEqual(
+            result['description'],
+            u"THE RECEIVER'S LOCATION WAS CLOSED ON THE 2ND DELIVERY ATTEMPT. A 3RD DELIVERY ATTEMPT WILL BE MADE"
+        )
+        self.assertEqual(result['finalized'], False)
+        self.assertEqual(result['status_code'], u'X')

@@ -293,6 +293,13 @@ class UPSApi(Carrier):
             ]
         )
 
+        self._Track = self._create_client(
+            'Track.wsdl',
+            plugins=[
+                authentication
+            ]
+        )
+
         self._PaperlessDocumentAPI = self._create_client(
             'PaperlessDocumentAPI.wsdl', plugins=[authentication])
 
@@ -531,6 +538,44 @@ class UPSApi(Carrier):
         if not request.extra_params.get('saturday_delivery', False):
             return
         api_shipment.ShipmentServiceOptions.SaturdayDeliveryIndicator = True
+
+    def track(self, identifier):
+        request = self._Track.factory.create('ns0:RequestType')
+        request.RequestOption = 15
+
+        with self.logger.lock:
+            self.logger.debug_header('Track number: %s' % identifier)
+
+        try:
+            response = self.service_call(self._Track.service.ProcessTrack, request, identifier, 02)
+        finally:
+            self.log_transmission(self._Track)
+
+        result = {}
+        details = response.Shipment[0].Package[0].Activity[0]
+        status = details.Status
+        result['delivered'] = status.Type == 'D'
+        result['finalized'] = status.Code == 'D'
+        result['status_code'] = u'{}'.format(status.Type)
+        result['description'] = u'{}'.format(status.Description)
+        address = getattr(details, 'ActivityLocation')
+        if status.Type == 'X':
+            # Backtrack to find the real reason for the odd status.
+            for activity in response.Shipment[0].Package[0].Activity:
+                if not hasattr(activity.Status, 'Type'):
+                    result['description'] = u'{}'.format(activity.Status.Description)
+                    address = getattr(activity, 'ActivityLocation', address)
+                    break
+        street = [' ']
+        if address:
+            address = address.Address
+            result['location'] = Address(
+                street_lines=street,
+                city=u'{}'.format(getattr(address, 'City', 'Unspecified City')),
+                subdivision=getattr(address, 'StateProvinceCode', None),
+                country=u'{}'.format(address.CountryCode),
+            )
+        return result
 
     def ship(self, service, request, receiver_account_number=None):
         self._ensure_request_supported(request)
