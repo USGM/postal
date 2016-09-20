@@ -179,3 +179,7 @@ class TestAramex (unittest.TestCase):
                 'HasErrors': True,
             })
             self.assertRaises(AddressError, self.carrier.quote, self.carrier.get_service('PPX'), request)
+
+    def test_tracking(self):
+        self.carrier.track('123456')
+        raise AssertionError

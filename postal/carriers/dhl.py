@@ -9,6 +9,9 @@ department.
 So, instead, we use a set of templates and populate these to make the final
 request.
 
+These templates are currently glorified Python strings. In the future, these should
+be replaced with something like Djinja templates.
+
 DHL rarely ships domestically, and trying to handle domestic shipments with
 them results in a lot of traps. We therefore disable domestic shipments with
 DHL.
@@ -24,11 +27,14 @@ from datetime import datetime
 from time import timezone
 from xml.etree.ElementTree import fromstring, tostring
 from xml.sax.saxutils import escape
+from dateutil import parser
 
+import pycountry
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from dateutil.relativedelta import relativedelta
 
 from money import Money
+from postal.data import Address
 from requests import post, RequestException
 
 from .base import Carrier, PostalLogger
@@ -38,6 +44,8 @@ from ..data import Shipment, TWOPLACES, sigfig
 
 
 logger = PostalLogger(__name__, 'DHL')
+
+country_map = {country.name.lower(): country for country in pycountry.countries}
 
 
 class DHLApi(Carrier):
@@ -406,6 +414,14 @@ class DHLApi(Carrier):
             request_template, escape_variables, non_escape_variables)
         return request
 
+    def track_request(self, identifier):
+        track_template = load_template('dhl', 'track.xml')
+        escape_variables = {'tracking_number': identifier}
+        non_escape_variables = {'request_header': self.create_header()}
+
+        return populate_template(
+            track_template, escape_variables, non_escape_variables)
+
     def shipment_request(self, service, request, paperless=True):
         ship_template = load_template('dhl', 'ship.xml')
         ship_datetime = request.ship_datetime or datetime.now()
@@ -520,6 +536,35 @@ class DHLApi(Carrier):
         charge = response.findtext('ShippingCharge')
         currency = response.findtext('CurrencyCode')
         return Money(charge, currency)
+
+    def track(self, identifier):
+        track_request = self.track_request(identifier)
+        with self.logger.lock:
+            self.logger.debug_header('Tracking')
+            self.logger.debug(identifier)
+
+        response = self.make_call(track_request)
+        events = response.find('AWBInfo').find('ShipmentInfo').findall('ShipmentEvent')
+        details = events[-1]
+        event = details.find('ServiceEvent')
+        event_code = event.findtext('EventCode')
+        event_time = parser.parse(details.findtext('Date') + ' ' + details.findtext('Time'))
+        result = {
+            'delivered': event_code == 'OK',
+            'finalized': event_code in ['OK'],
+            'status_code': u'{}'.format(event_code),
+            'description': u'{}'.format(event.findtext('Description')),
+            'event_time': event_time
+        }
+        street = [' ']
+        city, country = details.find('ServiceArea').findtext('Description').split(' - ')
+        country = country_map[country.lower()].alpha2
+        result['location'] = Address(
+            street_lines=street,
+            city=u'{}'.format(city),
+            country=country,
+        )
+        return result
 
     def ship(self, service, request):
         # DHL's shipment rating information from their shipment API is bogus.

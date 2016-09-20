@@ -553,11 +553,17 @@ class UPSApi(Carrier):
 
         result = {}
         details = response.Shipment[0].Package[0].Activity[0]
+        print details
         status = details.Status
         result['delivered'] = status.Type == 'D'
         result['finalized'] = status.Code == 'D'
         result['status_code'] = u'{}'.format(status.Type)
         result['description'] = u'{}'.format(status.Description)
+        date = details.Date
+        time = details.Time
+        year, month, day = int(date[0:4]), int(date[4:6]), int(date[6:8])
+        hour, min, sec = int(time[0:2]), int(time[2:4]), int(time[4:6])
+        result['event_time'] = datetime(year, month, day, hour, min, sec)
         address = getattr(details, 'ActivityLocation')
         if status.Type == 'X':
             # Backtrack to find the real reason for the odd status.

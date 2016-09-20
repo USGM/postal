@@ -3,6 +3,8 @@ from multiprocessing.pool import ThreadPool
 from base64 import b64decode
 from suds.client import Client
 from money import Money
+from suds.xsd.doctor import ImportDoctor, Import
+
 from postal.carriers.base import Carrier, ClearEmpty, PostalLogger
 from postal.exceptions import CarrierError, AddressError
 from datetime import datetime
@@ -90,6 +92,7 @@ class AramexApi(Carrier):
     _priority_letter_limit = 1.10231
     carrier_error = None
     _ship_client = None
+    _track_client = None
 
     def create_client(self, wsdl_name):
         client = Client(
@@ -123,8 +126,14 @@ class AramexApi(Carrier):
     @property
     def ship_client(self):
         if not self._ship_client:
-            self._ship_client = self.create_client('shipping-services-api-wsdl.wsdl')
+            self._ship_client = self.create_client('shipping.wsdl')
         return self._ship_client
+
+    @property
+    def track_client(self):
+        if not self._track_client:
+            self._ship_client = self.create_client('tracking.wsdl')
+        return self._track_client
 
     def requested_shipment_details(self, request):
         api_request = self.rates_client.factory.create('RateCalculatorRequest')
@@ -324,6 +333,15 @@ class AramexApi(Carrier):
     def get_services(self, request, service=False):
         AramexApi.carrier_error = None
         return self.process_request((request, False), service=service)
+
+    def track(self, identifier):
+        raise NotImplementedError("Aramex Tracking is not yet available.")
+        client_info = self.client_info
+        transaction = self.track_client.factory.create('Transaction')
+        tracking_numbers = self.track_client.factory.create('ns1:ArrayOfstring')
+        tracking_numbers.string.append(identifier)
+        response = self.track_client.service.TrackShipments(client_info, transaction, tracking_numbers, True)
+        print response
 
     def ship(self, service, request):
         AramexApi.carrier_error = None

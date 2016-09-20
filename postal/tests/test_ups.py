@@ -1,6 +1,7 @@
 from unittest import SkipTest
 import unittest
 
+from datetime import datetime
 from ddt import data, ddt
 from mock import Mock
 from money.Money import Money
@@ -79,3 +80,5 @@ class TestUPS(_AbstractTestCarrier, unittest.TestCase):
         )
         self.assertEqual(result['finalized'], False)
         self.assertEqual(result['status_code'], u'X')
+        self.assertEqual(result['event_time'], datetime(2010, 8, 30, 10, 39, 0))
+

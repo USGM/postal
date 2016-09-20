@@ -1,5 +1,6 @@
 import unittest
 
+from datetime import datetime
 from ddt import data, ddt, unpack
 from mock import Mock
 
@@ -148,3 +149,4 @@ class TestFedEx(_AbstractTestCarrier, unittest.TestCase):
         self.assertEqual(result['description'], u'Delivery exception')
         self.assertEqual(result['finalized'], True)
         self.assertEqual(result['status_code'], u'DE')
+        self.assertEqual(result['event_time'], datetime(2014, 1, 20, 0, 0))

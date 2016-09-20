@@ -8,6 +8,7 @@ from math import ceil
 from pprint import pformat
 import warnings
 from PyPDF2.utils import PdfReadWarning
+from dateutil import parser
 
 from money import Money
 from PyPDF2 import PdfFileReader, PdfFileWriter
@@ -747,6 +748,7 @@ class FedExApi(Carrier):
             subdivision=u'{}'.format(details.Location.StateOrProvinceCode),
             country=u'{}'.format(details.Location.CountryCode),
         )
+        result['event_time'] = details.CreationTime
         return result
 
     def delivery_datetime(self, service, request):
