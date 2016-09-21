@@ -119,6 +119,19 @@ class Address(object):
     def __repr__(self):
         return repr(self._str())
 
+    def to_primitive(self):
+        return {
+            'street_lines': self.street_lines,
+            'city': self.city,
+            'country': self.country.alpha2,
+            'subdivision': self.subdivision,
+            'residential': self.residential,
+            'phone_number': self.phone_number,
+            'email': self.email,
+            'contact_name': self.contact_name,
+            'postal_code': self.postal_code,
+        }
+
     def copy(self):
         return Address(
             contact_name=self.contact_name,
