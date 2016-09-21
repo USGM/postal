@@ -1,9 +1,14 @@
 from multiprocessing.pool import ThreadPool
 
 from base64 import b64decode
-from suds.client import Client
+from xml.etree.ElementTree import iterparse
+
+from StringIO import StringIO
+
+from dateutil import parser
+from postal.data import Address, country_map
+from suds.client import Client, TypeNotFound
 from money import Money
-from suds.xsd.doctor import ImportDoctor, Import
 
 from postal.carriers.base import Carrier, ClearEmpty, PostalLogger
 from postal.exceptions import CarrierError, AddressError
@@ -132,7 +137,7 @@ class AramexApi(Carrier):
     @property
     def track_client(self):
         if not self._track_client:
-            self._ship_client = self.create_client('tracking.wsdl')
+            self._track_client = self.create_client('tracking.wsdl')
         return self._track_client
 
     def requested_shipment_details(self, request):
@@ -335,13 +340,40 @@ class AramexApi(Carrier):
         return self.process_request((request, False), service=service)
 
     def track(self, identifier):
-        raise NotImplementedError("Aramex Tracking is not yet available.")
         client_info = self.client_info
         transaction = self.track_client.factory.create('Transaction')
         tracking_numbers = self.track_client.factory.create('ns1:ArrayOfstring')
         tracking_numbers.string.append(identifier)
-        response = self.track_client.service.TrackShipments(client_info, transaction, tracking_numbers, True)
-        print response
+        try:
+            self.track_client.service.TrackShipments(client_info, transaction, tracking_numbers, True)
+        except TypeNotFound:
+            # We expect this to always happen because of a bug in Aramex's wsdl. We will still have access to the
+            # raw XML, so we'll handle it here.
+            pass
+        response = self.log_service.last_received_reply
+        it = iterparse(StringIO(response))
+        for _, el in it:
+            if '}' in el.tag:
+                el.tag = el.tag.split('}', 1)[1]  # strip all namespaces
+        response = it.root
+        result = response.find('Body').find(
+            'ShipmentTrackingResponse').find('TrackingResults').find(
+                'KeyValueOfstringArrayOfTrackingResultmFAkxlpY'
+        ).find(
+            'Value'
+        ).find('TrackingResult')
+        event_code = result.findtext('UpdateCode')
+        city, country = result.findtext('UpdateLocation').split(', ')
+        country = country.lower()
+
+        return {
+            'delivered': event_code == 'SH001',
+            'finalized': event_code in ['SH001'],
+            'status_code': u'{}'.format(event_code),
+            'description': u'{}'.format(result.findtext('UpdateDescription')),
+            'event_time': parser.parse(result.findtext('UpdateDateTime')),
+            'location': Address(street_lines=[' '], city=city, country=country_map.get(country).alpha2)
+        }
 
     def ship(self, service, request):
         AramexApi.carrier_error = None

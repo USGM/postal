@@ -1,8 +1,11 @@
 import datetime
+import httplib
 import unittest
 
 import mock
+from StringIO import StringIO
 from money import Money
+from suds.transport.http import HttpTransport, Reply
 
 from postal.carriers.aramex import AramexApi
 from postal.carriers.base import Service
@@ -10,6 +13,7 @@ from postal.data import PackageType
 from postal.exceptions import AddressError
 from postal.postal import Postal
 from postal.configuration_base import base_postal_configuration
+from postal.tests.fixtures.aramex import tracking_response
 
 from ..data import (Address, Package, Request, Declaration)
 from .base import test_european, test_to, test_from
@@ -23,6 +27,14 @@ class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         dict.__init__(self, *args, **kwargs)
         self.__dict__ = self
+
+
+def fake_call(client, response_xml, status=200):
+    def invoke(args, kwargs):
+        msg = client.method.binding.input.get_message(client.method, args, kwargs)
+        return client.process_reply(
+            reply=response_xml, status=status, description='Test Reply', original_soapenv=msg
+        )
 
 
 class TestAramex (unittest.TestCase):
@@ -180,6 +192,15 @@ class TestAramex (unittest.TestCase):
             })
             self.assertRaises(AddressError, self.carrier.quote, self.carrier.get_service('PPX'), request)
 
-    def test_tracking(self):
-        self.carrier.track('123456')
-        raise AssertionError
+    @mock.patch.object(HttpTransport, 'send')
+    def test_tracking(self, mock_send):
+        mock_send.return_value = Reply(httplib.OK, {}, tracking_response)
+        response = self.carrier.track('123456')
+        self.assertEqual(response['delivered'], True)
+        self.assertEqual(response['description'], u'Shipment received at destination warehouse')
+        self.assertEqual(response['event_time'], datetime.datetime(2016, 5, 31, 16, 0))
+        self.assertEqual(response['finalized'], True)
+        self.assertEqual(response['status_code'], u'SH001')
+        self.assertEqual(response['location'].street_lines, [' '])
+        self.assertEqual(response['location'].country.alpha2, 'ZA')
+        self.assertEqual(response['location'].city, 'JOHANNESBURG')

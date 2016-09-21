@@ -1,4 +1,4 @@
-tracking_response = """<req:TrackingResponse xsi:schemaLocation="http://www.dhl.com TrackingResponse.xsd" xmlns:req="http://www.dhl.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+tracking_response = u"""<req:TrackingResponse xsi:schemaLocation="http://www.dhl.com TrackingResponse.xsd" xmlns:req="http://www.dhl.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
    <Response>
       <ServiceHeader>
          <MessageTime>2011-08-16T10:42:35+01:00</MessageTime>

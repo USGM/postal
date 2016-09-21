@@ -34,6 +34,8 @@ subdivision_map = {
     for country in countries
 }
 
+country_map = {country.name.lower(): country for country in countries}
+
 for code in ('AE', 'AA', 'AP'):
     subdivision_map['US'][code] = code
 

@@ -25,16 +25,15 @@ import random
 from base64 import b64decode
 from datetime import datetime
 from time import timezone
-from xml.etree.ElementTree import fromstring, tostring
+from xml.etree.ElementTree import fromstring
 from xml.sax.saxutils import escape
 from dateutil import parser
 
-import pycountry
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from dateutil.relativedelta import relativedelta
 
 from money import Money
-from postal.data import Address
+from postal.data import Address, country_map
 from requests import post, RequestException
 
 from .base import Carrier, PostalLogger
@@ -44,8 +43,6 @@ from ..data import Shipment, TWOPLACES, sigfig
 
 
 logger = PostalLogger(__name__, 'DHL')
-
-country_map = {country.name.lower(): country for country in pycountry.countries}
 
 
 class DHLApi(Carrier):
