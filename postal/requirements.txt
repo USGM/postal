@@ -2,6 +2,7 @@ pycountry==1.2
 python-money==0.5
 suds-jurko==0.6
 reportlab==3.3.0
+futures==3.0.5
 Pillow==3.2.0
 ddt==1.0.0
 mock==0.8.0

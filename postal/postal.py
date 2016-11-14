@@ -1,11 +1,37 @@
 """
 Front-end for the Postal Library.
 """
-from copy import copy
-from multiprocessing.pool import ThreadPool
+import traceback
 import sys
+
+from copy import copy
+
+from concurrent import futures
+from concurrent.futures import ThreadPoolExecutor
+
 from .exceptions import PostalError, NotSupportedError
 from carriers import Carrier
+
+
+class ThreadPoolExecutorStackTraced(ThreadPoolExecutor):
+
+    def submit(self, fn, *args, **kwargs):
+        """Submits the wrapped function instead of `fn`"""
+
+        return super(ThreadPoolExecutorStackTraced, self).submit(
+            self._function_wrapper, fn, *args, **kwargs)
+
+    def _function_wrapper(self, fn, *args, **kwargs):
+        """Wraps `fn` in order to preserve the traceback of any kind of
+        raised exception
+
+        """
+        try:
+            return fn(*args, **kwargs)
+        except Exception:
+            # Creates an exception of the same type and traceback before the futures library
+            # removes information that it should not.
+            raise sys.exc_info()[0](traceback.format_exc())
 
 
 class Postal:
@@ -67,13 +93,14 @@ class Postal:
 
         carriers = self.request_carrier_options(request)
 
-        thread_pool = ThreadPool(processes=len(carriers))
-        result = dict(thread_pool.map(
-            _task, [(carrier, request) for carrier in carriers.values()]))
-        if result:
-            thread_pool.terminate()
-            thread_pool.join()
-            return result
+        with ThreadPoolExecutorStackTraced(max_workers=len(carriers)) as executor:
+            futures_dict = {
+                executor.submit(_task, (carrier, request)): carrier.name for carrier in carriers.values()
+            }
+            results = []
+            for future in futures.as_completed(futures_dict):
+                results.append(future.result())
+        return dict(results)
 
     def get_all_services(self):
         """

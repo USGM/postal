@@ -1,10 +1,9 @@
-from multiprocessing.pool import ThreadPool
-
 from base64 import b64decode
 from xml.etree.ElementTree import iterparse
 
 from StringIO import StringIO
 
+from concurrent import futures
 from dateutil import parser
 from postal.data import Address, country_map
 from suds.client import Client, TypeNotFound
@@ -15,6 +14,8 @@ from postal.exceptions import CarrierError, AddressError
 from datetime import datetime
 from postal.data import Package
 from copy import deepcopy
+
+from postal.postal import ThreadPoolExecutorStackTraced
 from ..data import Shipment
 from collections import OrderedDict
 from decimal import Decimal
@@ -383,10 +384,14 @@ class AramexApi(Carrier):
         AramexApi.carrier_error = None
         request, ship = request_info
         requests = self.get_requests((request, ship), service=service)
-        thread_pool = ThreadPool(processes=len(requests))
-        results = thread_pool.map(self.get_request_rate, [(api_request, ship, service) for api_request in requests])
-        thread_pool.terminate()
-        thread_pool.join()
+        with ThreadPoolExecutorStackTraced(max_workers=len(requests)) as executor:
+            futures_with_service = {
+                executor.submit(self.get_request_rate, api_request, ship): service for api_request in requests
+            }
+            results = []
+            for future in futures.as_completed(futures_with_service):
+                results.append(future.result())
+
         if AramexApi.carrier_error:
             if ship:
                 raise AramexApi.carrier_error
@@ -427,8 +432,7 @@ class AramexApi(Carrier):
             raise codes[0]
         return {}
 
-    def get_request_rate(self, request_info):
-        request, ship, service = request_info
+    def get_request_rate(self, request, ship):
         try:
             if ship:
                 return self.service_call(
