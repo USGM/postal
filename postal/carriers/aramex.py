@@ -10,7 +10,7 @@ from suds.client import Client, TypeNotFound
 from money import Money
 
 from postal.carriers.base import Carrier, ClearEmpty, PostalLogger
-from postal.exceptions import CarrierError, AddressError
+from postal.exceptions import CarrierError, AddressError, PostalError
 from datetime import datetime
 from postal.data import Package
 from copy import deepcopy
@@ -318,21 +318,30 @@ class AramexApi(Carrier):
         response = super(AramexApi, self).service_call(func, *args, **kwargs)
         if response.HasErrors:
             msg = ''
-            for notification in response.Notifications.Notification:
-                code = notification['Code']
-                message = notification['Message']
-                # Handle the nightmare that is Aramex error handling.
-                # They use the same code for multiple things.
-                for key in self._switchable_messages:
-                    if key in message:
-                        code = self._switchable_messages[key]
-                        break
-                if code in self._translatable_errors:
-                    cls, msg, kwargs = self._translatable_errors[code]
-                    raise cls(msg, code=code, **kwargs)
-                msg += '{} {}.'.format(code, message)
+            try:
+                for notification in response.Notifications.Notification:
+                    code = notification['Code']
+                    message = notification['Message']
+                    # Handle the nightmare that is Aramex error handling.
+                    # They use the same code for multiple things.
+                    for key in self._switchable_messages:
+                        if key in message:
+                            code = self._switchable_messages[key]
+                            break
+                    if code in self._translatable_errors:
+                        cls, msg, kwargs = self._translatable_errors[code]
+                        raise cls(msg, code=code, **kwargs)
+                    msg += '{} {}.'.format(code, message)
+                    raise CarrierError(
+                        msg, code=code
+                    )
+            except PostalError:
+                raise
+            except Exception as err:
+                print type(err)
+                # We don't know what sort of exception this might be. Grab everything.
                 raise CarrierError(
-                    msg, code=code
+                    str(response)
                 )
         return response
 
