@@ -31,7 +31,7 @@ class ThreadPoolExecutorStackTraced(ThreadPoolExecutor):
         except Exception:
             # Creates an exception of the same type and traceback before the futures library
             # removes information that it should not.
-            raise
+            raise sys.exc_info()[0](traceback.format_exc())
 
 
 class Postal:
