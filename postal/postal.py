@@ -28,10 +28,10 @@ class ThreadPoolExecutorStackTraced(ThreadPoolExecutor):
         """
         try:
             return fn(*args, **kwargs)
-        except Exception:
+        except Exception as err:
             # Creates an exception of the same type and traceback before the futures library
             # removes information that it should not.
-            raise sys.exc_info()[0](traceback.format_exc())
+            raise err
 
 
 class Postal:
