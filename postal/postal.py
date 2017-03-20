@@ -31,7 +31,8 @@ class ThreadPoolExecutorStackTraced(ThreadPoolExecutor):
         except Exception as err:
             # Creates an exception of the same type and traceback before the futures library
             # removes information that it should not.
-            raise err
+            info = sys.exc_info()
+            raise info[0], info[1], info[2]
 
 
 class Postal:

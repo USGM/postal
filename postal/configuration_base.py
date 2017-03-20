@@ -123,7 +123,7 @@ base_postal_configuration = {
 
         # If account number is specified for aramex, then account pin, country code
         # and entity fields must also be given in the request.
-        'Aramex' : {
+        'Aramex': {
             'account_country_code': 'US',
             'account_entity': 'TES',
             'account_number': '123456789',
