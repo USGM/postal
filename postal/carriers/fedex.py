@@ -9,7 +9,7 @@ from pprint import pformat
 import warnings
 from PyPDF2.utils import PdfReadWarning
 from dateutil import parser
-
+from decimal import Decimal
 from money import Money
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from suds.client import Client
@@ -643,7 +643,11 @@ class FedExApi(Carrier):
                     rating.TotalBaseCharge.Amount,
                     rating.TotalBaseCharge.Currency
                 )
-                price['fees'] = (price['total'] - price['base_price'])
+                if (price['total'] - price['base_price']) < 0:
+                    price['base_price'] = price['total']
+                    price['fees'] = Money(Decimal('0.0'), 'USD')
+                else:
+                    price['fees'] = (price['total'] - price['base_price'])
                 break
         if not price:
             raise CarrierError("FedEx returned a nonsense price.")
