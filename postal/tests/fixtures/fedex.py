@@ -1,0 +1,351 @@
+tracking_response = u"""<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
+   <SOAP-ENV:Header/>
+   <SOAP-ENV:Body>
+      <TrackReply xmlns="http://fedex.com/ws/track/v12">
+         <HighestSeverity>SUCCESS</HighestSeverity>
+         <Notifications>
+            <Severity>SUCCESS</Severity>
+            <Source>trck</Source>
+            <Code>0</Code>
+            <Message>Request was successfully processed.</Message>
+            <LocalizedMessage>Request was successfully processed.</LocalizedMessage>
+         </Notifications>
+         <Version>
+            <ServiceId>trck</ServiceId>
+            <Major>12</Major>
+            <Intermediate>0</Intermediate>
+            <Minor>0</Minor>
+         </Version>
+         <CompletedTrackDetails>
+            <HighestSeverity>SUCCESS</HighestSeverity>
+            <Notifications>
+               <Severity>SUCCESS</Severity>
+               <Source>trck</Source>
+               <Code>0</Code>
+               <Message>Request was successfully processed.</Message>
+               <LocalizedMessage>Request was successfully processed.</LocalizedMessage>
+            </Notifications>
+            <DuplicateWaybill>false</DuplicateWaybill>
+            <MoreData>false</MoreData>
+            <TrackDetailsCount>0</TrackDetailsCount>
+            <TrackDetails>
+               <Notification>
+                  <Severity>SUCCESS</Severity>
+                  <Source>trck</Source>
+                  <Code>0</Code>
+                  <Message>Request was successfully processed.</Message>
+                  <LocalizedMessage>Request was successfully processed.</LocalizedMessage>
+               </Notification>
+               <TrackingNumber>785568835233</TrackingNumber>
+               <TrackingNumberUniqueIdentifier>2457795000~785568835233~FX</TrackingNumberUniqueIdentifier>
+               <StatusDetail>
+                  <CreationTime>2017-02-14T00:00:00</CreationTime>
+                  <Code>DL</Code>
+                  <Description>Delivered</Description>
+                  <Location>
+                     <City>LAGOS</City>
+                     <StateOrProvinceCode>LA</StateOrProvinceCode>
+                     <CountryCode>NG</CountryCode>
+                     <CountryName>Nigeria</CountryName>
+                     <Residential>false</Residential>
+                  </Location>
+               </StatusDetail>
+               <CarrierCode>FDXE</CarrierCode>
+               <OperatingCompanyOrCarrierDescription>FedEx Express</OperatingCompanyOrCarrierDescription>
+               <Service>
+                  <Type>INTERNATIONAL_PRIORITY</Type>
+                  <Description>FedEx International Priority</Description>
+                  <ShortDescription>IP</ShortDescription>
+               </Service>
+               <PackageWeight>
+                  <Units>LB</Units>
+                  <Value>6.0</Value>
+               </PackageWeight>
+               <PackageDimensions>
+                  <Length>13</Length>
+                  <Width>10</Width>
+                  <Height>5</Height>
+                  <Units>IN</Units>
+               </PackageDimensions>
+               <ShipmentWeight>
+                  <Units>LB</Units>
+                  <Value>6.0</Value>
+               </ShipmentWeight>
+               <Packaging>Your Packaging</Packaging>
+               <PackagingType>YOUR_PACKAGING</PackagingType>
+               <PackageSequenceNumber>1</PackageSequenceNumber>
+               <PackageCount>1</PackageCount>
+               <SpecialHandlings>
+                  <Type>DELIVER_WEEKDAY</Type>
+                  <Description>Deliver Weekday</Description>
+                  <PaymentType>OTHER</PaymentType>
+               </SpecialHandlings>
+               <SpecialHandlings>
+                  <Type>RESIDENTIAL_DELIVERY</Type>
+                  <Description>Residential Delivery</Description>
+                  <PaymentType>OTHER</PaymentType>
+               </SpecialHandlings>
+               <Payments>
+                  <Classification>DUTIES_AND_TAXES</Classification>
+                  <Type>RECIPIENT_ACCOUNT</Type>
+                  <Description>Recipient</Description>
+               </Payments>
+               <Payments>
+                  <Classification>TRANSPORTATION</Classification>
+                  <Type>SHIPPER_ACCOUNT</Type>
+                  <Description>Shipper</Description>
+               </Payments>
+               <ShipperAddress>
+                  <City>HOUSTON</City>
+                  <StateOrProvinceCode>TX</StateOrProvinceCode>
+                  <CountryCode>US</CountryCode>
+                  <CountryName>United States</CountryName>
+                  <Residential>false</Residential>
+               </ShipperAddress>
+               <DatesOrTimes>
+                  <Type>ACTUAL_DELIVERY</Type>
+                  <DateOrTimestamp>2017-02-14T15:20:00+01:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DatesOrTimes>
+                  <Type>ACTUAL_PICKUP</Type>
+                  <DateOrTimestamp>2017-02-10T17:37:00-06:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DatesOrTimes>
+                  <Type>SHIP</Type>
+                  <DateOrTimestamp>2017-02-10T00:00:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DatesOrTimes>
+                  <Type>ACTUAL_TENDER</Type>
+                  <DateOrTimestamp>2017-02-10T17:37:00-06:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DestinationAddress>
+                  <City>LAGOS</City>
+                  <StateOrProvinceCode>LA</StateOrProvinceCode>
+                  <CountryCode>NG</CountryCode>
+                  <CountryName>Nigeria</CountryName>
+                  <Residential>false</Residential>
+               </DestinationAddress>
+               <ActualDeliveryAddress>
+                  <City>LAGOS</City>
+                  <StateOrProvinceCode>LA</StateOrProvinceCode>
+                  <CountryCode>NG</CountryCode>
+                  <CountryName>Nigeria</CountryName>
+                  <Residential>false</Residential>
+               </ActualDeliveryAddress>
+               <DeliveryLocationType>RECEPTIONIST_OR_FRONT_DESK</DeliveryLocationType>
+               <DeliveryLocationDescription>Receptionist/Front Desk</DeliveryLocationDescription>
+               <DeliveryAttempts>0</DeliveryAttempts>
+               <DeliverySignatureName>K.DAVID</DeliverySignatureName>
+               <TotalUniqueAddressCountInConsolidation>0</TotalUniqueAddressCountInConsolidation>
+               <NotificationEventsAvailable>ON_DELIVERY</NotificationEventsAvailable>
+               <DeliveryOptionEligibilityDetails>
+                  <Option>INDIRECT_SIGNATURE_RELEASE</Option>
+                  <Eligibility>INELIGIBLE</Eligibility>
+               </DeliveryOptionEligibilityDetails>
+               <DeliveryOptionEligibilityDetails>
+                  <Option>REDIRECT_TO_HOLD_AT_LOCATION</Option>
+                  <Eligibility>INELIGIBLE</Eligibility>
+               </DeliveryOptionEligibilityDetails>
+               <DeliveryOptionEligibilityDetails>
+                  <Option>REROUTE</Option>
+                  <Eligibility>INELIGIBLE</Eligibility>
+               </DeliveryOptionEligibilityDetails>
+               <DeliveryOptionEligibilityDetails>
+                  <Option>RESCHEDULE</Option>
+                  <Eligibility>INELIGIBLE</Eligibility>
+               </DeliveryOptionEligibilityDetails>
+               <Events>
+                  <Timestamp>2017-02-14T15:20:00+01:00</Timestamp>
+                  <EventType>DL</EventType>
+                  <EventDescription>Delivered</EventDescription>
+                  <Address>
+                     <City>LAGOS</City>
+                     <StateOrProvinceCode>LA</StateOrProvinceCode>
+                     <PostalCode>23401</PostalCode>
+                     <CountryCode>NG</CountryCode>
+                     <CountryName>Nigeria</CountryName>
+                     <Residential>false</Residential>
+                  </Address>
+                  <ArrivalLocation>DELIVERY_LOCATION</ArrivalLocation>
+               </Events>
+            </TrackDetails>
+         </CompletedTrackDetails>
+      </TrackReply>
+   </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>"""
+
+
+tracking_response_StateOrProvinceCode = u"""<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
+   <SOAP-ENV:Header/>
+   <SOAP-ENV:Body>
+      <TrackReply xmlns="http://fedex.com/ws/track/v12">
+         <HighestSeverity>SUCCESS</HighestSeverity>
+         <Notifications>
+            <Severity>SUCCESS</Severity>
+            <Source>trck</Source>
+            <Code>0</Code>
+            <Message>Request was successfully processed.</Message>
+            <LocalizedMessage>Request was successfully processed.</LocalizedMessage>
+         </Notifications>
+         <Version>
+            <ServiceId>trck</ServiceId>
+            <Major>12</Major>
+            <Intermediate>0</Intermediate>
+            <Minor>0</Minor>
+         </Version>
+         <CompletedTrackDetails>
+            <HighestSeverity>SUCCESS</HighestSeverity>
+            <Notifications>
+               <Severity>SUCCESS</Severity>
+               <Source>trck</Source>
+               <Code>0</Code>
+               <Message>Request was successfully processed.</Message>
+               <LocalizedMessage>Request was successfully processed.</LocalizedMessage>
+            </Notifications>
+            <DuplicateWaybill>false</DuplicateWaybill>
+            <MoreData>false</MoreData>
+            <TrackDetailsCount>0</TrackDetailsCount>
+            <TrackDetails>
+               <Notification>
+                  <Severity>SUCCESS</Severity>
+                  <Source>trck</Source>
+                  <Code>0</Code>
+                  <Message>Request was successfully processed.</Message>
+                  <LocalizedMessage>Request was successfully processed.</LocalizedMessage>
+               </Notification>
+               <TrackingNumber>785968343776</TrackingNumber>
+               <TrackingNumberUniqueIdentifier>2457833000~785968343776~FX</TrackingNumberUniqueIdentifier>
+               <StatusDetail>
+                  <CreationTime>2017-03-23T00:00:00</CreationTime>
+                  <Code>DL</Code>
+                  <Description>Delivered</Description>
+                  <Location>
+                     <City>ACCRA</City>
+                     <CountryCode>GH</CountryCode>
+                     <CountryName>Ghana</CountryName>
+                     <Residential>false</Residential>
+                  </Location>
+               </StatusDetail>
+               <CarrierCode>FDXE</CarrierCode>
+               <OperatingCompanyOrCarrierDescription>FedEx Express</OperatingCompanyOrCarrierDescription>
+               <Service>
+                  <Type>INTERNATIONAL_PRIORITY</Type>
+                  <Description>FedEx International Priority</Description>
+                  <ShortDescription>IP</ShortDescription>
+               </Service>
+               <PackageWeight>
+                  <Units>LB</Units>
+                  <Value>13.1</Value>
+               </PackageWeight>
+               <PackageDimensions>
+                  <Length>22</Length>
+                  <Width>16</Width>
+                  <Height>12</Height>
+                  <Units>IN</Units>
+               </PackageDimensions>
+               <ShipmentWeight>
+                  <Units>LB</Units>
+                  <Value>13.1</Value>
+               </ShipmentWeight>
+               <Packaging>Your Packaging</Packaging>
+               <PackagingType>YOUR_PACKAGING</PackagingType>
+               <PackageSequenceNumber>1</PackageSequenceNumber>
+               <PackageCount>1</PackageCount>
+               <SpecialHandlings>
+                  <Type>DELIVER_WEEKDAY</Type>
+                  <Description>Deliver Weekday</Description>
+                  <PaymentType>OTHER</PaymentType>
+               </SpecialHandlings>
+               <SpecialHandlings>
+                  <Type>RESIDENTIAL_DELIVERY</Type>
+                  <Description>Residential Delivery</Description>
+                  <PaymentType>OTHER</PaymentType>
+               </SpecialHandlings>
+               <Payments>
+                  <Classification>DUTIES_AND_TAXES</Classification>
+                  <Type>RECIPIENT_ACCOUNT</Type>
+                  <Description>Recipient</Description>
+               </Payments>
+               <Payments>
+                  <Classification>TRANSPORTATION</Classification>
+                  <Type>SHIPPER_ACCOUNT</Type>
+                  <Description>Shipper</Description>
+               </Payments>
+               <ShipperAddress>
+                  <City>HOUSTON</City>
+                  <StateOrProvinceCode>TX</StateOrProvinceCode>
+                  <CountryCode>US</CountryCode>
+                  <CountryName>United States</CountryName>
+                  <Residential>false</Residential>
+               </ShipperAddress>
+               <DatesOrTimes>
+                  <Type>ACTUAL_DELIVERY</Type>
+                  <DateOrTimestamp>2017-03-23T13:06:00+00:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DatesOrTimes>
+                  <Type>ACTUAL_PICKUP</Type>
+                  <DateOrTimestamp>2017-03-20T17:08:00-05:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DatesOrTimes>
+                  <Type>SHIP</Type>
+                  <DateOrTimestamp>2017-03-20T00:00:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DatesOrTimes>
+                  <Type>ACTUAL_TENDER</Type>
+                  <DateOrTimestamp>2017-03-20T17:08:00-05:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DestinationAddress>
+                  <City>ACCRA</City>
+                  <StateOrProvinceCode>AA</StateOrProvinceCode>
+                  <CountryCode>GH</CountryCode>
+                  <CountryName>Ghana</CountryName>
+                  <Residential>false</Residential>
+               </DestinationAddress>
+               <ActualDeliveryAddress>
+                  <City>ACCRA</City>
+                  <CountryCode>GH</CountryCode>
+                  <CountryName>Ghana</CountryName>
+                  <Residential>false</Residential>
+               </ActualDeliveryAddress>
+               <DeliveryLocationType>FEDEX_LOCATION</DeliveryLocationType>
+               <DeliveryLocationDescription>FedEx Location</DeliveryLocationDescription>
+               <DeliveryAttempts>0</DeliveryAttempts>
+               <DeliverySignatureName>F.OSEI</DeliverySignatureName>
+               <TotalUniqueAddressCountInConsolidation>0</TotalUniqueAddressCountInConsolidation>
+               <NotificationEventsAvailable>ON_DELIVERY</NotificationEventsAvailable>
+               <DeliveryOptionEligibilityDetails>
+                  <Option>INDIRECT_SIGNATURE_RELEASE</Option>
+                  <Eligibility>INELIGIBLE</Eligibility>
+               </DeliveryOptionEligibilityDetails>
+               <DeliveryOptionEligibilityDetails>
+                  <Option>REDIRECT_TO_HOLD_AT_LOCATION</Option>
+                  <Eligibility>INELIGIBLE</Eligibility>
+               </DeliveryOptionEligibilityDetails>
+               <DeliveryOptionEligibilityDetails>
+                  <Option>REROUTE</Option>
+                  <Eligibility>INELIGIBLE</Eligibility>
+               </DeliveryOptionEligibilityDetails>
+               <DeliveryOptionEligibilityDetails>
+                  <Option>RESCHEDULE</Option>
+                  <Eligibility>INELIGIBLE</Eligibility>
+               </DeliveryOptionEligibilityDetails>
+               <Events>
+                  <Timestamp>2017-03-23T13:06:00+00:00</Timestamp>
+                  <EventType>DL</EventType>
+                  <EventDescription>Delivered</EventDescription>
+                  <Address>
+                     <City>ACCRA</City>
+                     <PostalCode>99999</PostalCode>
+                     <CountryCode>GH</CountryCode>
+                     <CountryName>Ghana</CountryName>
+                     <Residential>false</Residential>
+                  </Address>
+                  <ArrivalLocation>DELIVERY_LOCATION</ArrivalLocation>
+               </Events>
+            </TrackDetails>
+         </CompletedTrackDetails>
+      </TrackReply>
+   </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>"""
