@@ -13,11 +13,11 @@ from postal.data import PackageType
 from postal.exceptions import AddressError
 from postal.postal import Postal
 from postal.configuration_base import base_postal_configuration
-from postal.tests.fixtures.aramex import tracking_response
+from postal.tests.fixtures.aramex import tracking_response, tracking_response_ascii
 
-from ..data import (Address, Package, Request, Declaration)
-from .base import test_european, test_to, test_from
-from .test_configuration import config
+from postal.data import (Address, Package, Request, Declaration)
+from base import test_european, test_to, test_from
+from test_configuration import config
 from decimal import Decimal
 
 TWOPLACES = Decimal('0.01')
@@ -204,3 +204,16 @@ class TestAramex (unittest.TestCase):
         self.assertEqual(response['location'].street_lines, [' '])
         self.assertEqual(response['location'].country.alpha2, 'ZA')
         self.assertEqual(response['location'].city, 'JOHANNESBURG')
+
+    @mock.patch.object(HttpTransport, 'send')
+    def test_tracking_check_ascii(self, mock_send):
+        mock_send.return_value = Reply(httplib.OK, {}, tracking_response_ascii.encode('utf-8'))
+        response = self.carrier.track('30793916823')
+        self.assertEqual(response['delivered'], False)
+        self.assertEqual(response['description'], u'Collected by Consignee')
+        self.assertEqual(response['event_time'], datetime.datetime(2017, 4, 18, 17, 17))
+        self.assertEqual(response['finalized'], False)
+        self.assertEqual(response['status_code'], u'SH006')
+        self.assertEqual(response['location'].street_lines, [' '])
+        self.assertEqual(response['location'].country.alpha2, 'SA')
+        self.assertEqual(response['location'].city, 'Al Silay - exit 16 Riyadh')

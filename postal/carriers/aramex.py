@@ -16,7 +16,7 @@ from postal.data import Package
 from copy import deepcopy
 
 from postal.postal import ThreadPoolExecutorStackTraced
-from ..data import Shipment
+from postal.data import Shipment
 from collections import OrderedDict
 from decimal import Decimal
 from pprint import pformat
@@ -361,7 +361,7 @@ class AramexApi(Carrier):
             # raw XML, so we'll handle it here.
             pass
         response = self.log_service.last_received_reply
-        it = iterparse(StringIO(response))
+        it = iterparse(StringIO(response.encode('utf-8')))
         for _, el in it:
             if '}' in el.tag:
                 el.tag = el.tag.split('}', 1)[1]  # strip all namespaces
