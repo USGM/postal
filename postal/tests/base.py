@@ -6,10 +6,10 @@ from dateutil.relativedelta import relativedelta
 from PyPDF2 import PdfFileReader
 from money import Money
 
-from ..carriers.base import Service, Carrier
-from .test_configuration import config
+from postal.carriers.base import Service, Carrier
+from test_configuration import config
 
-from ..data import Address, Package, Declaration, Shipment, Request, \
+from postal.data import Address, Package, Declaration, Shipment, Request, \
     PackageType
 
 

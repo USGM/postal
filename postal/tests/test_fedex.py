@@ -5,9 +5,9 @@ from ddt import data, ddt, unpack
 from mock import Mock
 
 from base import _AbstractTestCarrier, test_from, test_to
-from ..carriers.fedex import FedExApi
-from ..carriers.base import Carrier
-from ..data import Request, Address, Package, Declaration, Shipment
+from postal.carriers.fedex import FedExApi
+from postal.carriers.base import Carrier
+from postal.data import Request, Address, Package, Declaration, Shipment
 from money import Money
 
 
@@ -139,6 +139,35 @@ class TestFedEx(_AbstractTestCarrier, unittest.TestCase):
         self.assertEqual(price_dict['fees'], Money('1.00', 'USD'))
         self.assertEqual(price_dict['base_price'], Money('2.00', 'USD'))
         self.assertEqual(price_dict['total'], Money('3.00', 'USD'))
+
+    @unpack
+    @data(('NORMAL_TYPE', False), ('PAYOR_LIST_SHIPMENT', True), ('PAYOR_LIST_PACKAGE', True))
+    def test_get_price_dict_negative_fees(self, list_type, retail):
+        info = Mock()
+        if retail:
+            info.ActualRateType = 'Dummy'
+        else:
+            info.ActualRateType = list_type
+        spec = ('RateType', 'TotalNetCharge', 'TotalBaseCharge', 'Currency')
+        details = [
+            Mock(RateType='Dummy', spec=[]),
+            Mock(
+                RateType=list_type,
+                TotalNetCharge=Mock(Amount='15.00', Currency='USD'),
+                TotalBaseCharge=Mock(Amount='17.00', Currency='USD'),
+                spec=spec,
+            ),
+            Mock(
+                RateType=list_type,
+                TotalNetCharge=Mock(Amount='5.00', Currency='USD'),
+                TotalBaseCharge=Mock(Amount='3.00', Currency='USD'),
+                spec=spec,
+            )
+        ]
+        price_dict = FedExApi.get_price_dict(info, details, retail=True)
+        self.assertEqual(price_dict['fees'], Money('0.00', 'USD'))
+        self.assertEqual(price_dict['base_price'], Money('15.00', 'USD'))
+        self.assertEqual(price_dict['total'], Money('15.00', 'USD'))
 
     def test_tracking(self):
         result = self.carrier.track('076288115212522')
