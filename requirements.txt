@@ -1,7 +1,7 @@
 python-money==0.5
 PyPDF2==1.23
 Pillow==3.2.0
-requests==2.0.1
+requests>=2.10.0
 suds-jurko==0.6
 reportlab==3.3.0
 pycountry==1.2
