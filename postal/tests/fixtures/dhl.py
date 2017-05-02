@@ -216,3 +216,26 @@ tracking_response = u"""<req:TrackingResponse xsi:schemaLocation="http://www.dhl
       </ShipmentInfo>
    </AWBInfo>
 </req:TrackingResponse>"""
+
+
+tracking_response_not_found = u"""<?xml version="1.0" encoding="UTF-8"?>
+<req:TrackingResponse xmlns:req="http://www.dhl.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.dhl.com TrackingResponse.xsd">
+    <Response>
+        <ServiceHeader>
+            <MessageTime>2017-05-03T13:12:39+01:00</MessageTime>
+            <MessageReference>9131014351352841244932374744</MessageReference>
+            <SiteID>1337766</SiteID>
+        </ServiceHeader>
+    </Response>
+    <AWBInfo>
+        <AWBNumber>1670466965</AWBNumber>
+        <Status>
+            <ActionStatus>No Shipments Found</ActionStatus>
+            <Condition>
+                <ConditionCode>209</ConditionCode>
+                <ConditionData>No Shipments Found for AWBNumber 1670466965</ConditionData>
+            </Condition>
+        </Status>
+    </AWBInfo>
+    <LanguageCode>en</LanguageCode>
+</req:TrackingResponse>"""
