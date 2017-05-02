@@ -169,8 +169,8 @@ def _task(arg_list):
     try:
         data_dict['services'] = carrier.get_services(request)
     except Exception as err:
-        if not hasattr(err, 'traceback'):
-            err.traceback = sys.exc_info()[2]
+        #if not hasattr(err, 'traceback'):
+            #err.traceback = sys.exc_info()[2]
         data_dict['error'] = err
 
     return carrier, data_dict
