@@ -1,15 +1,15 @@
 import unittest
-
+import httplib
 from datetime import datetime
 from ddt import data, ddt, unpack
-from mock import Mock
-
+from mock import Mock, patch
 from base import _AbstractTestCarrier, test_from, test_to
 from postal.carriers.fedex import FedExApi
 from postal.carriers.base import Carrier
 from postal.data import Request, Address, Package, Declaration, Shipment
 from money import Money
-
+from suds.transport.http import HttpTransport, Reply
+from postal.tests.fixtures.fedex import tracking_response, tracking_response_StateOrProvinceCode
 
 @ddt
 class TestFedEx(_AbstractTestCarrier, unittest.TestCase):
@@ -169,13 +169,25 @@ class TestFedEx(_AbstractTestCarrier, unittest.TestCase):
         self.assertEqual(price_dict['base_price'], Money('15.00', 'USD'))
         self.assertEqual(price_dict['total'], Money('15.00', 'USD'))
 
-    def test_tracking(self):
-        result = self.carrier.track('076288115212522')
-        self.assertEqual(result['delivered'], False)
+    @patch.object(HttpTransport, 'send')
+    def test_tracking(self, mock_send):
+        mock_send.return_value = Reply(httplib.OK, { }, tracking_response)
+        result = self.carrier.track('785568835233')
+        self.assertEqual(result['delivered'], True)
         self.assertEqual(result['location'].street_lines, [' '])
-        self.assertEqual(result['location'].city, u'Tampa')
-        self.assertEqual(result['location'].subdivision, u'FL')
-        self.assertEqual(result['description'], u'Delivery exception')
+        self.assertEqual(result['location'].city, u'LAGOS')
+        self.assertEqual(result['location'].subdivision, u'LA')
+        self.assertEqual(result['description'], u'Delivered')
         self.assertEqual(result['finalized'], True)
-        self.assertEqual(result['status_code'], u'DE')
-        self.assertEqual(result['event_time'], datetime(2014, 1, 20, 0, 0))
+        self.assertEqual(result['status_code'], u'DL')
+        self.assertEqual(result['event_time'], datetime(2017, 2, 14, 0, 0))
+
+    @patch.object(HttpTransport, 'send')
+    def test_tracking_StateOrProvinceCode(self, mock_send):
+        mock_send.return_value = Reply(httplib.OK, {}, tracking_response_StateOrProvinceCode)
+        result = self.carrier.track('785968343776')
+        self.assertEqual(result['location'].street_lines, [' '])
+        self.assertEqual(result['location'].city, u'ACCRA')
+        self.assertFalse(result['location'].subdivision)
+        self.assertEqual(result['description'], u'Delivered')
+        self.assertEqual(result['finalized'], True)

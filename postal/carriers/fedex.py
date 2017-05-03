@@ -746,10 +746,16 @@ class FedExApi(Carrier):
         result['status_code'] = u'{}'.format(details.Code)
         result['description'] = u'{}'.format(details.Description)
         street = [' ']
+
+        # Fedex API dose not return StateOrProvinceCode for some countries ex Ghana
+        subdivision = False
+        if hasattr(details.Location, 'StateOrProvinceCode'):
+            subdivision = u'{}'.format(details.Location.StateOrProvinceCode)
+
         result['location'] = Address(
             street_lines=street,
             city=u'{}'.format(details.Location.City),
-            subdivision=u'{}'.format(details.Location.StateOrProvinceCode),
+            subdivision=subdivision,
             country=u'{}'.format(details.Location.CountryCode),
         )
         result['event_time'] = details.CreationTime
