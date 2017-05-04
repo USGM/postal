@@ -5,7 +5,7 @@ from ddt import ddt, data
 from mock import Mock, patch
 
 from base import _AbstractTestCarrier
-from postal.tests.fixtures.dhl import tracking_response
+from postal.tests.fixtures.dhl import tracking_response, tracking_response_not_found
 from postal.carriers.dhl import DHLApi
 
 
@@ -39,3 +39,15 @@ class TestDHL(_AbstractTestCarrier, unittest.TestCase):
         self.assertTrue(result['finalized'])
         self.assertEqual(result['event_time'], datetime(2010, 7, 22, 12, 25))
         print result
+
+    @patch('postal.carriers.dhl.post')
+    def test_tracking_not_found(self, mock_post):
+        response = Mock()
+        mock_post.return_value = response
+        response.text = tracking_response_not_found
+        result = self.carrier.track('1670466965')
+        self.assertIn('No Shipments Found for AWBNumber', result['description'])
+        self.assertEqual(result['status_code'], '209')
+        self.assertFalse(result['location'])
+        self.assertFalse(result['delivered'])
+        self.assertFalse(result['finalized'])
