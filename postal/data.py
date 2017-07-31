@@ -6,12 +6,14 @@ from decimal import Decimal
 from datetime import datetime
 from money import Money
 from pycountry import countries, subdivisions
+
+
 try:
     import money
 except ImportError:
     import Money
 
-from exceptions import AddressError
+from exceptions import AddressError, NotSupportedError
 
 
 TWOPLACES = Decimal('0.01')  # used by DHL
@@ -214,6 +216,24 @@ class Request(object):
         for pack in self.packages:
             for dec in pack.declarations:
                 yield dec
+
+    def long_description(self, require_declarations=False):
+        """
+        Creates a long-form description of this request.
+        """
+        descriptions = []
+        for pack in self.packages:
+            if pack.declarations:
+                for dec in pack.declarations:
+                    descriptions.append(dec.description)
+            elif pack.documents_only:
+                descriptions.append('documents')
+            elif require_declarations:
+                raise NotSupportedError('Each package '
+                                        "in an international shipment "
+                                        "that isn't documents only must "
+                                        'have declarations.')
+        return ', '.join(descriptions) or 'Documents'
 
     def _str(self):
         extra_params = dict(self.extra_params)

@@ -725,22 +725,8 @@ class UPSApi(Carrier):
                     request.destination, use_phone=True, use_attn=True,
                     international=True)
 
-            descriptions = []
-            for pack in request.packages:
-                if pack.declarations:
-                    for dec in pack.declarations:
-                        descriptions.append(dec.description)
-                elif pack.documents_only:
-                    descriptions.append('documents')
-                else:
-                    raise NotSupportedError('UPS requires each package '
-                                            "in an international shipment "
-                                            "that isn't documents only to "
-                                            'have declarations.')
-            description = ', '.join(descriptions)
-
-            ### UPS does not allow descriptions longer than 50 characters.
-            api_shipment.Description = description[0:50]
+            # UPS does not allow descriptions longer than 50 characters.
+            api_shipment.Description = request.long_description(require_declarations=True)[0:50]
 
         self._set_signature(request, api_shipment)
 

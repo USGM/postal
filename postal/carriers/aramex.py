@@ -171,6 +171,7 @@ class AramexApi(Carrier):
         target.ChargeableWeight = target.ActualWeight
         target.PaymentType = 'P'
         target.NumberOfPieces = len(request.packages)
+        target.DescriptionOfGoods = request.long_description()[:250]
 
     def shipment_request_details(self, request_info):
         request, service = request_info
@@ -279,6 +280,7 @@ class AramexApi(Carrier):
         target.Details.ProductType = service.service_id
         target.Details.PaymentType = 'P'
         target.Details.NumberOfPieces = len(request.packages)
+        target.Details.DescriptionOfGoods = request.long_description()[:250]
         target.Details.GoodsOriginCountry = shipper.country.alpha2
         target.Details.PaymentOptions = ''
         target.Details.CustomsValueAmount.CurrencyCode = self.postal_configuration['default_currency']

@@ -3,7 +3,6 @@ import httplib
 import unittest
 
 import mock
-from StringIO import StringIO
 from money import Money
 from suds.transport.http import HttpTransport, Reply
 
@@ -167,6 +166,7 @@ class TestAramex (unittest.TestCase):
         self.assertEqual(request.destination.postal_code, dest.PostCode)
         self.assertEqual(request.total_weight(), shipment_details.ActualWeight.Value)
         self.assertEqual('LB', shipment_details.ActualWeight.Unit)
+        self.assertEqual(shipment_details.DescriptionOfGoods, 'Snaps, SIM Card')
 
         # Check declarations are set or not
         for i, package in enumerate(shipment_details.Items):
