@@ -121,42 +121,42 @@ class TestAramex (unittest.TestCase):
             if info['delivery_datetime'] is not None:
                 self.assertIsInstance(info['delivery_datetime'], datetime)
 
-    @mock.patch('postal.carriers.aramex.AramexApi.ship_client', new_callable=mock.Mock)
+    @mock.patch('postal.carriers.aramex.AramexApi.service_call', new_callable=mock.Mock)
     @mock.patch('postal.carriers.aramex.AramexApi.format_label')
     @mock.patch('postal.carriers.aramex.AramexApi.quote')
-    def test_shipping_domestic(self, mock_quote, mock_format_label, mock_ship_client):
-        mock_ship_client.service = mock.MagicMock()
-        mock_ship_client.service.CreateShipments.return_value = self.mock_ship_response;
+    def test_shipping_domestic(self, mock_quote, mock_format_label, mock_service_call):
+        mock_service_call.service = mock.MagicMock()
+        mock_service_call.return_value = self.mock_ship_response
         request = Request(self.test_from, self.test_to, [self.domestic_package])
         service = self.carrier.get_service('OND').ship(request)
-        calls = mock_ship_client.service.CreateShipments.call_args
+        calls = mock_service_call.call_args
         args = calls[0]
         self.validate_ship_arguments(args, request)
         self.validate_ship_service(service)
-        shipments = args[2]
-        self.assertEqual(shipments.Shipment.Details.ProductGroup,'DOM') # For domestic shipments - Product group should be DOM
+        shipment = args[3][0]
+        self.assertEqual(shipment.Details.ProductGroup, 'DOM')  # For domestic shipments - Product group should be DOM
 
-    @mock.patch('postal.carriers.aramex.AramexApi.ship_client', new_callable=mock.Mock)
+    @mock.patch('postal.carriers.aramex.AramexApi.service_call', new_callable=mock.Mock)
     @mock.patch('postal.carriers.aramex.AramexApi.format_label')
     @mock.patch('postal.carriers.aramex.AramexApi.quote')
-    def test_shipping_international(self, mock_quote, mock_format_label, mock_ship_client):
-        mock_ship_client.service = mock.MagicMock()
-        mock_ship_client.service.CreateShipments.return_value = self.mock_ship_response;
+    def test_shipping_international(self, mock_quote, mock_format_label, mock_service_call):
+        mock_service_call.service = mock.MagicMock()
+        mock_service_call.return_value = self.mock_ship_response
         request = Request(self.test_from, self.european_address, [self.international_package])
         service = self.carrier.get_service('PDX').ship(request)
-        calls = mock_ship_client.service.CreateShipments.call_args
+        calls = mock_service_call.call_args
         args = calls[0]
-        self.validate_ship_arguments(args, request)
+        self.validate_ship_arguments(args, request, empty_decs=True)
         self.validate_ship_service(service)
-        shipments = args[2]
-        self.assertEqual(shipments.Shipment.Details.ProductGroup,'EXP') # For international shipments - Product group should be DOM
+        shipment = args[3][0]
+        self.assertEqual(shipment.Details.ProductGroup, 'EXP')  # For international shipments - Product group should be DOM
 
-    def validate_ship_arguments(self, args, request):
-        auth = args[0]
-        shipments = args[2]
-        origin = shipments.Shipment.Shipper.PartyAddress
-        dest = shipments.Shipment.Consignee.PartyAddress
-        shipment_details = shipments.Shipment.Details
+    def validate_ship_arguments(self, args, request, empty_decs=False):
+        auth = args[1]
+        shipment = args[3][0]
+        origin = shipment.Shipper.PartyAddress
+        dest = shipment.Consignee.PartyAddress
+        shipment_details = shipment.Details
 
         self.assertEqual(self.carrier.client_info.UserName, auth.UserName)
         self.assertEqual(self.carrier.client_info.Password, auth.Password)
@@ -166,10 +166,13 @@ class TestAramex (unittest.TestCase):
         self.assertEqual(request.destination.postal_code, dest.PostCode)
         self.assertEqual(request.total_weight(), shipment_details.ActualWeight.Value)
         self.assertEqual('LB', shipment_details.ActualWeight.Unit)
-        self.assertEqual(shipment_details.DescriptionOfGoods, 'Snaps, SIM Card')
+        if empty_decs:
+            self.assertEqual(shipment_details.DescriptionOfGoods, 'Documents')
+        else:
+            self.assertEqual(shipment_details.DescriptionOfGoods, 'Snaps, SIM Card')
 
         # Check declarations are set or not
-        for i, package in enumerate(shipment_details.Items):
+        for i, package in enumerate(shipment_details.Items.ShipmentItem):
             self.assertEqual(package.Quantity, request.packages[0].declarations[i].units)
             self.assertEqual(package.GoodsDescription, request.packages[0].declarations[i].description)
             self.assertEqual(package.CustomsValue.Value, request.packages[0].declarations[i].value.amount)

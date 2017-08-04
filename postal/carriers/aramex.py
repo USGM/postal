@@ -240,7 +240,6 @@ class AramexApi(Carrier):
         attachment.FileContents = self.commercial_invoice(request)
         target.Attachments = attachment
 
-        items = []
         insurance_amount = 0
         container_number = 1
         for package in request.packages:
@@ -255,20 +254,19 @@ class AramexApi(Carrier):
                     shipment_item = self.ship_client.factory.create('ShipmentItem')
                     shipment_item.PackageType = ''
                     shipment_item.Quantity = declaration.units
-                    shipment_item.Weight = package.weight
+                    shipment_item.Weight.Value = package.weight
+                    shipment_item.Weight.Unit = 'LB'
                     shipment_item.GoodsDescription = declaration.description
                     shipment_item.CustomsValue.CurrencyCode = declaration.value.currency
                     shipment_item.CustomsValue.Value = declaration.value.amount
                     shipment_item.ContainerNumber = container_number
-                    shipment_items_copy = deepcopy(shipment_item)
-                    items.append(shipment_items_copy)
+                    target.Details.Items.ShipmentItem.append(shipment_item)
                 value = package.get_total_insured_value()
                 if value > 0:
                     insurance_amount = insurance_amount + value.amount
         if insurance_amount > 0:
             target.Details.InsuranceAmount.CurrencyCode = self.postal_configuration['default_currency']
             target.Details.InsuranceAmount.Value = insurance_amount
-        target.Details.Items = items
 
         target.Details.ActualWeight.Value = request.total_weight()
         target.Details.ActualWeight.Unit = 'LB'
