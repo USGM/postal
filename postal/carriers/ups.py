@@ -553,7 +553,6 @@ class UPSApi(Carrier):
 
         result = {}
         details = response.Shipment[0].Package[0].Activity[0]
-        print details
         status = details.Status
         result['delivered'] = status.Type == 'D'
         result['finalized'] = status.Code == 'D'

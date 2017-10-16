@@ -38,7 +38,6 @@ class TestDHL(_AbstractTestCarrier, unittest.TestCase):
         self.assertTrue(result['delivered'])
         self.assertTrue(result['finalized'])
         self.assertEqual(result['event_time'], datetime(2010, 7, 22, 12, 25))
-        print result
 
     @patch('postal.carriers.dhl.post')
     def test_tracking_not_found(self, mock_post):

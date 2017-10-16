@@ -338,7 +338,6 @@ class AramexApi(Carrier):
             except PostalError:
                 raise
             except Exception as err:
-                print type(err)
                 # We don't know what sort of exception this might be. Grab everything.
                 raise CarrierError(
                     str(response)
@@ -449,6 +448,9 @@ class AramexApi(Carrier):
                     request.Shipments, request.LabelInfo
                 )
             else:
+                with logger.lock:
+                    logger.debug_header('URL')
+                    logger.debug(self.rates_client)
                 response = self.service_call(
                     self.rates_client.service.CalculateRate, request.ClientInfo, request.Transaction,
                     request.OriginAddress, request.DestinationAddress, request.ShipmentDetails
