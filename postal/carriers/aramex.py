@@ -5,6 +5,7 @@ from StringIO import StringIO
 
 from concurrent import futures
 from dateutil import parser
+
 from postal.data import Address, country_map
 from suds.client import Client, TypeNotFound
 from money import Money
@@ -457,7 +458,9 @@ class AramexApi(Carrier):
                 )
                 return {'service': {request.ShipmentDetails.ProductType: self.get_price_dict(response)}, 'error': None}
         except CarrierError as e:
-            return {'service': {request.ShipmentDetails.ProductType:{}}, 'error': e}
+            if not ship:
+                return {'service': {request.ShipmentDetails.ProductType: {}}, 'error': e}
+            raise
 
     def get_price_dict(self, info):
         price = {}
