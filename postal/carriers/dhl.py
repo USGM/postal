@@ -36,6 +36,8 @@ from money import Money
 from postal.data import Address, country_map
 from requests import post, RequestException
 
+import pycountry
+
 from .base import Carrier, PostalLogger
 from .templates.constructor import load_template, populate_template
 from ..exceptions import CarrierError, NotSupportedError
@@ -555,8 +557,16 @@ class DHLApi(Carrier):
                 'event_time': event_time
             }
             street = [' ']
-            city, country = details.find('ServiceArea').findtext('Description').split(' - ')
-            country = country_map[country.lower()].alpha2
+            city, country = details.find('ServiceArea').findtext('Description').split('-')
+            try:
+                country = country_map[country.lower()].alpha2
+            except KeyError:
+                country = pycountry.countries.get(alpha3=country).alpha2
+            result['location'] = Address(
+                street_lines=street,
+                city=u'{}'.format(city),
+                country=country,
+            )
             result['location'] = Address(
                 street_lines=street,
                 city=u'{}'.format(city),
