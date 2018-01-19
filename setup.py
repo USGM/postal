@@ -32,7 +32,7 @@ def get_data_files():
 
 setup(
     name='Postal',
-    version='0.3.15',
+    version='0.3.16',
     author='US Global Mail with Silicus Technologies',
     author_email='it@usglobalmail.com',
     url='http://www.usglobalmail.com/',
