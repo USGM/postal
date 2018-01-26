@@ -653,8 +653,8 @@ class FedExApi(Carrier):
             raise CarrierError("FedEx returned a nonsense price.")
         return price
 
-    @staticmethod
-    def rate_response_dict(request, response):
+    # @staticmethod
+    def rate_response_dict(self, request, response):
         if not hasattr(response, 'RateReplyDetails'):
             return {}
         return {
@@ -700,6 +700,17 @@ class FedExApi(Carrier):
                 self.rates_client.service.getRates,
                 auth, client, transaction_detail, version, return_transit,
                 codes, variable_options, requested_shipment)
+            # TODO: hotfix. Need to find stable solution
+            if not hasattr(response, 'RateReplyDetails'):
+                k = 1
+                while not hasattr(response, 'RateReplyDetails'):
+                    if k == 50:
+                        break
+                    k += 1
+                    response = self.service_call(
+                        self.rates_client.service.getRates,
+                        auth, client, transaction_detail, version, return_transit,
+                        codes, variable_options, requested_shipment)
         finally:
             self.log_transmission(self.rates_client)
 
