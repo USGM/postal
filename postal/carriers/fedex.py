@@ -686,7 +686,7 @@ class FedExApi(Carrier):
         client = self.user_client(self.rates_client)
         transaction_detail = self.transaction_detail(self.rates_client)
         version = self.rates_version_id()
-        return_transit = True
+        return_transit = False
         codes = []
         variable_options = []
         requested_shipment = self.requested_shipment_rate(request)
@@ -700,17 +700,6 @@ class FedExApi(Carrier):
                 self.rates_client.service.getRates,
                 auth, client, transaction_detail, version, return_transit,
                 codes, variable_options, requested_shipment)
-            # TODO: hotfix. Need to find stable solution
-            if not hasattr(response, 'RateReplyDetails'):
-                k = 1
-                while not hasattr(response, 'RateReplyDetails'):
-                    if k == 50:
-                        break
-                    k += 1
-                    response = self.service_call(
-                        self.rates_client.service.getRates,
-                        auth, client, transaction_detail, version, return_transit,
-                        codes, variable_options, requested_shipment)
         finally:
             self.log_transmission(self.rates_client)
 
