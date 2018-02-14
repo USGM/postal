@@ -578,7 +578,7 @@ class UPSApi(Carrier):
                 street_lines=street,
                 city=u'{}'.format(getattr(address, 'City', 'Unspecified City')),
                 subdivision=getattr(address, 'StateProvinceCode', None),
-                country=u'{}'.format(address.CountryCode),
+                country=u'{}'.format(getattr(address, 'CountryCode', ''))
             )
         return result
 
