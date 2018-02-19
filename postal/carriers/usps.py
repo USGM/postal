@@ -695,19 +695,25 @@ class USPSApi(Carrier):
         return responses
 
     def delivery_datetime(self, service, request):
-        response = self.get_services(request)
-        try:
-            return response[service]['delivery_datetime']
-        except KeyError:
+        if not self.cache_key(request) in self.cache:
+            self.get_services(request)
+        data = self.cache[self.cache_key(request)].get(
+            service.service_id, None)
+        if not data:
             raise NotSupportedError(
                 "USPS does not support shipment of that package on "
-                "this service.")
+                "this service."
+            )
+        return data['delivery_datetime']
 
     def quote(self, service, request):
-        response = self.get_services(request)
-        try:
-            return response[service]['price']
-        except KeyError:
+        if not self.cache_key(request) in self.cache:
+            self.get_services(request)
+        data = self.cache[self.cache_key(request)].get(
+            service.service_id, None)
+        if not data:
             raise NotSupportedError(
                 "USPS does not support shipment of that package on "
-                "this service.")
+                "this service."
+            )
+        return data['price']

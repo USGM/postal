@@ -9,7 +9,8 @@ base_postal_configuration = {
 
     # Any carriers you don't want to include should be removed from this list.
     # Any extra carriers you create or import should be added to this list.
-    'enabled_carriers': [USPSApi, FedExApi, UPSApi, DHLApi, USPSApi, AramexApi],
+    'enabled_carriers': [USPSApi, FedExApi, UPSApi, DHLApi, AramexApi],
+
     # On occasion, Postal will need to tell a carrier what currency to use
     # when getting a rate or other request. Pick the standard abbreviation
     # for the currency you want used as per ISO-4217.
@@ -107,7 +108,6 @@ base_postal_configuration = {
         # After registering, email their team at
         # uspstechsupport@esecurecare.net And tell them you are using third
         # party software to be allowed to use real-world transactions.
-
         'USPS': {
             'account_id': 123456,
             'passphrase': 'password',

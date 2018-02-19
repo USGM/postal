@@ -1,7 +1,6 @@
 """
 Front-end for the Postal Library.
 """
-import traceback
 import sys
 
 from copy import copy
@@ -16,19 +15,19 @@ from carriers import Carrier
 class ThreadPoolExecutorStackTraced(ThreadPoolExecutor):
 
     def submit(self, fn, *args, **kwargs):
-        """Submits the wrapped function instead of `fn`"""
-
+        """
+        Submits the wrapped function instead of `fn`
+        """
         return super(ThreadPoolExecutorStackTraced, self).submit(
             self._function_wrapper, fn, *args, **kwargs)
 
     def _function_wrapper(self, fn, *args, **kwargs):
-        """Wraps `fn` in order to preserve the traceback of any kind of
-        raised exception
-
+        """
+        Wraps `fn` in order to preserve the traceback of any kind of raised exception
         """
         try:
             return fn(*args, **kwargs)
-        except Exception as err:
+        except Exception:
             # Creates an exception of the same type and traceback before the futures library
             # removes information that it should not.
             info = sys.exc_info()
@@ -61,7 +60,7 @@ class Postal:
                 self.carriers[name] = carrier(
                     postal_configuration=configuration_dict,
                     **carrier_configs[name])
-            except:
+            except Exception:
                 print 'Error while constructing carrier ' + str(name)
                 print 'with these args: ' + str(carrier_configs[name])
                 raise
@@ -71,7 +70,6 @@ class Postal:
         Gets all service options from all carriers.
 
         returns:
-
         {
             carrier:carriers.Carrier -> {
                 'services' -> dict|None= result of carrier.get_services()
@@ -84,11 +82,10 @@ class Postal:
         """
         if not request.packages:
             raise NotSupportedError('No packages in shipment.')
+        if len(request.packages) == 1:
+            raise NotSupportedError('The dimensions of that package are invalid.')
         for i, package in enumerate(request.packages, 1):
             if package.length < 0 or package.width < 0 or package.height < 0:
-                if len(request.packages) == 1:
-                    raise NotSupportedError('The dimensions of that package '
-                                            'are invalid.')
                 raise NotSupportedError('The dimensions of package #%s are '
                                         'invalid.' % i)
 
@@ -124,10 +121,9 @@ class Postal:
         return self.carriers[carrier_name].track(tracking_number)
 
     def get_package_type(self, carrier_name, code):
-        if carrier_name:
-            return self.carriers[carrier_name].get_package_type(code)
-        else:
+        if carrier_name not in self.carriers:
             return Carrier.generic_packaging_table[code]
+        return self.carriers[carrier_name].get_package_type(code)
 
     def get_all_package_types(self):
         """
@@ -163,7 +159,6 @@ class Postal:
 
 
 def _task(arg_list):
-
     carrier, request = arg_list
     data_dict = {'services': None, 'error': None}
     try:

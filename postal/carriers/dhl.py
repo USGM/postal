@@ -637,7 +637,7 @@ class DHLApi(Carrier):
         self._ensure_supported(request)
         if not self.cache_key(request) in self.cache:
             self.get_services(request)
-        data = self.cache[tuple(request)].get(service.service_id, None)
+        data = self.cache[self.cache_key(request)].get(service.service_id, None)
         if not data:
             raise NotSupportedError(
                 "DHL does not support shipment of that package(s).")

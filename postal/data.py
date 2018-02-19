@@ -13,17 +13,11 @@ try:
 except ImportError:
     import Money
 
-from exceptions import AddressError, NotSupportedError
+from .exceptions import AddressError, NotSupportedError
 
 
 TWOPLACES = Decimal('0.01')  # used by DHL
 
-
-def get_country(country_code):
-    try:
-        return countries.get(alpha2=country_code)
-    except KeyError:
-        raise AddressError('"%s" is not a valid country code.' % country_code)
 
 # Force pycountry to fetch data.
 subdivisions.get(country_code='US')
@@ -42,6 +36,13 @@ for code in ('AE', 'AA', 'AP'):
     subdivision_map['US'][code] = code
 
 
+def get_country(country_code):
+    try:
+        return countries.get(alpha2=country_code)
+    except KeyError:
+        raise AddressError('"%s" is not a valid country code.' % country_code)
+
+
 def stack_values(iterable, func_name):
     result = 0
     for item in iterable:
@@ -51,6 +52,10 @@ def stack_values(iterable, func_name):
     if str(result.currency) == 'XXX':
         raise Exception("Can't compute sum of different kinds of currencies.")
     return result
+
+
+def sigfig(amount):
+    return Decimal(amount).quantize(TWOPLACES)
 
 
 class Address(object):
@@ -428,7 +433,7 @@ class Declaration(object):
         """
         self.description = description
         if value != 0 and not isinstance(value, Money):
-            ### zero doesn't really have a unit
+            # zero doesn't really have a unit
             raise TypeError()
         self.value = value
         self.units = units
@@ -499,7 +504,3 @@ class Shipment(object):
 
     def __repr__(self):
         return str(self)
-
-
-def sigfig(amount):
-    return Decimal(amount).quantize(TWOPLACES)
