@@ -12,7 +12,7 @@ import sys
 import logging
 from threading import RLock
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta
 import inspect
 import os
 from pprint import pformat
@@ -173,7 +173,7 @@ class Carrier(object):
     def __init__(self, postal_configuration):
         self.postal_configuration = postal_configuration
         self.logger = PostalLogger(carrier_name=self.name)
-        # Add this to any suds clients as a plugin and then use 
+        # Add this to any suds clients as a plugin and then use
         # last_sent() and last_received() on it to grab recent messages.
         self.log_service = LoggingWebServicePlugin()
         if not postal_configuration:
@@ -210,16 +210,36 @@ class Carrier(object):
         return "file://%s" % full_path
 
     @staticmethod
-    def cache_key(request):
-        return hash(tuple(sorted(
-            request.packages, key=lambda x: x.cache_hash())))
+    def cache_key(request, provider=''):
+        _cache_key = str(provider)
+        _cache_key += str(request.destination.cache_hash())
+        for package in request.packages:
+            _cache_key += str(package.cache_hash())
+        for key in request.extra_params:
+            _cache_key += '{key}:{value}'.format(
+                key=key,
+                value=request.extra_params[key]
+            )
+        return hash(_cache_key)
 
-    def cache_results(self, request, response_dict):
+    def cache_results(self, request, response_dict, provider=''):
         """
         Avoid looking up information on an object more than we must.
         """
         # For now, we make this in-process.
-        self.cache.update({self.cache_key(request): response_dict})
+        self.cache.update({
+            self.cache_key(request, provider): {
+                'response': response_dict,
+                'timestamp': datetime.now()
+            }
+        })
+
+    def get_from_cache(self, request, provider=''):
+        time_to_fetch = datetime.now() - timedelta(minutes=30)
+        _cache_key = self.cache_key(request, provider)
+        if _cache_key in self.cache and self.cache[_cache_key]['timestamp'] > time_to_fetch:
+            return self.cache[self.cache_key(request, provider)]['response']
+        return False
 
     def get_all_services(self):
         """

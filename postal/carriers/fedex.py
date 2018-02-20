@@ -681,30 +681,32 @@ class FedExApi(Carrier):
         """
         Get available services for shipping a package.
         """
-        self._ensure_supported(request)
-        auth = self.authentication(self.rates_client)
-        client = self.user_client(self.rates_client)
-        transaction_detail = self.transaction_detail(self.rates_client)
-        version = self.rates_version_id()
-        return_transit = False
-        codes = []
-        variable_options = []
-        requested_shipment = self.requested_shipment_rate(request)
+        result = self.get_from_cache(request, 'fedex')
+        if not result:
+            self._ensure_supported(request)
+            auth = self.authentication(self.rates_client)
+            client = self.user_client(self.rates_client)
+            transaction_detail = self.transaction_detail(self.rates_client)
+            version = self.rates_version_id()
+            return_transit = False
+            codes = []
+            variable_options = []
+            requested_shipment = self.requested_shipment_rate(request)
 
-        with self.logger.lock:
-            self.logger.debug_header('Get Services')
-            self.logger.debug(request)
+            with self.logger.lock:
+                self.logger.debug_header('Get Services')
+                self.logger.debug(request)
 
-        try:
-            response = self.service_call(
-                self.rates_client.service.getRates,
-                auth, client, transaction_detail, version, return_transit,
-                codes, variable_options, requested_shipment)
-        finally:
-            self.log_transmission(self.rates_client)
+            try:
+                response = self.service_call(
+                    self.rates_client.service.getRates,
+                    auth, client, transaction_detail, version, return_transit,
+                    codes, variable_options, requested_shipment)
+            finally:
+                self.log_transmission(self.rates_client)
 
-        result = self.rate_response_dict(request, response)
-        self.cache_results(request, result)
+            result = self.rate_response_dict(request, response)
+            self.cache_results(request, result, 'fedex')
 
         final = {
             self.get_service(key): {
@@ -763,27 +765,25 @@ class FedExApi(Carrier):
 
     def delivery_datetime(self, service, request):
         self._ensure_supported(request)
-        if not self.cache_key(request) in self.cache:
+        data = self.get_from_cache(request, 'fedex')
+        if not data:
             self.get_services(request)
-        data = self.cache[self.cache_key(request)].get(
-            service.service_id, None)
+        data = self.get_from_cache(request, 'fedex').get(service.service_id, None)
         if not data:
             raise NotSupportedError(
-                "FedEx does not support shipment of that package on "
-                "this service."
+                "FedEx does not support shipment of that package on this service."
             )
         return data['delivery_datetime']
 
     def quote(self, service, request):
         self._ensure_supported(request)
-        if not self.cache_key(request) in self.cache:
+        data = self.get_from_cache(request, 'fedex')
+        if not data:
             self.get_services(request)
-        data = self.cache[self.cache_key(request)].get(
-            service.service_id, None)
+        data = self.get_from_cache(request, 'fedex').get(service.service_id, None)
         if not data:
             raise NotSupportedError(
-                "FedEx does not support shipment of that package on this "
-                "service.")
+                "FedEx does not support shipment of that package on this service.")
         return data['price']
 
     def _ensure_supported(self, request):

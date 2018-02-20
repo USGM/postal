@@ -232,15 +232,17 @@ class DHLApi(Carrier):
     def get_services(self, request):
         self._ensure_supported(request)
 
-        rate_request = self.rates_request(request)
+        response_dict = self.get_from_cache(request, 'dhl')
+        if not response_dict:
+            rate_request = self.rates_request(request)
 
-        with self.logger.lock:
-            self.logger.debug_header('Get Services')
-            self.logger.debug(request)
+            with self.logger.lock:
+                self.logger.debug_header('Get Services')
+                self.logger.debug(request)
 
-        response = self.make_call(rate_request, rates=True)[0][1]
-        response_dict = self.response_to_dict(response.findall('QtdShp'))
-        self.cache_results(request, response_dict)
+            response = self.make_call(rate_request, rates=True)[0][1]
+            response_dict = self.response_to_dict(response.findall('QtdShp'))
+            self.cache_results(request, response_dict, 'dhl')
 
         result = {
             self.get_service(key): {
@@ -635,23 +637,22 @@ class DHLApi(Carrier):
 
     def delivery_datetime(self, service, request):
         self._ensure_supported(request)
-        if not self.cache_key(request) in self.cache:
-            self.get_services(request)
-        data = self.cache[self.cache_key(request)].get(service.service_id, None)
+        data = self.get_from_cache(request, 'dhl')
         if not data:
-            raise NotSupportedError(
-                "DHL does not support shipment of that package(s).")
+            self.get_services(request)
+        data = self.get_from_cache(request, 'dhl').get(service.service_id, None)
+        if not data:
+            raise NotSupportedError("DHL does not support shipment of that package(s).")
         return data['delivery_datetime']
 
     def quote(self, service, request):
         self._ensure_supported(request)
-        if not self.cache_key(request) in self.cache:
-            self.get_services(request)
-        data = self.cache[self.cache_key(request)].get(
-            service.service_id, None)
+        data = self.get_from_cache(request, 'dhl')
         if not data:
-            raise NotSupportedError(
-                "DHL does not support shipment of that package(s).")
+            self.get_services(request)
+        data = self.get_from_cache(request, 'dhl').get(service.service_id, None)
+        if not data:
+            raise NotSupportedError("DHL does not support shipment of that package(s).")
         return data['price']
 
 

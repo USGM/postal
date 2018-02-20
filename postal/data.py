@@ -151,6 +151,13 @@ class Address(object):
             residential=self.residential
         )
 
+    def cache_hash(self):
+        address = 'x'.join(map(str, sorted([
+            self.contact_name, self.phone_number, self.street_lines, self.city,
+            self.subdivision, self.postal_code, self.country.alpha2, self.residential
+        ])))
+        return hash(address)
+
 
 class Request(object):
     """

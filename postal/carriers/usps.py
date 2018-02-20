@@ -671,22 +671,24 @@ class USPSApi(Carrier):
             logger.debug_header('Get Services')
             logger.debug(request)
 
-        responses = []
-        for package in request.packages:
-            postage_request = self.client.factory.create('PostageRatesRequest')
-            self._set_dims(postage_request, package, softpack_convert=False)
-            self._set_address_info(postage_request, request, short=True)
-            self._set_creds(postage_request, inset=True)
-            self._signature_params(postage_request, request)
-            self._insurance_params(postage_request, package)
-            postage_request.DeliveryTimeDays = "TRUE"
-            response = self.service_call(
-                self.client.service.CalculatePostageRates, postage_request)
+        responses = self.get_from_cache(request, 'dhl')
+        if not responses:
+            responses = []
+            for package in request.packages:
+                postage_request = self.client.factory.create('PostageRatesRequest')
+                self._set_dims(postage_request, package, softpack_convert=False)
+                self._set_address_info(postage_request, request, short=True)
+                self._set_creds(postage_request, inset=True)
+                self._signature_params(postage_request, request)
+                self._insurance_params(postage_request, package)
+                postage_request.DeliveryTimeDays = "TRUE"
+                response = self.service_call(
+                    self.client.service.CalculatePostageRates, postage_request)
 
-            response_dict = self._request_response_table(request, response)
-            responses.append(response_dict)
-        responses = self.compile_options(request, responses)
-        self.cache_results(request, responses)
+                response_dict = self._request_response_table(request, response)
+                responses.append(response_dict)
+            responses = self.compile_options(request, responses)
+            self.cache_results(request, responses, 'usps')
 
         with logger.lock:
             logger.debug_header('Response')
@@ -695,25 +697,19 @@ class USPSApi(Carrier):
         return responses
 
     def delivery_datetime(self, service, request):
-        if not self.cache_key(request) in self.cache:
-            self.get_services(request)
-        data = self.cache[self.cache_key(request)].get(
-            service.service_id, None)
+        data = self.get_from_cache(request, 'usps')
         if not data:
-            raise NotSupportedError(
-                "USPS does not support shipment of that package on "
-                "this service."
-            )
+            self.get_services(request)
+        data = self.get_from_cache(request, 'usps').get(service, None)
+        if not data:
+            raise NotSupportedError("USPS does not support shipment of that package on this service.")
         return data['delivery_datetime']
 
     def quote(self, service, request):
-        if not self.cache_key(request) in self.cache:
-            self.get_services(request)
-        data = self.cache[self.cache_key(request)].get(
-            service.service_id, None)
+        data = self.get_from_cache(request, 'usps')
         if not data:
-            raise NotSupportedError(
-                "USPS does not support shipment of that package on "
-                "this service."
-            )
+            self.get_services(request)
+        data = self.get_from_cache(request, 'usps').get(service, None)
+        if not data:
+            raise NotSupportedError("USPS does not support shipment of that package on this service.")
         return data['price']

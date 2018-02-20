@@ -82,10 +82,10 @@ class Postal:
         """
         if not request.packages:
             raise NotSupportedError('No packages in shipment.')
-        if len(request.packages) == 1:
-            raise NotSupportedError('The dimensions of that package are invalid.')
         for i, package in enumerate(request.packages, 1):
             if package.length < 0 or package.width < 0 or package.height < 0:
+                if len(request.packages) == 1:
+                    raise NotSupportedError('The dimensions of that package are invalid.')
                 raise NotSupportedError('The dimensions of package #%s are '
                                         'invalid.' % i)
 
