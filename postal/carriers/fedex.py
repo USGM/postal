@@ -743,7 +743,6 @@ class FedExApi(Carrier):
 
         result = {}
         details = response.CompletedTrackDetails[0].TrackDetails[0].StatusDetail
-        actual_delivery_address = response.CompletedTrackDetails[0].TrackDetails[0].ActualDeliveryAddress
 
         result['delivered'] = details.Code == 'DL'
         result['finalized'] = details.Code in ['DL', 'CA', 'DE']
@@ -759,13 +758,13 @@ class FedExApi(Carrier):
         city, country_code = '', ''
         if hasattr(details.Location, 'City'):
             city = details.Location.City
-        elif result['delivered']:
-            city = actual_delivery_address.City
+        elif result['delivered'] and hasattr(response.CompletedTrackDetails[0].TrackDetails[0], 'ActualDeliveryAddress'):
+            city = response.CompletedTrackDetails[0].TrackDetails[0].ActualDeliveryAddress.City
 
         if hasattr(details.Location, 'CountryCode'):
             country_code = details.Location.CountryCode
-        elif result['delivered']:
-            country_code = actual_delivery_address.CountryCode
+        elif result['delivered'] and hasattr(response.CompletedTrackDetails[0].TrackDetails[0], 'ActualDeliveryAddress'):
+            country_code = response.CompletedTrackDetails[0].TrackDetails[0].ActualDeliveryAddress.CountryCode
 
         result['location'] = Address(
             street_lines=street,
