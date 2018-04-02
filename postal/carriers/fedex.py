@@ -743,6 +743,8 @@ class FedExApi(Carrier):
 
         result = {}
         details = response.CompletedTrackDetails[0].TrackDetails[0].StatusDetail
+        actual_delivery_address = response.CompletedTrackDetails[0].TrackDetails[0].ActualDeliveryAddress
+
         result['delivered'] = details.Code == 'DL'
         result['finalized'] = details.Code in ['DL', 'CA', 'DE']
         result['status_code'] = u'{}'.format(details.Code)
@@ -754,13 +756,30 @@ class FedExApi(Carrier):
         if hasattr(details.Location, 'StateOrProvinceCode'):
             subdivision = u'{}'.format(details.Location.StateOrProvinceCode)
 
+        city, country_code = '', ''
+        if hasattr(details.Location, 'City'):
+            city = details.Location.City
+        elif result['delivered']:
+            city = actual_delivery_address.City
+
+        if hasattr(details.Location, 'CountryCode'):
+            country_code = details.Location.CountryCode
+        elif result['delivered']:
+            country_code = actual_delivery_address.CountryCode
+
         result['location'] = Address(
             street_lines=street,
-            city=u'{}'.format(details.Location.City),
+            city=u'{}'.format(city),
             subdivision=subdivision,
-            country=u'{}'.format(details.Location.CountryCode),
+            country=u'{}'.format(country_code),
         )
-        result['event_time'] = details.CreationTime
+
+        if hasattr(details, 'CreationTime'):
+            result['event_time'] = details.CreationTime
+        elif hasattr(response.CompletedTrackDetails[0].TrackDetails[0], 'Events'):
+            events = response.CompletedTrackDetails[0].TrackDetails[0].Events
+            event = events.pop()
+            result['event_time'] = event.Timestamp
         return result
 
     def delivery_datetime(self, service, request):
