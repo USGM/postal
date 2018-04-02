@@ -671,7 +671,7 @@ class USPSApi(Carrier):
             logger.debug_header('Get Services')
             logger.debug(request)
 
-        responses = self.get_from_cache(request, 'dhl')
+        responses = self.get_from_cache(request, 'usps')
         if not responses:
             responses = []
             for package in request.packages:
