@@ -237,8 +237,11 @@ class Carrier(object):
     def get_from_cache(self, request, provider=''):
         time_to_fetch = datetime.now() - timedelta(minutes=30)
         _cache_key = self.cache_key(request, provider)
-        if _cache_key in self.cache and self.cache[_cache_key]['timestamp'] > time_to_fetch:
-            return self.cache[self.cache_key(request, provider)]['response']
+        if _cache_key in self.cache:
+            if self.cache[_cache_key]['timestamp'] > time_to_fetch:
+                return self.cache[_cache_key]['response']
+            else:
+                del self.cache[_cache_key]
         return False
 
     def get_all_services(self):

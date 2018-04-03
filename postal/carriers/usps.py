@@ -687,8 +687,8 @@ class USPSApi(Carrier):
 
                 response_dict = self._request_response_table(request, response)
                 responses.append(response_dict)
-            responses = self.compile_options(request, responses)
             self.cache_results(request, responses, 'usps')
+        responses = self.compile_options(request, responses)
 
         with logger.lock:
             logger.debug_header('Response')
