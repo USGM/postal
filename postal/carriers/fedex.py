@@ -745,10 +745,17 @@ class FedExApi(Carrier):
         track_details = response.CompletedTrackDetails[0].TrackDetails[0]
         details = track_details.StatusDetail
 
-        result['delivered'] = details.Code == 'DL'
-        result['finalized'] = details.Code in ['DL', 'CA', 'DE']
-        result['status_code'] = u'{}'.format(details.Code)
-        result['description'] = u'{}'.format(details.Description)
+        if hasattr(details, 'Code'):
+            result['delivered'] = details.Code == 'DL'
+            result['finalized'] = details.Code in ['DL', 'CA', 'DE']
+            result['status_code'] = u'{}'.format(details.Code)
+        else:
+            result['delivered'], result['finalized'], result['status_code'] = False, False, u''
+
+        if hasattr(details, 'Description'):
+            result['description'] = u'{}'.format(details.Description)
+        else:
+            result['description'] = u''
         street = [' ']
 
         # Fedex API dose not return StateOrProvinceCode for some countries ex Ghana
@@ -783,6 +790,8 @@ class FedExApi(Carrier):
             events = track_details.Events
             event = events.pop()
             result['event_time'] = event.Timestamp
+        else:
+            result['event_time'] = None
         return result
 
     def delivery_datetime(self, service, request):
