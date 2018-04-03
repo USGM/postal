@@ -742,7 +742,8 @@ class FedExApi(Carrier):
             self.log_transmission(self.rates_client)
 
         result = {}
-        details = response.CompletedTrackDetails[0].TrackDetails[0].StatusDetail
+        track_details = response.CompletedTrackDetails[0].TrackDetails[0]
+        details = track_details.StatusDetail
 
         result['delivered'] = details.Code == 'DL'
         result['finalized'] = details.Code in ['DL', 'CA', 'DE']
@@ -758,25 +759,28 @@ class FedExApi(Carrier):
         city, country_code = '', ''
         if hasattr(details.Location, 'City'):
             city = details.Location.City
-        elif result['delivered'] and hasattr(response.CompletedTrackDetails[0].TrackDetails[0], 'ActualDeliveryAddress'):
-            city = response.CompletedTrackDetails[0].TrackDetails[0].ActualDeliveryAddress.City
+        elif result['delivered'] and hasattr(track_details, 'ActualDeliveryAddress'):
+            city = track_details.ActualDeliveryAddress.City
 
         if hasattr(details.Location, 'CountryCode'):
             country_code = details.Location.CountryCode
-        elif result['delivered'] and hasattr(response.CompletedTrackDetails[0].TrackDetails[0], 'ActualDeliveryAddress'):
-            country_code = response.CompletedTrackDetails[0].TrackDetails[0].ActualDeliveryAddress.CountryCode
+        elif result['delivered'] and hasattr(track_details, 'ActualDeliveryAddress'):
+            country_code = track_details.ActualDeliveryAddress.CountryCode
 
-        result['location'] = Address(
-            street_lines=street,
-            city=u'{}'.format(city),
-            subdivision=subdivision,
-            country=u'{}'.format(country_code),
-        )
+        if all([city, country_code]):
+            result['location'] = Address(
+                street_lines=street,
+                city=u'{}'.format(city),
+                subdivision=subdivision,
+                country=u'{}'.format(country_code),
+            )
+        else:
+            result['location'] = False
 
         if hasattr(details, 'CreationTime'):
             result['event_time'] = details.CreationTime
-        elif hasattr(response.CompletedTrackDetails[0].TrackDetails[0], 'Events'):
-            events = response.CompletedTrackDetails[0].TrackDetails[0].Events
+        elif hasattr(track_details, 'Events'):
+            events = track_details.Events
             event = events.pop()
             result['event_time'] = event.Timestamp
         return result

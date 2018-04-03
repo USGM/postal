@@ -569,11 +569,6 @@ class DHLApi(Carrier):
                 city=u'{}'.format(city),
                 country=country,
             )
-            result['location'] = Address(
-                street_lines=street,
-                city=u'{}'.format(city),
-                country=country,
-            )
         else:
             condition = response.find('AWBInfo').find('Status').find('Condition')
             conditionCode = condition.findtext('ConditionCode')

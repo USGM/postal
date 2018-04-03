@@ -572,7 +572,7 @@ class UPSApi(Carrier):
                     address = getattr(activity, 'ActivityLocation', address)
                     break
         street = [' ']
-        if address and address.Address:
+        if address and hasattr(address, 'Address'):
             address = address.Address
             result['location'] = Address(
                 street_lines=street,
