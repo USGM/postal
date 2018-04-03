@@ -545,42 +545,47 @@ class DHLApi(Carrier):
             self.logger.debug(identifier)
 
         response = self.make_call(track_request)
+
+        result = {
+            'delivered': False,
+            'finalized': False,
+            'status_code': u'',
+            'description': u'',
+            'event_time': None,
+            'location': False
+        }
+
         if response.find('AWBInfo').find('ShipmentInfo') is not None:
             events = response.find('AWBInfo').find('ShipmentInfo').findall('ShipmentEvent')
-            details = events[-1]
-            event = details.find('ServiceEvent')
-            event_code = event.findtext('EventCode')
-            event_time = parser.parse(details.findtext('Date') + ' ' + details.findtext('Time'))
-            result = {
-                'delivered': event_code == 'OK',
-                'finalized': event_code in ['OK'],
-                'status_code': u'{}'.format(event_code),
-                'description': u'{}'.format(event.findtext('Description')),
-                'event_time': event_time
-            }
-            street = [' ']
-            city, country = details.find('ServiceArea').findtext('Description').split('-')
-            try:
-                country = country_map[country.lower()].alpha2
-            except KeyError:
-                country = pycountry.countries.get(alpha3=country).alpha2
-            result['location'] = Address(
-                street_lines=street,
-                city=u'{}'.format(city),
-                country=country,
-            )
+            if len(events):
+                details = events[-1]
+                event = details.find('ServiceEvent')
+                event_code = event.findtext('EventCode')
+                event_time = parser.parse(details.findtext('Date') + ' ' + details.findtext('Time'))
+                result = {
+                    'delivered': event_code == 'OK',
+                    'finalized': event_code in ['OK'],
+                    'status_code': u'{}'.format(event_code),
+                    'description': u'{}'.format(event.findtext('Description')),
+                    'event_time': event_time
+                }
+                street = [' ']
+                city, country = details.find('ServiceArea').findtext('Description').split('-')
+                try:
+                    country = country_map[country.lower()].alpha2
+                except KeyError:
+                    country = pycountry.countries.get(alpha3=country).alpha2
+                result['location'] = Address(
+                    street_lines=street,
+                    city=u'{}'.format(city),
+                    country=country,
+                )
         else:
             condition = response.find('AWBInfo').find('Status').find('Condition')
             conditionCode = condition.findtext('ConditionCode')
             conditionData = condition.findtext('ConditionData')
-            result = {
-                'delivered': False,
-                'finalized': False,
-                'status_code': u'{}'.format(conditionCode),
-                'description': u'{}'.format(conditionData),
-                'event_time': '',
-                'location': False
-            }
+            result['status_code'] = u'{}'.format(conditionCode)
+            result['description'] = u'{}'.format(conditionData)
         return result
 
     def ship(self, service, request):
