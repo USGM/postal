@@ -570,7 +570,12 @@ class DHLApi(Carrier):
                     'event_time': event_time
                 }
                 street = [' ']
-                city, country = details.find('ServiceArea').findtext('Description').split('-')
+                city_country = details.find('ServiceArea').findtext('Description').split('-')
+                if len(city_country) == 3:
+                    city, place, country = city_country
+                    city = "{city} - {place}".format(city=city, place=place)
+                else:
+                    city, country = city_country
                 try:
                     country = country_map[country.lower()].alpha2
                 except KeyError:
