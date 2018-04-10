@@ -574,12 +574,13 @@ class UPSApi(Carrier):
         street = [' ']
         if address and hasattr(address, 'Address'):
             address = address.Address
-            result['location'] = Address(
-                street_lines=street,
-                city=u'{}'.format(getattr(address, 'City', 'Unspecified City')),
-                subdivision=getattr(address, 'StateProvinceCode', None),
-                country=u'{}'.format(getattr(address, 'CountryCode', ''))
-            )
+            if hasattr(address, 'CountryCode') and address.CountryCode:
+                result['location'] = Address(
+                    street_lines=street,
+                    city=u'{}'.format(getattr(address, 'City', 'Unspecified City')),
+                    subdivision=getattr(address, 'StateProvinceCode', None),
+                    country=u'{}'.format(address.CountryCode)
+                )
         return result
 
     def ship(self, service, request, receiver_account_number=None):
