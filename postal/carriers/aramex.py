@@ -360,6 +360,8 @@ class AramexApi(Carrier):
             # We expect this to always happen because of a bug in Aramex's wsdl. We will still have access to the
             # raw XML, so we'll handle it here.
             pass
+        except Exception:
+            return False
         response = self.log_service.last_received_reply
         it = iterparse(StringIO(response.encode('utf-8')))
         for _, el in it:
