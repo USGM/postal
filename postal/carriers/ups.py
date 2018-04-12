@@ -27,8 +27,9 @@ from suds import WebFault
 
 from .base import Carrier, PostalLogger
 
-from ..data import Address, Shipment
+from ..data import Address, Shipment, country_map
 from ..exceptions import CarrierError, NotSupportedError, AddressError
+import pycountry
 
 __author__ = 'Nathan Everitt'
 
@@ -575,11 +576,18 @@ class UPSApi(Carrier):
         if address and hasattr(address, 'Address'):
             address = address.Address
             if hasattr(address, 'CountryCode') and address.CountryCode:
+                country = address.CountryCode
+                if len(country) > 2:
+                    try:
+                        country = country_map[country.lower()].alpha2
+                    except KeyError:
+                        country = pycountry.countries.get(alpha3=country).alpha2
+
                 result['location'] = Address(
                     street_lines=street,
                     city=u'{}'.format(getattr(address, 'City', 'Unspecified City')),
                     subdivision=getattr(address, 'StateProvinceCode', None),
-                    country=u'{}'.format(address.CountryCode)
+                    country=u'{}'.format(country)
                 )
         return result
 
