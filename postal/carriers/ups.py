@@ -74,7 +74,7 @@ class FixMissingTags(FixBrokenNamespace):
         self.swap_namespaces(namespace, [shipment_rating_options])
         shipment.append(shipment_rating_options)
         options = shipment.getChild('ShipmentServiceOptions')
-        if options.children:
+        if options and options.children:
             indicator = options.getChild('SaturdayDeliveryIndicator')
             if indicator is not None:
                 indicator.text = ''
