@@ -8,7 +8,6 @@ from math import ceil
 from pprint import pformat
 import warnings
 from PyPDF2.utils import PdfReadWarning
-from dateutil import parser
 from decimal import Decimal
 from money import Money
 from PyPDF2 import PdfFileReader, PdfFileWriter
@@ -16,7 +15,7 @@ from suds.client import Client
 
 from .base import Carrier, ClearEmpty, PY3, PostalLogger
 from ..exceptions import CarrierError, NotSupportedError, PostalError, \
-    AddressError
+    AddressError, SoftCarrierError
 from ..data import Address, Shipment, Declaration
 
 from io import BytesIO
@@ -744,6 +743,10 @@ class FedExApi(Carrier):
         result = {}
         track_details = response.CompletedTrackDetails[0].TrackDetails[0]
         details = track_details.StatusDetail
+
+        if hasattr(track_details, 'Notification'):
+            if track_details.Notification.Code == '9040':
+                raise SoftCarrierError(u"{}".format(track_details.Notification.Message))
 
         if hasattr(details, 'Code'):
             result['delivered'] = details.Code == 'DL'

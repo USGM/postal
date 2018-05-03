@@ -31,6 +31,12 @@ class CarrierError(PostalError):
     """
 
 
+class SoftCarrierError(PostalError):
+    """
+    Used when we got carrier temporary error.
+    """
+
+
 class NotSupportedError(PostalError):
     """
     Used when a requested shipment exceeds the limits of a service.

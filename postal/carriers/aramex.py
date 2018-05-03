@@ -11,7 +11,7 @@ from suds.client import Client, TypeNotFound
 from money import Money
 
 from postal.carriers.base import Carrier, ClearEmpty, PostalLogger
-from postal.exceptions import CarrierError, AddressError, PostalError
+from postal.exceptions import CarrierError, AddressError, PostalError, SoftCarrierError
 from datetime import datetime
 from postal.data import Package
 from copy import deepcopy
@@ -360,7 +360,9 @@ class AramexApi(Carrier):
             # We expect this to always happen because of a bug in Aramex's wsdl. We will still have access to the
             # raw XML, so we'll handle it here.
             pass
-        except Exception:
+        except Exception as err:
+            if err.message == u'<NonExistingWaybills/> not mapped to message part':
+                raise SoftCarrierError(u"NonExistingWaybills")
             return False
         response = self.log_service.last_received_reply
         it = iterparse(StringIO(response.encode('utf-8')))

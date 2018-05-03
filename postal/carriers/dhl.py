@@ -40,7 +40,7 @@ import pycountry
 
 from .base import Carrier, PostalLogger
 from .templates.constructor import load_template, populate_template
-from ..exceptions import CarrierError, NotSupportedError
+from ..exceptions import CarrierError, NotSupportedError, SoftCarrierError
 from ..data import Shipment, TWOPLACES, sigfig
 
 
@@ -589,6 +589,8 @@ class DHLApi(Carrier):
             condition = response.find('AWBInfo').find('Status').find('Condition')
             conditionCode = condition.findtext('ConditionCode')
             conditionData = condition.findtext('ConditionData')
+            if conditionCode == '209':
+                raise SoftCarrierError(u"{}".format(conditionData))
             result['status_code'] = u'{}'.format(conditionCode)
             result['description'] = u'{}'.format(conditionData)
         return result

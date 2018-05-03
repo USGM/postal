@@ -28,7 +28,7 @@ from suds import WebFault
 from .base import Carrier, PostalLogger
 
 from ..data import Address, Shipment, country_map
-from ..exceptions import CarrierError, NotSupportedError, AddressError
+from ..exceptions import CarrierError, NotSupportedError, AddressError, SoftCarrierError
 import pycountry
 
 __author__ = 'Nathan Everitt'
@@ -1184,3 +1184,19 @@ class UPSApi(Carrier):
                 package.get_total_insured_value())
 
         return api_package
+
+    def service_call(self, func, *args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as err:
+            try:
+                if err.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Code == '155002':
+                    raise SoftCarrierError(u"{}".format(err.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Description))
+            except AttributeError:
+                pass
+
+            if hasattr(err, 'document'):
+                raise CarrierError(u"{}".format(err.document))
+            raise CarrierError(repr(err))
+        finally:
+            self.log_transmission(func.client)
