@@ -1190,8 +1190,12 @@ class UPSApi(Carrier):
             return func(*args, **kwargs)
         except Exception as err:
             try:
-                if err.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Code == '155002':
-                    raise SoftCarrierError(u"{}".format(err.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Description))
+                err_code = err.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Code
+                err_description = err.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Description
+                if err_code in ['151044', '151045', '155002']:
+                    raise SoftCarrierError(u"{}".format(err_description))
+                else:
+                    raise CarrierError(u"{}".format(err_description))
             except AttributeError:
                 pass
 
