@@ -552,44 +552,111 @@ class UPSApi(Carrier):
         finally:
             self.log_transmission(self._Track)
 
+        shipment = response.Shipment[0]
+        if hasattr(shipment, 'Package'):
+            return self.get_track_information_from_package_activity(shipment)
+        else:
+            return self.get_track_information_from_shipment_activity(shipment)
+
+    def get_track_information_from_package_activity(self, shipment):
+        """
+        In usual case flow we should retrieve a track information from package activity.
+        Args:
+            shipment: ShipmentRequest object
+
+        Returns: dict with track information
+        """
         result = {}
-        details = response.Shipment[0].Package[0].Activity[0]
+        details = shipment.Package[0].Activity[0]
         status = details.Status
         result['delivered'] = status.Type == 'D'
         result['finalized'] = status.Code == 'D'
         result['status_code'] = u'{}'.format(status.Type)
         result['description'] = u'{}'.format(status.Description)
-        date = details.Date
-        time = details.Time
-        year, month, day = int(date[0:4]), int(date[4:6]), int(date[6:8])
-        hour, min, sec = int(time[0:2]), int(time[2:4]), int(time[4:6])
-        result['event_time'] = datetime(year, month, day, hour, min, sec)
+        result['event_time'] = self.get_event_time(details)
         address = getattr(details, 'ActivityLocation')
         if status.Type == 'X':
             # Backtrack to find the real reason for the odd status.
-            for activity in response.Shipment[0].Package[0].Activity:
+            for activity in shipment.Package[0].Activity:
                 if not hasattr(activity.Status, 'Type'):
                     result['description'] = u'{}'.format(activity.Status.Description)
                     address = getattr(activity, 'ActivityLocation', address)
                     break
-        street = [' ']
         if address and hasattr(address, 'Address'):
             address = address.Address
-            if hasattr(address, 'CountryCode') and address.CountryCode:
-                country = address.CountryCode
-                if len(country) > 2:
-                    try:
-                        country = country_map[country.lower()].alpha2
-                    except KeyError:
-                        country = pycountry.countries.get(alpha3=country).alpha2
-
-                result['location'] = Address(
-                    street_lines=street,
-                    city=u'{}'.format(getattr(address, 'City', 'Unspecified City')),
-                    subdivision=getattr(address, 'StateProvinceCode', None),
-                    country=u'{}'.format(country)
-                )
+        location = self.get_event_location(address)
+        if location:
+            result['location'] = location
         return result
+
+    def get_track_information_from_shipment_activity(self, shipment):
+        """
+        Sometimes we do not have package object in ShipmentRequest.
+        In this case we should retrieve track info from shipment activity.
+        Args:
+            shipment: ShipmentRequest object
+
+        Returns: dict with track information
+        """
+        result = {
+            'delivered': False,
+            'finalized': False,
+            'status_code': 'X'
+        }
+        details = shipment.Activity[0]
+        if hasattr(details, 'Description'):
+            result['description'] = details.Description
+            if details.Description == 'Delivered':
+                result['delivered'] = result['finalized'] = True
+                result['status_code'] = 'D'
+        result['event_time'] = self.get_event_time(details)
+        if hasattr(details, 'ActivityLocation'):
+            address = details.ActivityLocation
+            location = self.get_event_location(address)
+            if location:
+                result['location'] = location
+        return result
+
+    @staticmethod
+    def get_event_time(details):
+        """
+        Get event time from event details.
+        Args:
+            details: event details
+
+        Returns: datetime information about event
+        """
+        date = details.Date
+        time = details.Time
+        year, month, day = int(date[0:4]), int(date[4:6]), int(date[6:8])
+        hour, min, sec = int(time[0:2]), int(time[2:4]), int(time[4:6])
+        return datetime(year, month, day, hour, min, sec)
+
+    @staticmethod
+    def get_event_location(address):
+        """
+        Retrieve address from UPS address object
+        Args:
+            address: UPS address object
+
+        Returns: Address object if it can be created or false.
+        """
+        location = False
+        if hasattr(address, 'CountryCode') and address.CountryCode:
+            country = address.CountryCode
+            if len(country) > 2:
+                try:
+                    country = country_map[country.lower()].alpha2
+                except KeyError:
+                    country = pycountry.countries.get(alpha3=country).alpha2
+
+            location = Address(
+                street_lines=[' '],
+                city=u'{}'.format(getattr(address, 'City', 'Unspecified City')),
+                subdivision=getattr(address, 'StateProvinceCode', None),
+                country=u'{}'.format(country)
+            )
+        return location
 
     def ship(self, service, request, receiver_account_number=None):
         self._ensure_request_supported(request)
