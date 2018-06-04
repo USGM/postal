@@ -71,7 +71,8 @@ class AramexApi(Carrier):
         'DDX': (7, 10),
         'DPX': (7, 10),
         'GDX': (7, 10),
-        'GPX': (7, 10)
+        'GPX': (7, 10),
+        'EPX': (7, 10)
     }
 
     _carrier_error_codes = {
