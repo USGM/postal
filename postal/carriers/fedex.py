@@ -742,7 +742,10 @@ class FedExApi(Carrier):
 
         result = {}
         track_details = response.CompletedTrackDetails[0].TrackDetails[0]
-        details = track_details.StatusDetail
+        try:
+            details = track_details.StatusDetail
+        except AttributeError:
+            details = track_details.Events[0]
 
         if hasattr(track_details, 'Notification'):
             if track_details.Notification.Code == '9040':
@@ -763,17 +766,22 @@ class FedExApi(Carrier):
 
         # Fedex API dose not return StateOrProvinceCode for some countries ex Ghana
         subdivision = False
-        if hasattr(details.Location, 'StateOrProvinceCode'):
-            subdivision = u'{}'.format(details.Location.StateOrProvinceCode)
+        if hasattr(details, 'Location'):
+            address = details.Location
+        else:
+            address = details.Address
+
+        if hasattr(address, 'StateOrProvinceCode'):
+            subdivision = u'{}'.format(address.StateOrProvinceCode)
 
         city, country_code = '', ''
-        if hasattr(details.Location, 'City'):
-            city = details.Location.City
+        if hasattr(address, 'City'):
+            city = address.City
         elif result['delivered'] and hasattr(track_details, 'ActualDeliveryAddress'):
             city = track_details.ActualDeliveryAddress.City
 
-        if hasattr(details.Location, 'CountryCode'):
-            country_code = details.Location.CountryCode
+        if hasattr(address, 'CountryCode'):
+            country_code = address.CountryCode
         elif result['delivered'] and hasattr(track_details, 'ActualDeliveryAddress'):
             country_code = track_details.ActualDeliveryAddress.CountryCode
 
