@@ -378,12 +378,16 @@ class AramexApi(Carrier):
             'Value'
         ).find('TrackingResult')
         event_code = result.findtext('UpdateCode')
-        city, country = result.findtext('UpdateLocation').split(', ')
+        try:
+            city, country = result.findtext('UpdateLocation').split(', ')
+        except ValueError:
+            country = result.findtext('UpdateLocation')
+            city = ' '
         country = country.lower()
 
         return {
-            'delivered': event_code == 'SH001',
-            'finalized': event_code in ['SH001'],
+            'delivered': event_code == 'SH005',
+            'finalized': event_code in ['SH005'],
             'status_code': u'{}'.format(event_code),
             'description': u'{}'.format(result.findtext('UpdateDescription')),
             'event_time': parser.parse(result.findtext('UpdateDateTime')),
