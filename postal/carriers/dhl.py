@@ -579,7 +579,15 @@ class DHLApi(Carrier):
                 try:
                     country = country_map[country.lower()].alpha2
                 except KeyError:
-                    country = pycountry.countries.get(alpha3=country).alpha2
+                    try:
+                        country = pycountry.countries.get(alpha3=country).alpha2
+                    except KeyError:
+                        # By some reason DHL returns NGR code for Nigeria instead NGA
+                        if country == "NGR":
+                            country = pycountry.countries.get(alpha3="NGA")
+                        else:
+                            with self.logger.lock:
+                                self.logger.error("Unknown country received during tracking: {}".format(country))
                 result['location'] = Address(
                     street_lines=street,
                     city=u'{}'.format(city),
