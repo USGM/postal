@@ -572,7 +572,11 @@ class UPSApi(Carrier):
         result['delivered'] = status.Type == 'D'
         result['finalized'] = status.Code == 'D'
         result['status_code'] = u'{}'.format(status.Type)
-        result['description'] = u'{}'.format(status.Description)
+        try:
+            result['description'] = u'{}'.format(status.Description)
+        except AttributeError:
+            result['description'] = ''
+            self.logger.error("Empty Description received for shipment: {}".format(shipment))
         result['event_time'] = self.get_event_time(details)
         address = getattr(details, 'ActivityLocation')
         if status.Type == 'X':
