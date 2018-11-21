@@ -458,7 +458,9 @@ class FedExApi(Carrier):
         except (CarrierError, AttributeError):
             raise CarrierError("FedEx returned a nonsense price. Please "
                                "contact their customer service about tracking "
-                               "number %s." % tracking_number)
+                               "number %s. Error: %s | %s" % (tracking_number,
+                                                              result.Notifications[0].Code,
+                                                              result.Notifications[0].Message))
         shipment_dict = {
             'shipment': Shipment(self, tracking_number),
             'packages': package_details,
@@ -729,18 +731,26 @@ class FedExApi(Carrier):
         selection_details.PackageIdentifier.Type = 'TRACKING_NUMBER_OR_DOORTAG'
         selection_details.PackageIdentifier.Value = identifier
 
-        with self.logger.lock:
-            self.logger.debug_header('Track number: %s' % identifier)
-
-        try:
-            response = self.service_call(
-                self.tracking_client.service.track,
-                auth, client, transaction_detail, version, selection_details
-            )
-        finally:
-            self.log_transmission(self.rates_client)
+        response = self.call_tracking_api(auth,
+                                          client,
+                                          transaction_detail,
+                                          version,
+                                          selection_details,
+                                          identifier)
 
         result = {}
+        if response.CompletedTrackDetails[0].DuplicateWaybill:
+            # Sometimes fedex returns that airway bill is duplicated.
+            # Update selections detail with tacking number unique ID
+            # and call api again. Otherwise Fedex do not return any tracking info.
+            unique_identifier = response.CompletedTrackDetails[0].TrackDetails[0].TrackingNumberUniqueIdentifier
+            selection_details.TrackingNumberUniqueIdentifier = unique_identifier
+            response = self.call_tracking_api(auth,
+                                              client,
+                                              transaction_detail,
+                                              version,
+                                              selection_details,
+                                              identifier)
         track_details = response.CompletedTrackDetails[0].TrackDetails[0]
         try:
             details = track_details.StatusDetail
@@ -834,6 +844,20 @@ class FedExApi(Carrier):
             raise NotSupportedError(
                 'FedEx requires the use of ISO_3166-2 state/province codes, '
                 'not names.')
+
+    def call_tracking_api(self, auth, client, transaction_detail, version, selection_details, identifier):
+        # Call FedEx API to track shipment.
+        with self.logger.lock:
+            self.logger.debug_header('Track number: %s' % identifier)
+
+        try:
+            response = self.service_call(
+                self.tracking_client.service.track,
+                auth, client, transaction_detail, version, selection_details
+            )
+        finally:
+            self.log_transmission(self.rates_client)
+        return response
 
 # Need to find a way to dynamically get all carriers.
 # Also need to find a proper way to specify their inits.
