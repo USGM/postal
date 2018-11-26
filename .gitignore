@@ -1,7 +1,9 @@
 .idea*
 *.pyc
-postal/tests/test_credentials.py
 build/*
 dist/*
 Postal*.egg-*
 *.DS_Store
+/.pydevproject
+/.eggs/
+/.vault_auth.yml
