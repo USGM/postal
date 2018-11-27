@@ -1,0 +1,5 @@
+version: '3.4'
+
+secrets:
+    vault_auth.yml:
+        file: /run/secrets/vault_auth.yml
