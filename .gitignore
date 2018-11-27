@@ -5,3 +5,7 @@ build/*
 dist/*
 Postal*.egg-*
 *.DS_Store
+/.eggs/
+/.project
+/.pydevproject
+/.userdict.txt
