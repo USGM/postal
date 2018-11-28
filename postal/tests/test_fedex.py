@@ -9,7 +9,9 @@ from postal.carriers.base import Carrier
 from postal.data import Request, Address, Package, Declaration, Shipment
 from money import Money
 from suds.transport.http import HttpTransport, Reply
-from postal.tests.fixtures.fedex import tracking_response, tracking_response_StateOrProvinceCode
+from postal.tests.fixtures.fedex import tracking_response, tracking_response_StateOrProvinceCode, \
+    tracking_response_unique_identifier, tracking_response_duplicate_way_bill
+
 
 @ddt
 class TestFedEx(_AbstractTestCarrier, unittest.TestCase):
@@ -171,7 +173,7 @@ class TestFedEx(_AbstractTestCarrier, unittest.TestCase):
 
     @patch.object(HttpTransport, 'send')
     def test_tracking(self, mock_send):
-        mock_send.return_value = Reply(httplib.OK, { }, tracking_response)
+        mock_send.return_value = Reply(httplib.OK, {}, tracking_response)
         result = self.carrier.track('785568835233')
         self.assertEqual(result['delivered'], True)
         self.assertEqual(result['location'].street_lines, [' '])
@@ -191,3 +193,10 @@ class TestFedEx(_AbstractTestCarrier, unittest.TestCase):
         self.assertFalse(result['location'].subdivision)
         self.assertEqual(result['description'], u'Delivered')
         self.assertEqual(result['finalized'], True)
+
+    @patch.object(HttpTransport, 'send')
+    def test_tracking_duplicate_waybill_returns_info(self, mock_send):
+        mock_send.side_effect = (Reply(httplib.OK, {}, tracking_response_duplicate_way_bill),
+                                 Reply(httplib.OK, {}, tracking_response_unique_identifier))
+        result = self.carrier.track('783796503059')
+        self.assertIn("event_time", result.keys())
