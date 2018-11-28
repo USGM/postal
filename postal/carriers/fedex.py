@@ -846,7 +846,16 @@ class FedExApi(Carrier):
                 'not names.')
 
     def call_tracking_api(self, auth, client, transaction_detail, version, selection_details, identifier):
-        # Call FedEx API to track shipment.
+        """
+        Actually call the tracking API.
+        :param auth: suds WebAuthenticationDetail object with authorization credentials
+        :param client: suds ClientDetail object with account number and meter number
+        :param transaction_detail: suds TransactionDetail object
+        :param version: suds VersionId object with used API version
+        :param selection_details: suds TrackSelectionDetail object with data for tracking shipment
+        :param identifier: Tracking number of the shipment
+        :return: suds Reply object with data returned by tracking API
+        """
         with self.logger.lock:
             self.logger.debug_header('Track number: %s' % identifier)
 

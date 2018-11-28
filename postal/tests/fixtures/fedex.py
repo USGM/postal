@@ -175,7 +175,6 @@ tracking_response = u"""<?xml version="1.0" encoding="UTF-8"?>
    </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>"""
 
-
 tracking_response_StateOrProvinceCode = u"""<?xml version="1.0" encoding="UTF-8"?>
 <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
    <SOAP-ENV:Header/>
@@ -349,3 +348,302 @@ tracking_response_StateOrProvinceCode = u"""<?xml version="1.0" encoding="UTF-8"
       </TrackReply>
    </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>"""
+
+tracking_response_duplicate_way_bill = u"""<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
+   <SOAP-ENV:Header/>
+   <SOAP-ENV:Body>
+      <TrackReply xmlns="http://fedex.com/ws/track/v12">
+         <HighestSeverity>SUCCESS</HighestSeverity>
+         <Notifications>
+            <Severity>SUCCESS</Severity>
+            <Source>trck</Source>
+            <Code>0</Code>
+            <Message>Request was successfully processed.</Message>
+            <LocalizedMessage>Request was successfully processed.</LocalizedMessage>
+         </Notifications>
+         <Version>
+            <ServiceId>trck</ServiceId>
+            <Major>12</Major>
+            <Intermediate>0</Intermediate>
+            <Minor>0</Minor>
+         </Version>
+         <CompletedTrackDetails>
+            <HighestSeverity>SUCCESS</HighestSeverity>
+            <DuplicateWaybill>true</DuplicateWaybill>
+            <MoreData>false</MoreData>
+            <TrackDetailsCount>0</TrackDetailsCount>
+            <TrackDetails>
+               <Notification>
+                  <Severity>SUCCESS</Severity>
+                  <Source>trck</Source>
+                  <Code>0</Code>
+                  <Message>Request was successfully processed.</Message>
+                  <LocalizedMessage>Request was successfully processed.</LocalizedMessage>
+               </Notification>
+               <TrackingNumber>783796503059</TrackingNumber>
+               <TrackingNumberUniqueIdentifier>2458438000~783796503059~FX</TrackingNumberUniqueIdentifier>
+               <CarrierCode>FDXE</CarrierCode>
+               <OperatingCompanyOrCarrierDescription>FedEx Express</OperatingCompanyOrCarrierDescription>
+               <PackageSequenceNumber>0</PackageSequenceNumber>
+               <PackageCount>0</PackageCount>
+               <CreatorSoftwareId>WSXI</CreatorSoftwareId>
+               <Payments>
+                  <Classification>DUTIES_AND_TAXES</Classification>
+                  <Type>RECIPIENT_ACCOUNT</Type>
+                  <Description>Recipient</Description>
+               </Payments>
+               <DatesOrTimes>
+                  <Type>ACTUAL_DELIVERY</Type>
+                  <DateOrTimestamp>2018-11-21T16:07:00+08:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DatesOrTimes>
+                  <Type>ACTUAL_PICKUP</Type>
+                  <DateOrTimestamp>2018-11-15T16:36:00-06:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DatesOrTimes>
+                  <Type>SHIP</Type>
+                  <DateOrTimestamp>2018-11-15T00:00:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DatesOrTimes>
+                  <Type>ACTUAL_TENDER</Type>
+                  <DateOrTimestamp>2018-11-15T16:36:00-06:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DestinationAddress>
+                  <City>SG</City>
+                  <StateOrProvinceCode>01</StateOrProvinceCode>
+                  <CountryCode>SG</CountryCode>
+                  <CountryName>Singapore</CountryName>
+                  <Residential>false</Residential>
+               </DestinationAddress>
+               <DeliveryAttempts>0</DeliveryAttempts>
+               <TotalUniqueAddressCountInConsolidation>0</TotalUniqueAddressCountInConsolidation>
+            </TrackDetails>
+            <TrackDetails>
+               <Notification>
+                  <Severity>SUCCESS</Severity>
+                  <Source>trck</Source>
+                  <Code>0</Code>
+                  <Message>Request was successfully processed.</Message>
+                  <LocalizedMessage>Request was successfully processed.</LocalizedMessage>
+               </Notification>
+               <TrackingNumber>783796503059</TrackingNumber>
+               <TrackingNumberUniqueIdentifier>2458439000~783796503059~FX</TrackingNumberUniqueIdentifier>
+               <CarrierCode>FDXE</CarrierCode>
+               <OperatingCompanyOrCarrierDescription>FedEx Express</OperatingCompanyOrCarrierDescription>
+               <PackageSequenceNumber>0</PackageSequenceNumber>
+               <PackageCount>0</PackageCount>
+               <DatesOrTimes>
+                  <Type>ACTUAL_PICKUP</Type>
+                  <DateOrTimestamp>2018-11-15T20:57:00-06:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DatesOrTimes>
+                  <Type>SHIP</Type>
+                  <DateOrTimestamp>2018-11-15T00:00:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DatesOrTimes>
+                  <Type>ACTUAL_TENDER</Type>
+                  <DateOrTimestamp>2018-11-15T20:57:00-06:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DestinationAddress>
+                  <Residential>false</Residential>
+               </DestinationAddress>
+               <DeliveryAttempts>0</DeliveryAttempts>
+               <TotalUniqueAddressCountInConsolidation>0</TotalUniqueAddressCountInConsolidation>
+            </TrackDetails>
+         </CompletedTrackDetails>
+      </TrackReply>
+   </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>
+"""
+
+tracking_response_unique_identifier = u"""<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
+   <SOAP-ENV:Header/>
+   <SOAP-ENV:Body>
+      <TrackReply xmlns="http://fedex.com/ws/track/v12">
+         <HighestSeverity>SUCCESS</HighestSeverity>
+         <Notifications>
+            <Severity>SUCCESS</Severity>
+            <Source>trck</Source>
+            <Code>0</Code>
+            <Message>Request was successfully processed.</Message>
+            <LocalizedMessage>Request was successfully processed.</LocalizedMessage>
+         </Notifications>
+         <Version>
+            <ServiceId>trck</ServiceId>
+            <Major>12</Major>
+            <Intermediate>0</Intermediate>
+            <Minor>0</Minor>
+         </Version>
+         <CompletedTrackDetails>
+            <HighestSeverity>SUCCESS</HighestSeverity>
+            <Notifications>
+               <Severity>SUCCESS</Severity>
+               <Source>trck</Source>
+               <Code>0</Code>
+               <Message>Request was successfully processed.</Message>
+               <LocalizedMessage>Request was successfully processed.</LocalizedMessage>
+            </Notifications>
+            <DuplicateWaybill>false</DuplicateWaybill>
+            <MoreData>false</MoreData>
+            <TrackDetailsCount>0</TrackDetailsCount>
+            <TrackDetails>
+               <Notification>
+                  <Severity>SUCCESS</Severity>
+                  <Source>trck</Source>
+                  <Code>0</Code>
+                  <Message>Request was successfully processed.</Message>
+                  <LocalizedMessage>Request was successfully processed.</LocalizedMessage>
+               </Notification>
+               <TrackingNumber>783796503059</TrackingNumber>
+               <TrackingNumberUniqueIdentifier>2458438000~783796503059~FX</TrackingNumberUniqueIdentifier>
+               <StatusDetail>
+                  <CreationTime>2018-11-21T00:00:00</CreationTime>
+                  <Code>DL</Code>
+                  <Description>Delivered</Description>
+                  <Location>
+                     <City>SG</City>
+                     <StateOrProvinceCode>01</StateOrProvinceCode>
+                     <CountryCode>SG</CountryCode>
+                     <CountryName>Singapore</CountryName>
+                     <Residential>false</Residential>
+                  </Location>
+               </StatusDetail>
+               <CarrierCode>FDXE</CarrierCode>
+               <OperatingCompanyOrCarrierDescription>FedEx Express</OperatingCompanyOrCarrierDescription>
+               <Service>
+                  <Type>INTERNATIONAL_ECONOMY</Type>
+                  <Description>FedEx International Economy</Description>
+                  <ShortDescription>IE</ShortDescription>
+               </Service>
+               <PackageWeight>
+                  <Units>LB</Units>
+                  <Value>13.8</Value>
+               </PackageWeight>
+               <PackageDimensions>
+                  <Length>24</Length>
+                  <Width>15</Width>
+                  <Height>15</Height>
+                  <Units>IN</Units>
+               </PackageDimensions>
+               <ShipmentWeight>
+                  <Units>LB</Units>
+                  <Value>13.8</Value>
+               </ShipmentWeight>
+               <Packaging>Your Packaging</Packaging>
+               <PackagingType>YOUR_PACKAGING</PackagingType>
+               <PackageSequenceNumber>1</PackageSequenceNumber>
+               <PackageCount>1</PackageCount>
+               <CreatorSoftwareId>WSXI</CreatorSoftwareId>
+               <SpecialHandlings>
+                  <Type>DELIVER_WEEKDAY</Type>
+                  <Description>Deliver Weekday</Description>
+                  <PaymentType>OTHER</PaymentType>
+               </SpecialHandlings>
+               <SpecialHandlings>
+                  <Type>RESIDENTIAL_DELIVERY</Type>
+                  <Description>Residential Delivery</Description>
+                  <PaymentType>OTHER</PaymentType>
+               </SpecialHandlings>
+               <Payments>
+                  <Classification>DUTIES_AND_TAXES</Classification>
+                  <Type>RECIPIENT_ACCOUNT</Type>
+                  <Description>Recipient</Description>
+               </Payments>
+               <Payments>
+                  <Classification>TRANSPORTATION</Classification>
+                  <Type>SHIPPER_ACCOUNT</Type>
+                  <Description>Shipper</Description>
+               </Payments>
+               <ShipperAddress>
+                  <City>HOUSTON</City>
+                  <StateOrProvinceCode>TX</StateOrProvinceCode>
+                  <CountryCode>US</CountryCode>
+                  <CountryName>United States</CountryName>
+                  <Residential>false</Residential>
+               </ShipperAddress>
+               <DatesOrTimes>
+                  <Type>ACTUAL_DELIVERY</Type>
+                  <DateOrTimestamp>2018-11-21T16:07:00+08:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DatesOrTimes>
+                  <Type>ACTUAL_PICKUP</Type>
+                  <DateOrTimestamp>2018-11-15T16:36:00-06:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DatesOrTimes>
+                  <Type>SHIP</Type>
+                  <DateOrTimestamp>2018-11-15T00:00:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DatesOrTimes>
+                  <Type>ACTUAL_TENDER</Type>
+                  <DateOrTimestamp>2018-11-15T16:36:00-06:00</DateOrTimestamp>
+               </DatesOrTimes>
+               <DestinationAddress>
+                  <City>SG</City>
+                  <StateOrProvinceCode>01</StateOrProvinceCode>
+                  <CountryCode>SG</CountryCode>
+                  <CountryName>Singapore</CountryName>
+                  <Residential>false</Residential>
+               </DestinationAddress>
+               <ActualDeliveryAddress>
+                  <City>SG</City>
+                  <StateOrProvinceCode>01</StateOrProvinceCode>
+                  <CountryCode>SG</CountryCode>
+                  <CountryName>Singapore</CountryName>
+                  <Residential>false</Residential>
+               </ActualDeliveryAddress>
+               <DeliveryLocationType>RECEPTIONIST_OR_FRONT_DESK</DeliveryLocationType>
+               <DeliveryLocationDescription>Receptionist/Front Desk</DeliveryLocationDescription>
+               <DeliveryAttempts>0</DeliveryAttempts>
+               <DeliverySignatureName>D.DIAN</DeliverySignatureName>
+               <TotalUniqueAddressCountInConsolidation>0</TotalUniqueAddressCountInConsolidation>
+               <AvailableImages>
+                  <Type>SIGNATURE_PROOF_OF_DELIVERY</Type>
+               </AvailableImages>
+               <Signature>
+                  <Notifications>
+                     <Severity>ERROR</Severity>
+                     <Source>trck</Source>
+                     <Code>4550</Code>
+                     <Message>Signature images are not available for display for shipments to this country.</Message>
+                     <LocalizedMessage>Signature images are not available for display for shipments to this country.</LocalizedMessage>
+                  </Notifications>
+               </Signature>
+               <NotificationEventsAvailable>ON_DELIVERY</NotificationEventsAvailable>
+               <DeliveryOptionEligibilityDetails>
+                  <Option>INDIRECT_SIGNATURE_RELEASE</Option>
+                  <Eligibility>INELIGIBLE</Eligibility>
+               </DeliveryOptionEligibilityDetails>
+               <DeliveryOptionEligibilityDetails>
+                  <Option>REDIRECT_TO_HOLD_AT_LOCATION</Option>
+                  <Eligibility>INELIGIBLE</Eligibility>
+               </DeliveryOptionEligibilityDetails>
+               <DeliveryOptionEligibilityDetails>
+                  <Option>REROUTE</Option>
+                  <Eligibility>INELIGIBLE</Eligibility>
+               </DeliveryOptionEligibilityDetails>
+               <DeliveryOptionEligibilityDetails>
+                  <Option>RESCHEDULE</Option>
+                  <Eligibility>INELIGIBLE</Eligibility>
+               </DeliveryOptionEligibilityDetails>
+               <Events>
+                  <Timestamp>2018-11-21T16:07:00+08:00</Timestamp>
+                  <EventType>DL</EventType>
+                  <EventDescription>Delivered</EventDescription>
+                  <Address>
+                     <City>SG</City>
+                     <StateOrProvinceCode>01</StateOrProvinceCode>
+                     <PostalCode>819834</PostalCode>
+                     <CountryCode>SG</CountryCode>
+                     <CountryName>Singapore</CountryName>
+                     <Residential>false</Residential>
+                  </Address>
+                  <ArrivalLocation>DELIVERY_LOCATION</ArrivalLocation>
+               </Events>
+            </TrackDetails>
+         </CompletedTrackDetails>
+      </TrackReply>
+   </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>
+"""
