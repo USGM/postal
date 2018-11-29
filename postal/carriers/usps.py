@@ -33,7 +33,6 @@ from base import Carrier, ClearEmpty, PY3, PostalLogger, LoggingWebServicePlugin
 from ..exceptions import CarrierError, NotSupportedError
 from ..data import Shipment, sigfig, TWOPLACES, Declaration, subdivision_map
 
-
 logger = PostalLogger('USPS')
 
 
@@ -74,8 +73,8 @@ class USPSApi(Carrier):
         'Letter': 'Letter',
         'FlatRateEnvelope': 'Flat Rate Envelope',
         'FlatRateLegalEnvelope': 'Flat Rate Legal Envelope',
-        'FlatRatePaddedEnvelope': 'Flate Rate Padded Envelope',
-        'SmallFlatRateEnvelope': ' Small Flat Rate Envelope',
+        'FlatRatePaddedEnvelope': 'Flat Rate Padded Envelope',
+        'SmallFlatRateEnvelope': 'Small Flat Rate Envelope',
         'SmallFlatRateBox': 'Small Flat Rate Box',
         'MediumFlatRateBox': 'Medium Flat Rate Box',
         'LargeFlatRateBox': 'Large Flat Rate Box'}
@@ -246,7 +245,6 @@ class USPSApi(Carrier):
             api_request.Services._AdultSignatureRestrictedDelivery = 'ON'
         elif signature == 'Indirect':
             api_request.Services._SignatureConfirmation = 'ON'
-
 
     @staticmethod
     def _format_phone(phone_number, international=False):
@@ -462,7 +460,7 @@ class USPSApi(Carrier):
             item.Description = declaration.description
             commodities = sum(dec.units for dec in package.declarations)
             item.Weight = int(
-                float(package.weight) / (len(declarations) or 1) /
+                float(package.weight) / (len(declarations) or 1) / 
                 (commodities or 1)) or 1
             label_request.CustomsInfo.CustomsItems.CustomsItem.append(item)
 

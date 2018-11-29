@@ -7,3 +7,6 @@ Postal*.egg-*
 /.pydevproject
 /.eggs/
 /.vault_auth.yml
+/.eggs/
+/.project
+/.userdict.txt
