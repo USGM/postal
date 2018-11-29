@@ -21,18 +21,27 @@ pipeline {
        REPO_PRIV_KEY_FILE = credentials('REPO_PRIV_KEY_FILE')
        DOCKER_REGISTRY_AUTH = credentials('DOCKER_REGISTRY_AUTH')
        TARGET_ENV = 'test'
+       VAULT_ADDR = 'https://vault.usglobalmail.com'
   }
 
   stages {
     stage ('Prep') {
         steps {
             sh "postal/tests/prep.sh"
+
+            withCredentials([
+                            string(credentialsId: 'jenkins-vault-token', variable: 'VAULT_TOKEN')]) 
+            {
+                sh "make .vault_auth.yml"
+            }
+
         }
     }
-    stage('Unit Tests') {
+    stage('Integration Tests') {
       steps {
-        sh "echo 'Run Unit Tests'"
-        sh "make"
+            sh "echo 'Run Integration Tests'"
+            sh "make"
+        }
       }
     }
   }

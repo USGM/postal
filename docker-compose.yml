@@ -10,4 +10,4 @@ services:
         - vault_auth.yml
 secrets:
     vault_auth.yml:
-        external: true
+        file: ./.vault_auth.yml

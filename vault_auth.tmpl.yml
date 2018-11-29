@@ -1,0 +1,4 @@
+url: https://vault.usglobalmail.com
+ssl_verify: false
+role_id: ${ROLE_ID} 
+secret_id: ${SECRET_ID}
