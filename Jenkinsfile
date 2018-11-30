@@ -30,7 +30,7 @@ pipeline {
             sh "postal/tests/prep.sh"
 
             withCredentials([
-                            string(credentialsId: 'jenkins-vault-token', variable: 'VAULT_TOKEN')]) 
+                            string(credentialsId: 'jenkins-vault-token', variable: 'VAULT_TOKEN')])
             {
                 sh "make .vault_auth.yml"
             }
@@ -42,7 +42,7 @@ pipeline {
             sh "echo 'Run Integration Tests'"
             sh "make"
         }
-      }
+      
     }
   }
   post {
