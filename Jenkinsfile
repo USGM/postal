@@ -36,7 +36,7 @@ pipeline {
             withCredentials([
                             string(credentialsId: 'jenkins-vault-token', variable: 'VAULT_TOKEN')])
             {
-                sh "make .vault_auth.yml"
+                sh "make -B .vault_auth.yml"
             }
 
         }
