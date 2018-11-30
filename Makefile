@@ -10,6 +10,7 @@ TAG ?= $(shell git rev-parse --short HEAD)
 SWARM_ADDR ?= 192.168.20.62:2376
 VAULT_SKIP_VERIFY ?= true
 VAULT_ROLE_NAME ?= integrator
+VAULT_ADDR ?= https://vault.usglobalmail.com
 
 export
 
@@ -47,6 +48,6 @@ secret:
 	docker secret create vault_auth.yml ./.vault_auth.yml
 	
 .vault_auth.yml:
-	ROLE_ID=`vault read auth/approle/role/${VAULT_ROLE_NAME}/role-id` \
+	ROLE_ID=`vault read -field=role_id auth/approle/role/${VAULT_ROLE_NAME}/role-id` \
 	SECRET_ID=`vault write -field=secret_id -f auth/approle/role/${VAULT_ROLE_NAME}/secret-id` \
-    envsubst < vault_auth.tmpl.yml > .vault_auth.yml 
+    eval "echo \"$$(cat vault_auth.tmpl.yml)\"" > .vault_auth.yml
