@@ -6,6 +6,10 @@ pipeline {
     }
   }
 
+//  triggers {
+//    cron('H * * * *')
+//  }
+
   // using the Timestamper plugin we can add timestamps to the console log
   options {
     // disabled due to bug JENKINS-48556
@@ -38,9 +42,12 @@ pipeline {
         }
     }
     stage('Integration Tests') {
+    
       steps {
             sh "echo 'Run Integration Tests'"
-            sh "make"
+            retry(2) {
+                sh "make"
+            }
         }
       
     }
@@ -48,6 +55,7 @@ pipeline {
   post {
     always {
       sh "make dc-down"
+      // disabled due to DinD issues
       //junit "build/junit/*.xml"
       deleteDir()
     }
