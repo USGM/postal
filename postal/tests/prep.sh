@@ -16,6 +16,6 @@ chmod a+x $WORKSPACE/.local/bin/docker-compose
 # Install Vault
 curl -o vault.zip https://releases.hashicorp.com/vault/0.11.5/vault_0.11.5_linux_amd64.zip ; yes | unzip vault.zip
 chmod a+x vault
-mv vault ~/.local/bin/
+mv vault $WORKSPACE/.local/bin/
 
 if [ -f .env ] ; then mv .env .env.bak ; fi
