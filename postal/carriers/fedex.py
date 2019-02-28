@@ -272,7 +272,7 @@ class FedExApi(Carrier):
     def label_specification(self, spec):
         spec.LabelFormatType = 'COMMON2D'
         spec.ImageType = 'PDF'
-        spec.LabelStockType = 'PAPER_4X6'
+        spec.LabelStockType = 'STOCK_4X6'
 
     @staticmethod
     def decode_label(label):
