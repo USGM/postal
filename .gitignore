@@ -9,3 +9,4 @@ Postal*.egg-*
 /.project
 /.pydevproject
 /.userdict.txt
+/.vscode
