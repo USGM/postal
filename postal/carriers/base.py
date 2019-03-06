@@ -39,7 +39,16 @@ PY3 = sys.version_info[0] == 3
 
 
 class PostalLogger(object):
-    def __init__(self, logger_name='postal', carrier_name='Unknown Carrier'):
+    def __init__(self, logger_name=None, carrier_name=None):
+        if not logger_name:
+            if not carrier_name:
+                logger_name = 'postal'
+            else:
+                logger_name = 'postal.' + carrier_name
+
+        if not carrier_name:
+            carrier_name = 'Unknown Carrier'
+
         self.logger = logging.getLogger(logger_name)
         self.carrier_name = carrier_name
         self.lock = RLock()
