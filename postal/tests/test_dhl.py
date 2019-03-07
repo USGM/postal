@@ -60,4 +60,5 @@ class TestDHL(_AbstractTestCarrier, unittest.TestCase):
     test_international_multiship = _empty_result_fail
     test_international_services = _empty_result_fail
     test_international_rate_ship_match = _empty_result_fail
+    test_international_insurance = _empty_result_fail    
     
