@@ -10,3 +10,4 @@ Postal*.egg-*
 /.eggs/
 /.project
 /.userdict.txt
+/.vscode
