@@ -1,0 +1,10 @@
+version: '3.4'
+
+services:
+    postal:
+        volumes:
+        - .:/app
+
+secrets:
+    vault_auth.yml:
+        file: ./.vault_auth.yml
