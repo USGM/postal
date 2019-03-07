@@ -51,3 +51,4 @@ secret:
 	ROLE_ID=`vault read -field=role_id auth/approle/role/${VAULT_ROLE_NAME}/role-id` \
 	SECRET_ID=`vault write -field=secret_id -f auth/approle/role/${VAULT_ROLE_NAME}/secret-id` \
     eval "echo \"$$(cat vault_auth.tmpl.yml)\"" > .vault_auth.yml
+
