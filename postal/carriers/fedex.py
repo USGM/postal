@@ -272,14 +272,21 @@ class FedExApi(Carrier):
     def label_specification(self, spec):
         spec.LabelFormatType = 'COMMON2D'
         spec.ImageType = 'PDF'
-        spec.LabelStockType = 'PAPER_4X6'
+        spec.LabelStockType = 'STOCK_4X6'
 
     @staticmethod
-    def format_label(label):
+    def decode_label(label):
         # Some jump-around for dual compatibility with Python 2 and 3
         if isinstance(label, bytes):
             label = label.decode('utf-8')
         label = b64decode(label)
+        return label
+
+    @staticmethod
+    def format_label(label):
+        # Some jump-around for dual compatibility with Python 2 and 3
+        label = decode_label(label)
+
         input = PdfFileReader(BytesIO(label))
         input.strict = False
         output = PdfFileWriter()
@@ -435,7 +442,7 @@ class FedExApi(Carrier):
         detail = result.CompletedShipmentDetail.CompletedPackageDetails[0]
         package_details[package] = {
             'tracking_number': str(master_tracking_id.TrackingNumber),
-            'label': self.format_label(detail.Label.Parts[0].Image)}
+            'label': self.decode_label(detail.Label.Parts[0].Image)}
         for sequence_num, package in enumerate(request.packages[1:]):
             sequence_num += 2
             requested_shipment = self.requested_shipment(
@@ -449,7 +456,7 @@ class FedExApi(Carrier):
             package_details[package] = {
                 'tracking_number': str(
                     detail.TrackingIds[0].TrackingNumber),
-                'label': self.format_label(detail.Label.Parts[0].Image)}
+                'label': self.decode_label(detail.Label.Parts[0].Image)}
         tracking_number = str(master_tracking_id.TrackingNumber)
 
         try:
