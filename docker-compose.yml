@@ -1,0 +1,14 @@
+version: '3.4'
+
+services:
+    postal:
+        build: .
+        image: ${DOCKER_REGISTRY}/postal:${TAG}
+#         environment:
+#         - VAULT_AUTH_CONF=/run/secrets/vault_auth.yml
+#         secrets:
+#         - vault_auth.yml
+# secrets:
+#     vault_auth.yml:
+#         file: ./.vault_auth.yml
+#Test branch build
