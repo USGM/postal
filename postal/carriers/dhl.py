@@ -337,9 +337,6 @@ class DHLApi(Carrier):
         if not money and not insurance:
             return ''
 
-        if request.documents_only():
-            return ''
-
         return populate_template(
             template, {
                 'currency': money.currency,
