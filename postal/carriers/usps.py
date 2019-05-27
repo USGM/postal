@@ -105,7 +105,7 @@ class USPSApi(Carrier):
             url = 'https://labelserver.endicia.com/LabelService/' \
                   'EwsLabelService.asmx?WSDL'
 
-        self.client = Client(url, plugins=[ClearEmpty(), self.log_service])
+        self.client = Client(url, plugins=[ClearEmpty(), self.log_service], timeout=20)
 
     def service_call(self, func, *args, **kwargs):
         try:
