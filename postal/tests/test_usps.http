@@ -1,14 +1,28 @@
+
+# stage
+
 @url = https://elstestserver.endicia.com/LabelService/EwsLabelService.asmx?WSDL
 @account_id = 2505571
 @passphrase = Lucy in the sky
-@requester_id = lusg2
+@requester_id = lusg
 
 ###
+
+# prod
 
 #@url = https://labelserver.endicia.com/labelservice/ewslabelservice.asmx?wsdl
 #@account_id = 922400
 #@passphrase = green table 825 bus
 #@requester_id = lusg
+
+###
+
+# globegistics prod
+
+#@url = https://labelserver.endicia.com/labelservice/ewslabelservice.asmx?wsdl
+#@account_id = 982627
+#@passphrase = game 825 time play
+#@requester_id = 982627
 
 ###
 
