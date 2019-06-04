@@ -1,0 +1,58 @@
+
+# stage
+
+@url = https://elstestserver.endicia.com/LabelService/EwsLabelService.asmx?WSDL
+@account_id = 2505571
+@passphrase = Lucy in the sky
+@requester_id = lusg
+
+###
+
+# prod
+
+#@url = https://labelserver.endicia.com/labelservice/ewslabelservice.asmx?wsdl
+#@account_id = 922400
+#@passphrase = green table 825 bus
+#@requester_id = lusg
+
+###
+
+# globegistics prod
+
+#@url = https://labelserver.endicia.com/labelservice/ewslabelservice.asmx?wsdl
+#@account_id = 982627
+#@passphrase = game 825 time play
+#@requester_id = 982627
+
+###
+
+POST {{url}} HTTP/1.1
+Content-Type: text/xml
+
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:ns0="www.envmgr.com/LabelService" xmlns:ns1="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
+<ns1:Body>
+    <ns0:CalculatePostageRates>
+        <ns0:PostageRatesRequest>
+            <ns0:MailClass>Domestic</ns0:MailClass>
+            <ns0:WeightOz>4</ns0:WeightOz>
+            <ns0:MailpieceShape>Flat</ns0:MailpieceShape>
+            <ns0:MailpieceDimensions>
+                <ns0:Length>1.00</ns0:Length>
+                <ns0:Width>1.00</ns0:Width>
+                <ns0:Height>1.00</ns0:Height>
+            </ns0:MailpieceDimensions>
+            <ns0:Machinable>True</ns0:Machinable>
+            <ns0:InsuredValue>0</ns0:InsuredValue>
+            <ns0:FromPostalCode>77043</ns0:FromPostalCode>
+            <ns0:ToPostalCode>98105</ns0:ToPostalCode>
+            <ns0:DeliveryTimeDays>TRUE</ns0:DeliveryTimeDays>
+            <ns0:RequesterID>{{requester_id}}</ns0:RequesterID>
+            <ns0:CertifiedIntermediary>
+                <ns0:AccountID>{{account_id}}</ns0:AccountID>
+                <ns0:PassPhrase>{{passphrase}}</ns0:PassPhrase>
+            </ns0:CertifiedIntermediary>
+        </ns0:PostageRatesRequest>
+    </ns0:CalculatePostageRates>
+</ns1:Body>
+</SOAP-ENV:Envelope>

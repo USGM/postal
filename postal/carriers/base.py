@@ -65,6 +65,10 @@ class PostalLogger(object):
         self.logger.info(pformat(shipment_dict))
 
     def debug(self, message):
+        if (not message) or message == None:
+            import traceback
+            message = traceback.format_stack()
+
         # temporarily displaying low-detail debug messages as info level until
         # finding a way to use custom log levels with Django
         self.logger.info(message)
