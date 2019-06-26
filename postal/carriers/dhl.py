@@ -44,7 +44,7 @@ from ..exceptions import CarrierError, NotSupportedError, SoftCarrierError
 from ..data import Shipment, TWOPLACES, sigfig
 
 
-logger = PostalLogger(__name__, 'DHL')
+logger = PostalLogger(carrier_name='DHL')
 
 
 class DHLApi(Carrier):
