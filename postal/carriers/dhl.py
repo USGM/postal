@@ -43,10 +43,6 @@ from .templates.constructor import load_template, populate_template
 from ..exceptions import CarrierError, NotSupportedError, SoftCarrierError
 from ..data import Shipment, TWOPLACES, sigfig
 
-
-logger = PostalLogger(carrier_name='DHL')
-
-
 class DHLApi(Carrier):
     name = 'DHL'
     domestic = False

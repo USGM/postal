@@ -576,7 +576,7 @@ class UPSApi(Carrier):
             result['description'] = u'{}'.format(status.Description)
         except AttributeError:
             result['description'] = ''
-            self.logger.error("Empty Description received for shipment: {}".format(shipment))
+            self.logger.exception("Empty Description received for shipment: {}".format(shipment))
         result['event_time'] = self.get_event_time(details)
         address = getattr(details, 'ActivityLocation')
         if status.Type == 'X':

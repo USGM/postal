@@ -33,9 +33,6 @@ from base import Carrier, ClearEmpty, PY3, PostalLogger
 from ..exceptions import CarrierError, NotSupportedError
 from ..data import Shipment, sigfig, TWOPLACES, Declaration, subdivision_map
 
-logger = PostalLogger(carrier_name='USPS')
-
-
 class USPSApi(Carrier):
     name = 'USPS'
     address_validation = False
@@ -109,14 +106,14 @@ class USPSApi(Carrier):
         self.client = Client(url, plugins=[ClearEmpty(), self.log_service], timeout=20)
 
     def service_call(self, func, *args, **kwargs):
-        logger.error("Sending request to %s" % self.url)
+        self.logger.debug("Sending request to %s" % self.url)
         response = super(USPSApi, self).service_call(func, *args, **kwargs)
         
         try:
             if response.Status != 0:
                 raise CarrierError(response.ErrorMessage)
         except AttributeError:
-            logger.error("Got AttributeError")
+            self.logger.exception("Got AttributeError")
             pass
         return response
 
@@ -548,10 +545,10 @@ class USPSApi(Carrier):
     def ship(self, service, request):
         self._sanity_check(request)
 
-        with logger.lock:
-            logger.debug_header('Shipment')
-            logger.debug(service)
-            logger.debug(request)
+        with self.logger.lock:
+            self.logger.debug_header('Shipment')
+            self.logger.debug(service)
+            self.logger.debug(request)
 
         if len(request.packages) == 1:
             return self.ship_package(request, service, request.packages[0])
@@ -571,9 +568,9 @@ class USPSApi(Carrier):
                         package: {'label': None, 'tracking_number': None}}})
         result = self.compile_shipments(responses)
 
-        with logger.lock:
-            logger.debug_header('Response')
-            logger.shipment_response(result)
+        with self.logger.lock:
+            self.logger.debug_header('Response')
+            self.logger.shipment_response(result)
 
         return result
 
@@ -657,9 +654,9 @@ class USPSApi(Carrier):
     def get_services(self, request):
         self._sanity_check(request)
 
-        with logger.lock:
-            logger.debug_header('Get Services')
-            logger.debug(request)
+        with self.logger.lock:
+            self.logger.debug_header('Get Services')
+            self.logger.debug(request)
 
         try:
             responses = self.get_from_cache(request, 'usps')
@@ -681,13 +678,13 @@ class USPSApi(Carrier):
                 self.cache_results(request, responses, 'usps')
             responses = self.compile_options(request, responses)
 
-            with logger.lock:
-                logger.debug_header('Response')
-                logger.debug(pformat(responses, width=1))
+            with self.logger.lock:
+                self.logger.debug_header('Response')
+                self.logger.debug(pformat(responses, width=1))
 
             return responses
         except Exception as ex:
-            logger.exception("In USPS.get_services")
+            self.logger.exception("In USPS.get_services")
 
     def delivery_datetime(self, service, request):
         data = self.get_services(request).get(service, None)
