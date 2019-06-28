@@ -21,7 +21,6 @@ from ..data import Address, Shipment, Declaration
 from io import BytesIO
 
 
-logger = PostalLogger(carrier_name='FedEx')
 warnings.filterwarnings("ignore", category=PdfReadWarning)
 
 
@@ -218,9 +217,9 @@ class FedExApi(Carrier):
         address_item = self.address_client.factory.create('AddressToValidate')
         self.set_address(address_item, address)
 
-        with logger.lock:
-            logger.debug_header('Validate Address')
-            logger.debug(address)
+        with self.logger.lock:
+            self.logger.debug_header('Validate Address')
+            self.logger.debug(address)
 
         result = self.service_call(
             self.address_client.service.addressValidation,
@@ -232,9 +231,9 @@ class FedExApi(Carrier):
         result = result.AddressResults[0][0][0]
         success = result.Score
         address = self.address_from_validator(result, address)
-        with logger.lock:
-            logger.debug_header('Response')
-            logger.debug(address)
+        with self.logger.lock:
+            self.logger.debug_header('Response')
+            self.logger.debug(address)
         return success, address
 
     def ship_version_id(self):
@@ -474,9 +473,9 @@ class FedExApi(Carrier):
             'price': price,
             'alerts': alerts}
 
-        with logger.lock:
-            logger.debug_header('Response')
-            logger.shipment_response(shipment_dict)
+        with self.logger.lock:
+            self.logger.debug_header('Response')
+            self.logger.shipment_response(shipment_dict)
         return shipment_dict
 
     def carrier_codes(self):
@@ -723,9 +722,9 @@ class FedExApi(Carrier):
                 'trackable': True}
             for key, value in result.items()}
 
-        with logger.lock:
-            logger.debug_header('Response')
-            logger.debug(pformat(final, width=1))
+        with self.logger.lock:
+            self.logger.debug_header('Response')
+            self.logger.debug(pformat(final, width=1))
 
         return final
 

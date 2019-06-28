@@ -28,7 +28,6 @@ from PyPDF2.utils import PdfReadWarning
 
 
 TWOPLACES = Decimal('0.01')
-logger = PostalLogger(carrier_name='Aramex')
 warnings.filterwarnings("ignore", category=PdfReadWarning)
 
 
@@ -427,9 +426,9 @@ class AramexApi(Carrier):
                 'packages': package_details,
                 'price': self.quote(service, request),
             }
-            with logger.lock:
-                logger.debug_header('Response')
-                logger.shipment_response(shipment_dict)
+            with self.logger.lock:
+                self.logger.debug_header('Response')
+                self.logger.shipment_response(shipment_dict)
             return shipment_dict
 
         final = {
@@ -439,9 +438,9 @@ class AramexApi(Carrier):
                 'trackable': True
             } for response in results if response and not response['error'] for key, value in response['service'].items()
         }
-        with logger.lock:
-            logger.debug_header('Response')
-            logger.debug(pformat(final, width=1))
+        with self.logger.lock:
+            self.logger.debug_header('Response')
+            self.logger.debug(pformat(final, width=1))
 
         if final:
             return final
@@ -458,9 +457,9 @@ class AramexApi(Carrier):
                     request.Shipments, request.LabelInfo
                 )
             else:
-                with logger.lock:
-                    logger.debug_header('URL')
-                    logger.debug(self.rates_client)
+                with self.logger.lock:
+                    self.logger.debug_header('URL')
+                    self.logger.debug(self.rates_client)
                 response = self.service_call(
                     self.rates_client.service.CalculateRate, request.ClientInfo, request.Transaction,
                     request.OriginAddress, request.DestinationAddress, request.ShipmentDetails

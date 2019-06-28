@@ -29,12 +29,9 @@ from PyPDF2 import PdfFileReader, PdfFileWriter
 from money import Money
 from suds.client import Client
 
-from base import Carrier, ClearEmpty, PY3, PostalLogger, LoggingWebServicePlugin
+from base import Carrier, ClearEmpty, PY3, PostalLogger
 from ..exceptions import CarrierError, NotSupportedError
 from ..data import Shipment, sigfig, TWOPLACES, Declaration, subdivision_map
-
-logger = PostalLogger('USPS')
-
 
 class USPSApi(Carrier):
     name = 'USPS'
@@ -104,27 +101,19 @@ class USPSApi(Carrier):
         else:
             url = 'https://labelserver.endicia.com/LabelService/' \
                   'EwsLabelService.asmx?WSDL'
+        self.url = url
 
         self.client = Client(url, plugins=[ClearEmpty(), self.log_service], timeout=20)
 
     def service_call(self, func, *args, **kwargs):
-        try:
-            response = super(USPSApi, self).service_call(func, *args, **kwargs)
-        finally:
-            with logger.lock:
-                try:
-                    logger.sent(self.client.last_sent())
-                except AttributeError:
-                    logger.sent("Nothing sent!")
-                try:
-                    logger.received(self.client.last_received())
-                except AttributeError:
-                    logger.received("Nothing received!")
-
+        self.logger.debug("Sending request to %s" % self.url)
+        response = super(USPSApi, self).service_call(func, *args, **kwargs)
+        
         try:
             if response.Status != 0:
                 raise CarrierError(response.ErrorMessage)
         except AttributeError:
+            self.logger.exception("Got AttributeError")
             pass
         return response
 
@@ -556,10 +545,10 @@ class USPSApi(Carrier):
     def ship(self, service, request):
         self._sanity_check(request)
 
-        with logger.lock:
-            logger.debug_header('Shipment')
-            logger.debug(service)
-            logger.debug(request)
+        with self.logger.lock:
+            self.logger.debug_header('Shipment')
+            self.logger.debug(service)
+            self.logger.debug(request)
 
         if len(request.packages) == 1:
             return self.ship_package(request, service, request.packages[0])
@@ -579,9 +568,9 @@ class USPSApi(Carrier):
                         package: {'label': None, 'tracking_number': None}}})
         result = self.compile_shipments(responses)
 
-        with logger.lock:
-            logger.debug_header('Response')
-            logger.shipment_response(result)
+        with self.logger.lock:
+            self.logger.debug_header('Response')
+            self.logger.shipment_response(result)
 
         return result
 
@@ -665,34 +654,37 @@ class USPSApi(Carrier):
     def get_services(self, request):
         self._sanity_check(request)
 
-        with logger.lock:
-            logger.debug_header('Get Services')
-            logger.debug(request)
+        with self.logger.lock:
+            self.logger.debug_header('Get Services')
+            self.logger.debug(request)
 
-        responses = self.get_from_cache(request, 'usps')
-        if not responses:
-            responses = []
-            for package in request.packages:
-                postage_request = self.client.factory.create('PostageRatesRequest')
-                self._set_dims(postage_request, package, softpack_convert=False)
-                self._set_address_info(postage_request, request, short=True)
-                self._set_creds(postage_request, inset=True)
-                self._signature_params(postage_request, request)
-                self._insurance_params(postage_request, package)
-                postage_request.DeliveryTimeDays = "TRUE"
-                response = self.service_call(
-                    self.client.service.CalculatePostageRates, postage_request)
+        try:
+            responses = self.get_from_cache(request, 'usps')
+            if not responses:
+                responses = []
+                for package in request.packages:
+                    postage_request = self.client.factory.create('PostageRatesRequest')
+                    self._set_dims(postage_request, package, softpack_convert=False)
+                    self._set_address_info(postage_request, request, short=True)
+                    self._set_creds(postage_request, inset=True)
+                    self._signature_params(postage_request, request)
+                    self._insurance_params(postage_request, package)
+                    postage_request.DeliveryTimeDays = "TRUE"
+                    response = self.service_call(
+                        self.client.service.CalculatePostageRates, postage_request)
 
-                response_dict = self._request_response_table(request, response)
-                responses.append(response_dict)
-            self.cache_results(request, responses, 'usps')
-        responses = self.compile_options(request, responses)
+                    response_dict = self._request_response_table(request, response)
+                    responses.append(response_dict)
+                self.cache_results(request, responses, 'usps')
+            responses = self.compile_options(request, responses)
 
-        with logger.lock:
-            logger.debug_header('Response')
-            logger.debug(pformat(responses, width=1))
+            with self.logger.lock:
+                self.logger.debug_header('Response')
+                self.logger.debug(pformat(responses, width=1))
 
-        return responses
+            return responses
+        except Exception as ex:
+            self.logger.exception("In USPS.get_services")
 
     def delivery_datetime(self, service, request):
         data = self.get_services(request).get(service, None)
