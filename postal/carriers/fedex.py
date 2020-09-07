@@ -122,7 +122,7 @@ class FedExApi(Carrier):
         self.meter_number = meter_number
         self.test = test
 
-        self.rates_client = self.create_client('RateService_v14.wsdl')
+        self.rates_client = self.create_client('RateService_v26.wsdl')
 
         self.address_client = self.create_client('AddressValidationService_v2.wsdl')
 
@@ -247,7 +247,7 @@ class FedExApi(Carrier):
     def rates_version_id(self):
         version = self.rates_client.factory.create('VersionId')
         version.ServiceId = 'crs'
-        version.Major = 14
+        version.Major = 26
         version.Intermediate = 0
         version.Minor = 0
         return version
@@ -614,6 +614,9 @@ class FedExApi(Carrier):
         self.set_address(api_request.Recipient, request.destination)
         self.set_saturday_delivery(request, api_request)
 
+        api_request.SpecialServicesRequested = self.rates_client.factory.create('ShipmentSpecialServicesRequested')
+        api_request.SpecialServicesRequested.SpecialServiceTypes.append('FEDEX_ONE_RATE')
+
         api_request.RateRequestTypes = 'LIST'
         api_request.PackageCount = len(request.packages)
         if len(request.packages) == 1:
@@ -698,6 +701,7 @@ class FedExApi(Carrier):
             return_transit = False
             codes = []
             variable_options = []
+            consolidation_key = None
             requested_shipment = self.requested_shipment_rate(request)
 
             with self.logger.lock:
@@ -708,7 +712,8 @@ class FedExApi(Carrier):
                 response = self.service_call(
                     self.rates_client.service.getRates,
                     auth, client, transaction_detail, version, return_transit,
-                    codes, variable_options, requested_shipment)
+                    codes, variable_options, consolidation_key,
+                    requested_shipment)
             finally:
                 self.log_transmission(self.rates_client)
 
