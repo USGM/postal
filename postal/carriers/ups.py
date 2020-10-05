@@ -865,7 +865,6 @@ class UPSApi(Carrier):
                   'alerts': alerts}
 
         with self.logger.lock:
-            self.logger.debug_header('Response')
             self.logger.shipment_response(result)
 
         return result
@@ -898,8 +897,7 @@ class UPSApi(Carrier):
         self._ensure_request_supported(request)
 
         with self.logger.lock:
-            self.logger.debug_header('Get Services')
-            self.logger.debug(request)
+            self.logger.debug_with_header('GetServicesRequest', request)
         rates = self._request_rates(request, 'Shop')
 
         shipment_info = Queue()
@@ -920,8 +918,7 @@ class UPSApi(Carrier):
                 result[service] = rates
 
         with self.logger.lock:
-            self.logger.debug_header('Response')
-            self.logger.debug(pformat(result, width=1))
+            self.logger.debug_with_header('GetServicesResponse', pformat(result, width=9999))
         return result
 
     def _request_rates(self, request, request_type, service=None):
@@ -1010,8 +1007,8 @@ class UPSApi(Carrier):
         address_key.PostcodePrimaryLow = address.postal_code
 
         with self.logger.lock:
-            self.logger.debug_header('Validate Address')
-            self.logger.debug(address)
+            self.logger.debug_with_header('ValidateAddressRequest', address)
+
         try:
             response = self._XAV.service.ProcessXAV(
                 request,
@@ -1027,8 +1024,7 @@ class UPSApi(Carrier):
 
         if not hasattr(response, 'Candidate') or len(response.Candidate) == 0:
             with self.logger.lock:
-                self.logger.debug_header('Response')
-                self.logger.debug('Invalid')
+                self.logger.debug_with_header('ValidateAddressResponse', 'Invalid')
             return False, address
 
         candidate = response.Candidate[0]
@@ -1059,14 +1055,11 @@ class UPSApi(Carrier):
 
         if result == address:
             with self.logger.lock:
-                self.logger.debug_header('Response')
-                self.logger.debug('Valid')
+                self.logger.debug_with_header('ValidateAddressResponse', 'Valid')
             return True, result
         else:
             with self.logger.lock:
-                self.logger.debug_header('Response')
-                self.logger.debug('Corrected to:')
-                self.logger.debug(result)
+                self.logger.debug_with_header('ValidateAddressResponse', 'Corrected to: ' + result)
             return False, result
 
     def delivery_datetime(self, service, request):
@@ -1121,9 +1114,7 @@ class UPSApi(Carrier):
         num_packages = len(request.packages)
 
         with self.logger.lock:
-            self.logger.debug_header('Time in Transit')
-            self.logger.debug(service)
-            self.logger.debug(request)
+            self.logger.debug_header('TimeInTransitRequest', '%r,%r' % (service, request))
         try:
             response = self._TNTWS.service.ProcessTimeInTransit(
                 api_request, req_ship_from, req_ship_to, sticks, weight,
@@ -1134,13 +1125,13 @@ class UPSApi(Carrier):
             code = err.fault.detail.Errors.ErrorDetail.PrimaryErrorCode.Code
             if code == '270037':  # no TiT information available
                 with self.logger.lock:
-                    self.logger.debug_header('Response')
-                    self.logger.debug('No TiT information available.')
+                    self.logger.debug_with_header('TimeInTransitResponse', 'No TiT information available.')
                 return None
             elif code == '270019':  # TiT service is not available
                 with self.logger.lock:
-                    self.logger.debug_header('Response')
+                    self.logger.debug_header('TimeInTransitResponse')
                     self.logger.warning('TiT service is not available.')
+                    self.logger.warning(response)
                 return None  # It's not essential information
             raise self._convert_webfault(err)
 
@@ -1150,8 +1141,7 @@ class UPSApi(Carrier):
         if not hasattr(response, 'TransitResponse'):
             # a warning because UPS is being inconsistent for unknown reasons
             with self.logger.lock:
-                self.logger.debug_header('Response')
-                self.logger.warning('No TiT information given.')
+                self.logger.debug_with_header('TimeInTransitResponse', 'No TiT information given.')
                 self.logger.warning(response)
             return None
 
@@ -1170,12 +1160,11 @@ class UPSApi(Carrier):
                 hour=int(time[0:2]),
                 minute=int(time[2:4]))
             with self.logger.lock:
-                self.logger.debug_header('Response')
-                self.logger.debug(result)
+                self.logger.debug_with_header('TimeInTransitResponse', result)
             return result
 
         with self.logger.lock:
-            self.logger.debug_header('Response')
+            self.logger.debug_header('TimeInTransitResponse')
             self.logger.warning('No matching TiT info found.')
             self.logger.warning(response)
         return None
@@ -1184,32 +1173,27 @@ class UPSApi(Carrier):
         self._ensure_request_supported(request)
 
         with self.logger.lock:
-            self.logger.debug_header('Get Price')
+            self.logger.debug_header('GetPriceRequest')
             self.logger.debug(service)
             self.logger.debug(request)
         rates = self._request_rates(request, 'Rate', service)
 
         if len(rates.RatedShipment) != 1:
             with logger.lock:
-                self.logger.debug_header('Response')
-                self.logger.debug('No rates available.')
-                self.logger.debug(rates)
+                self.logger.debug_with_header('GetPriceResponse:No rates available', rates)
             raise CarrierError('UPS has no rates available for those '
                                'parameters.')
         rated_shipment = rates.RatedShipment[0]
         if rated_shipment.Service.Code != service.service_id:
             with self.logger.lock:
-                self.logger.debug_header('Response')
-                self.logger.debug('No rates available.')
-                self.logger.debug(rates)
+                self.logger.debug_with_header('GetPriceResponse:No rates available', rates)
             raise CarrierError('UPS has no rates available for those '
                                'parameters.')
 
         result = self._get_price(rated_shipment)
 
         with self.logger.lock:
-            self.logger.debug_header('Response')
-            self.logger.debug(result)
+            self.logger.debug_with_header('GetPriceResponse', result)
 
         return result
 

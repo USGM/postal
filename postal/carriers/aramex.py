@@ -427,7 +427,6 @@ class AramexApi(Carrier):
                 'price': self.quote(service, request),
             }
             with self.logger.lock:
-                self.logger.debug_header('Response')
                 self.logger.shipment_response(shipment_dict)
             return shipment_dict
 
@@ -439,8 +438,7 @@ class AramexApi(Carrier):
             } for response in results if response and not response['error'] for key, value in response['service'].items()
         }
         with self.logger.lock:
-            self.logger.debug_header('Response')
-            self.logger.debug(pformat(final, width=1))
+            self.logger.debug_with_header('Response', pformat(final, width=9999))
 
         if final:
             return final
@@ -458,8 +456,7 @@ class AramexApi(Carrier):
                 )
             else:
                 with self.logger.lock:
-                    self.logger.debug_header('URL')
-                    self.logger.debug(self.rates_client)
+                    self.logger.debug_with_header('URL', self.rates_client)
                 response = self.service_call(
                     self.rates_client.service.CalculateRate, request.ClientInfo, request.Transaction,
                     request.OriginAddress, request.DestinationAddress, request.ShipmentDetails

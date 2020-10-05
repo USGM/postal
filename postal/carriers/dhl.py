@@ -233,8 +233,7 @@ class DHLApi(Carrier):
             rate_request = self.rates_request(request)
 
             with self.logger.lock:
-                self.logger.debug_header('Get Services')
-                self.logger.debug(request)
+                self.logger.debug_with_header('GetServicesRequest', request)
 
             response = self.make_call(rate_request, rates=True)[0][1]
             response_dict = self.response_to_dict(response.findall('QtdShp'))
@@ -248,8 +247,7 @@ class DHLApi(Carrier):
             for key, value in response_dict.items()}
 
         with self.logger.lock:
-            self.logger.debug_header('Response')
-            self.logger.debug(pformat(result, width=1))
+            self.logger.debug_with_header('GetServicesResponse', pformat(result, width=9999))
 
         return result
 
@@ -534,8 +532,7 @@ class DHLApi(Carrier):
     def track(self, identifier):
         track_request = self.track_request(identifier)
         with self.logger.lock:
-            self.logger.debug_header('Tracking')
-            self.logger.debug(identifier)
+            self.logger.debug_with_header('Tracking', identifier)
 
         response = self.make_call(track_request)
 
@@ -638,7 +635,6 @@ class DHLApi(Carrier):
             'alerts': alerts}
 
         with self.logger.lock:
-            self.logger.debug_header('Response')
             self.logger.shipment_response(shipment_dict)
 
         return shipment_dict

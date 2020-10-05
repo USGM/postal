@@ -218,8 +218,7 @@ class FedExApi(Carrier):
         self.set_address(address_item, address)
 
         with self.logger.lock:
-            self.logger.debug_header('Validate Address')
-            self.logger.debug(address)
+            self.logger.debug_with_header('ValidateAddressRequest', address)
 
         result = self.service_call(
             self.address_client.service.addressValidation,
@@ -232,8 +231,7 @@ class FedExApi(Carrier):
         success = result.Score
         address = self.address_from_validator(result, address)
         with self.logger.lock:
-            self.logger.debug_header('Response')
-            self.logger.debug(address)
+            self.logger.debug_with_header('ValidateAddressResponse', address)
         return success, address
 
     def ship_version_id(self):
@@ -474,7 +472,6 @@ class FedExApi(Carrier):
             'alerts': alerts}
 
         with self.logger.lock:
-            self.logger.debug_header('Response')
             self.logger.shipment_response(shipment_dict)
         return shipment_dict
 
@@ -701,8 +698,7 @@ class FedExApi(Carrier):
             requested_shipment = self.requested_shipment_rate(request)
 
             with self.logger.lock:
-                self.logger.debug_header('Get Services')
-                self.logger.debug(request)
+                self.logger.debug_with_header('GetServicesRequest', request)
 
             try:
                 response = self.service_call(
@@ -723,8 +719,7 @@ class FedExApi(Carrier):
             for key, value in result.items()}
 
         with self.logger.lock:
-            self.logger.debug_header('Response')
-            self.logger.debug(pformat(final, width=1))
+            self.logger.debug_with_header('GetServicesResponse', pformat(final, width=9999))
 
         return final
 
