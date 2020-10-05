@@ -37,8 +37,9 @@ from postal.exceptions import NotSupportedError
 
 PY3 = sys.version_info[0] == 3
 
-
 class PostalLogger(object):
+    cleaner_regex = r"\s*\n\s*"
+
     def __init__(self, logger_name=None, carrier_name=None):
         if not logger_name:
             if not carrier_name:
@@ -54,15 +55,13 @@ class PostalLogger(object):
         self.lock = RLock()
 
     def sent(self, message):
-        self.logger.debug(('='*5) + ' SENT ' + ('='*5))
-        self.logger.debug(message)
+        self.logger.debug(self.carrier_name + '->' + re.sub(self.cleaner_regex, '', message, flags=re.MULTILINE))
 
     def received(self, message):
-        self.logger.debug(('='*5) + ' RECEIVED ' + ('='*5))
-        self.logger.debug(message)
+        self.logger.debug(self.carrier_name + '<-' + re.sub(self.cleaner_regex, '', message, flags=re.MULTILINE))
 
     def shipment_response(self, shipment_dict):
-        self.logger.info(pformat(shipment_dict))
+        self.debug_with_header('ShipmentResponse', pformat(shipment_dict, width=9999))
 
     def debug(self, message):
         if (not message) or message == None:
@@ -75,6 +74,13 @@ class PostalLogger(object):
 
     def debug_header(self, title):
         self.debug((" %s: %s " % (self.carrier_name, title)).center(50, "="))
+
+    def debug_with_header(self, title, message):
+        if (not message) or message == None:
+            import traceback
+            message = traceback.format_stack()
+
+        self.debug("%s:%s:%s" % (self.carrier_name, title, message))
 
     def exception(self, message):
         self.logger.exception(message)
@@ -399,8 +405,8 @@ class Carrier(object):
         Log last send/receive action from a SUDs client.
         """
         with self.logger.lock:
-            self.logger.debug(self.log_service.last_sent())
-            self.logger.debug(self.log_service.last_received())
+            self.logger.sent(self.log_service.last_sent())
+            self.logger.received(self.log_service.last_received())
 
     def expected_package_type(self, request, package):
         """

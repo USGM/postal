@@ -117,6 +117,14 @@ class Address(object):
             ((('\n    Residential' if self.residential else '')))
         )
 
+    def _str_short(self):
+        return '%s %s, %s, %s, %s %s %s%s' % (
+            self.contact_name, self.phone_number, self.street_lines,
+            self.city, self.subdivision, self.postal_code,
+            getattr(self.country, 'alpha2', 'Unspecified country'),
+            (((' (Residential)' if self.residential else '')))
+        )
+
     def __str__(self):
         return self._str().encode('utf8')
 
@@ -252,10 +260,10 @@ class Request(object):
         if 'invoice' in extra_params:
             extra_params['invoice'] = '[Invoice]'  # Fix for hanging tests
 
-        origin = self.origin and self.origin._str()
-        destination = self.destination and self.destination._str()
-        return 'Request(\n  origin=\n%s\n  destination=\n%s\n  packages=%s' \
-               '\n  ship_datetime=%s\n  extra_params=%s\n)' \
+        origin = self.origin and self.origin._str_short()
+        destination = self.destination and self.destination._str_short()
+        return 'Request(origin=%s, destination=%s, packages=%s' \
+               ', ship_datetime=%s, extra_params=%s)' \
                % (origin, destination, self.packages, self.ship_datetime,
                   extra_params)
 

@@ -107,7 +107,10 @@ class USPSApi(Carrier):
 
     def service_call(self, func, *args, **kwargs):
         self.logger.debug("Sending request to %s" % self.url)
-        response = super(USPSApi, self).service_call(func, *args, **kwargs)
+        try:
+            response = super(USPSApi, self).service_call(func, *args, **kwargs)
+        finally:
+            self.log_transmission(self.client)
         
         try:
             if response.Status != 0:
@@ -569,7 +572,6 @@ class USPSApi(Carrier):
         result = self.compile_shipments(responses)
 
         with self.logger.lock:
-            self.logger.debug_header('Response')
             self.logger.shipment_response(result)
 
         return result
@@ -655,8 +657,7 @@ class USPSApi(Carrier):
         self._sanity_check(request)
 
         with self.logger.lock:
-            self.logger.debug_header('Get Services')
-            self.logger.debug(request)
+            self.logger.debug_with_header('GetServicesRequest', pformat(request, width=9999))
 
         try:
             responses = self.get_from_cache(request, 'usps')
@@ -679,8 +680,7 @@ class USPSApi(Carrier):
             responses = self.compile_options(request, responses)
 
             with self.logger.lock:
-                self.logger.debug_header('Response')
-                self.logger.debug(pformat(responses, width=1))
+                self.logger.debug_with_header('GetServicesResponse', pformat(responses, width=9999))
 
             return responses
         except Exception as ex:
