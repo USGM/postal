@@ -197,10 +197,7 @@ class USPSApi(Carrier):
         dims.Length, dims.Width, dims.Height = sorted(
             [sigfig(package.length), sigfig(package.width),
                 sigfig(package.height)], reverse=True)
-        ounces = int(ceil(package.weight * 16))
-        if not ounces:
-            ounces = 1
-        api_request.WeightOz = ounces
+        api_request.WeightOz = "%.1f" % (package.weight * 16)
         api_request.Machinable = True
 
         # Trying comparison to package code instead of carrier+code with ==
@@ -212,6 +209,13 @@ class USPSApi(Carrier):
         else:
             api_request.MailpieceShape = self._get_internal_package_type_code(
                 package.package_type, package.carrier_conversion)
+
+        if (api_request.WeightOz <= 1 and dims.Length == 1 and
+                dims.Width == 1 and dims.Height == 1 and
+                api_request.MailpieceShape in ['Flat','FlatRateEnvelope']):
+            # Endicia indicated that 1x1x1 has problems with their APIs sometimes as of 2020/10/08
+            dims.Length = 2
+            dims.Height = 0.1
 
     def _set_creds(self, api_request, inset=False):
         api_request.RequesterID = self.requester_id
