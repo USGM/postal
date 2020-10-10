@@ -211,7 +211,7 @@ class USPSApi(Carrier):
             api_request.MailpieceShape = self._get_internal_package_type_code(
                 package.package_type, package.carrier_conversion)
 
-        if (weight <= 1 and dims.Length == 1 and
+        if (weight <= 16 and dims.Length == 1 and
                 dims.Width == 1 and dims.Height == 1 and
                 api_request.MailpieceShape in ['Flat','FlatRateEnvelope']):
             # Endicia indicated that 1x1x1 has problems with their APIs sometimes as of 2020/10/08
