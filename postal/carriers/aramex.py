@@ -242,6 +242,7 @@ class AramexApi(Carrier):
         target.Attachments = attachment
 
         insurance_amount = 0
+        declared_amount = 0
         container_number = 1
         for package in request.packages:
             container_number += 1
@@ -265,6 +266,9 @@ class AramexApi(Carrier):
                 value = package.get_total_insured_value()
                 if value > 0:
                     insurance_amount = insurance_amount + value.amount
+                value = package.get_total_declared_value()
+                if value > 0:
+                    declared_amount = declared_amount + value.amount
         if insurance_amount > 0:
             target.Details.InsuranceAmount.CurrencyCode = self.postal_configuration['default_currency']
             target.Details.InsuranceAmount.Value = insurance_amount
@@ -283,7 +287,7 @@ class AramexApi(Carrier):
         target.Details.GoodsOriginCountry = shipper.country.alpha2
         target.Details.PaymentOptions = ''
         target.Details.CustomsValueAmount.CurrencyCode = self.postal_configuration['default_currency']
-        target.Details.CustomsValueAmount.Value = 1
+        target.Details.CustomsValueAmount.Value = 1 if not declared_amount else (declared_amount/target.Details.NumberOfPieces)
         return target
 
     @staticmethod
@@ -355,7 +359,9 @@ class AramexApi(Carrier):
         tracking_numbers = self.track_client.factory.create('ns1:ArrayOfstring')
         tracking_numbers.string.append(identifier)
         try:
-            self.track_client.service.TrackShipments(client_info, transaction, tracking_numbers, True)
+            self.service_call(
+                self.track_client.service.TrackShipments,
+                client_info, transaction, tracking_numbers, True)
         except TypeNotFound:
             # We expect this to always happen because of a bug in Aramex's wsdl. We will still have access to the
             # raw XML, so we'll handle it here.
@@ -455,8 +461,6 @@ class AramexApi(Carrier):
                     request.Shipments, request.LabelInfo
                 )
             else:
-                with self.logger.lock:
-                    self.logger.debug_with_header('URL', self.rates_client)
                 response = self.service_call(
                     self.rates_client.service.CalculateRate, request.ClientInfo, request.Transaction,
                     request.OriginAddress, request.DestinationAddress, request.ShipmentDetails
