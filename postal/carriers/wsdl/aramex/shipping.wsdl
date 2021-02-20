@@ -402,6 +402,8 @@
                     <xs:element name="CollectAmount" nillable="true" type="q68:Money"
                                 xmlns:q68="http://ws.aramex.net/ShippingAPI/v1/"/>
                     <xs:element name="Services" nillable="true" type="xs:string"/>
+                    <xs:element name="OriginCity" nillable="true" type="xs:string"/>
+                    <xs:element name="DestinationCity" nillable="true" type="xs:string"/>
                 </xs:sequence>
             </xs:complexType>
             <xs:element name="ProcessedShipmentDetails" nillable="true" type="q69:ProcessedShipmentDetails"
